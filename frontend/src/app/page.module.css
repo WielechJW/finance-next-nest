@@ -1,0 +1,89 @@
+.page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+  background: #f1f5f9;
+}
+
+.card {
+  width: 100%;
+  max-width: 520px;
+  padding: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgb(15 23 42 / 6%);
+}
+
+.brand {
+  margin: 0 0 24px;
+  color: #1d4ed8;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.card h1 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 36px);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.intro {
+  margin: 16px 0 28px;
+  color: #475569;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.actions a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+.primary {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.primary:hover {
+  background: #1e40af;
+}
+
+.secondary {
+  background: #fff;
+  color: #1d4ed8;
+}
+
+.secondary:hover {
+  background: #eff6ff;
+}
+
+.actions a:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 28px 20px;
+    border-radius: 16px;
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}

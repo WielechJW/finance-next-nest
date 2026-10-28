@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ChangeEvent, type SubmitEvent } from "react";
+import { useState, type SyntheticEvent, type SubmitEvent } from "react";
 import styles from "./auth-form.module.css";
 
 type FieldName = "email" | "password" | "confirmPassword";
@@ -12,8 +12,9 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isValid, setIsValid] = useState(false);
 
-  function handleChange(event: ChangeEvent<HTMLFormElement>) {
-    const field = event.target as HTMLInputElement;
+  function handleChange(event: SyntheticEvent<HTMLFormElement>) {
+    const field = event.target;
+    if (!(field instanceof HTMLInputElement)) return;
 
     setIsValid(false);
     setErrors((current) => ({
