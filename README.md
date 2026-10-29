@@ -3,7 +3,7 @@
 Jeden projekt, dwie aplikacje napisane w TypeScript:
 
 - `frontend/` — Next.js z Reactem i App Routerem: strony i interfejs użytkownika.
-- `backend/` — NestJS: API, logika aplikacji, a później komunikacja z bazą danych.
+- `backend/` — NestJS: API, logika aplikacji i dostęp do PostgreSQL przez Prisma.
 
 Na początek każda aplikacja ma własny `package.json` i `package-lock.json`.
 `package.json` opisuje zależności i komendy, a `package-lock.json` zapisuje ich
@@ -64,7 +64,57 @@ zatrzymanie lub odtworzenie kontenera. Aby zatrzymać bazę:
 docker compose stop db
 ```
 
-Backend zostanie podłączony do bazy w kolejnym kroku przez Prisma.
+## Prisma i konfiguracja backendu
+
+Prisma 7 opisuje modele w `backend/prisma/schema.prisma`, zapisuje zmiany bazy
+jako migracje SQL i generuje typowanego klienta dla NestJS.
+
+Po sklonowaniu repozytorium przygotuj lokalną konfigurację backendu:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Ustaw `DATABASE_URL` zgodnie z danymi PostgreSQL w głównym `.env`.
+Przykładowy adres dla domyślnej konfiguracji lokalnej:
+
+```dotenv
+DATABASE_URL="postgresql://finance:finance_local_dev@127.0.0.1:5432/finance?schema=public"
+```
+
+Znaki specjalne w użytkowniku, haśle lub nazwie bazy zakoduj jak w adresie URL.
+Główny `.env` konfiguruje Compose, a `backend/.env` jest wczytywany przez Prisma
+i NestJS niezależnie od katalogu, z którego uruchamiasz backend. Zmienne
+środowiskowe procesu mają pierwszeństwo przed plikiem. Brak lub błędny format
+`DATABASE_URL` powoduje czytelny błąd przy starcie, bez wypisywania danych dostępu.
+
+Przy działającej bazie zastosuj zapisane migracje:
+
+```bash
+npm --prefix backend run prisma:deploy
+npm --prefix backend run prisma:status
+```
+
+Model `User` ma identyfikator UUID, unikalny e-mail, hash hasła i daty utworzenia
+oraz aktualizacji. Normalizacja e-maila i hashowanie haseł zostaną dodane razem
+z API rejestracji. Sam model nie tworzy jeszcze kont użytkowników.
+
+Po kolejnej zmianie schematu utwórz migrację i wygeneruj klienta:
+
+```bash
+npm --prefix backend run prisma:migrate -- --name opis_zmiany
+npm --prefix backend run prisma:generate
+```
+
+Migracje w `backend/prisma/migrations/` zapisuj w Git. Wygenerowany klient
+w `backend/src/generated/prisma/` jest ignorowany; build, uruchomienie NestJS
+i podstawowe testy generują go automatycznie. Generowanie nie wymaga połączenia
+z bazą ani ustawionego `DATABASE_URL`.
+
+`PrismaModule` udostępnia jeden `PrismaService` serwisom aplikacji. Backend
+łączy się z bazą podczas startu i zamyka połączenia przy zakończeniu procesu.
+Testy konfiguracji i endpointu powitalnego działają bez bazy; test endpointu
+zastępuje dostawcę Prisma, ponieważ ten endpoint nie wykonuje zapytań.
 
 ## Uruchomienie podczas nauki
 
@@ -79,7 +129,7 @@ npm --prefix frontend run dev
 Otwórz http://localhost:3000. Zmień tekst w `frontend/src/app/page.tsx`, zapisz
 plik i zobacz zmianę w przeglądarce.
 
-Terminal 2 — backend:
+Terminal 2 — backend (po uruchomieniu bazy i zastosowaniu migracji):
 
 ```bash
 npm --prefix backend run start:dev
@@ -102,6 +152,9 @@ Obie aplikacje uruchamiasz osobno. Połączenie frontendu z API będzie kolejnym
 | `backend/src/app.module.ts` | Rejestracja kontrolerów i serwisów. |
 | `backend/src/app.controller.ts` | Obsługa adresów API i metod HTTP. |
 | `backend/src/app.service.ts` | Logika wywoływana przez kontroler. |
+| `backend/src/prisma/prisma.service.ts` | Wspólny klient Prisma i cykl połączenia z bazą. |
+| `backend/prisma/schema.prisma` | Modele danych. |
+| `backend/prisma.config.ts` | Konfiguracja poleceń Prisma i migracji. |
 
 ## Sprawdzenie projektu
 
@@ -128,12 +181,14 @@ chroni przed tym główny `.gitignore`.
 
 ## Proponowana kolejność nauki
 
-1. TypeScript: typy, obiekty, tablice, funkcje, interfejsy i `async/await`.
-2. NestJS: prześledź żądanie od kontrolera do serwisu. Dodaj `GET /transactions`
-   zwracające tablicę kilku przykładowych transakcji z pamięci.
-3. Next.js i React: komponenty, propsy, stan i pobieranie danych z API.
-4. Dodaj tworzenie transakcji, walidację danych i obsługę błędów.
-5. Gdy API działa, dołącz PostgreSQL i zapis danych.
+Szczegółowy zakres i zależności zadań opisuje
+[plan projektu w issue #1](https://github.com/WielechJW/finance-next-nest/issues/1).
+
+1. Logowanie: formularze, PostgreSQL i Prisma, API rejestracji, sesje oraz
+   połączenie interfejsu z API.
+2. Prywatny portfel użytkownika i saldo początkowe.
+3. Przychody i wydatki: dodawanie, historia, filtry, edycja i usuwanie.
+4. Analityka: podsumowania okresów, kategorie i trendy.
 
 ## Dokumentacja
 
