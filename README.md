@@ -96,8 +96,7 @@ npm --prefix backend run prisma:status
 ```
 
 Model `User` ma identyfikator UUID, unikalny e-mail, hash hasła i daty utworzenia
-oraz aktualizacji. Normalizacja e-maila i hashowanie haseł zostaną dodane razem
-z API rejestracji. Sam model nie tworzy jeszcze kont użytkowników.
+oraz aktualizacji. Konta można tworzyć przez API rejestracji opisane poniżej.
 
 Po kolejnej zmianie schematu utwórz migrację i wygeneruj klienta:
 
@@ -115,6 +114,71 @@ z bazą ani ustawionego `DATABASE_URL`.
 łączy się z bazą podczas startu i zamyka połączenia przy zakończeniu procesu.
 Testy konfiguracji i endpointu powitalnego działają bez bazy; test endpointu
 zastępuje dostawcę Prisma, ponieważ ten endpoint nie wykonuje zapytań.
+
+## Rejestracja użytkownika
+
+`POST /auth/register` przyjmuje JSON z polami `email` i `password`:
+
+```bash
+curl -i http://localhost:3001/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"anna@example.com","password":"Moje testowe haslo 123!"}'
+```
+
+Poprawne żądanie tworzy użytkownika i zwraca `201 Created` z polami `id`,
+`email` i `createdAt`. Dane zobaczysz też w Prisma Studio:
+
+```bash
+cd backend
+npx prisma studio
+```
+
+Reguły danych wejściowych:
+
+- E-mail musi być tekstem w poprawnym formacie, po normalizacji do 254 znaków.
+  Usuwamy spacje na końcach i zamieniamy litery na małe.
+- Hasło musi być tekstem o długości od 15 do 128 znaków. Spacje, Unicode
+  i wielkość liter są zachowywane; hasło nie jest przycinane ani skracane.
+- Dodatkowe pola są odrzucane. Potwierdzenie hasła sprawdza formularz;
+  do API wysyłamy tylko `email` i `password`.
+
+Hasła są zapisywane jako Argon2id: `memoryCost=19456` KiB (19 MiB),
+`timeCost=2`, `parallelism=1`, z losową solą generowaną przez bibliotekę.
+Parametry odpowiadają jednej z minimalnych konfiguracji
+[OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id).
+API zwraca wyłącznie jawnie wybrane pola użytkownika. Hasło i hash nie trafiają
+do odpowiedzi ani logów rejestracji, także przy błędach zapisu i hashowania.
+
+| Status | Znaczenie |
+| --- | --- |
+| `201` | Konto zostało utworzone. |
+| `400` | Nieprawidłowe dane lub dodatkowe pola. |
+| `409` | E-mail jest zajęty, również po normalizacji lub przy równoczesnej rejestracji. |
+| `500` | Nie udało się utworzyć konta; szczegóły techniczne nie trafiają do odpowiedzi. |
+
+Unikalność e-maila rozstrzyga indeks w PostgreSQL. Utworzenie konta jest
+obsługiwane przez moduły `Auth` i `Users`; logowanie oraz sesje to następny etap.
+
+## Testy integracyjne z PostgreSQL
+
+Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
+Rejestrację z rzeczywistym PostgreSQL sprawdza osobny zestaw:
+
+```bash
+cp backend/.env.test.example backend/.env.test
+npm --prefix backend run test:integration
+```
+
+W `backend/.env.test` ustaw `DATABASE_URL_TEST`, dopasowując użytkownika, hasło
+i port do lokalnego PostgreSQL. Wzór wskazuje bazę `finance_test`. Konfiguracja
+testów wymaga osobnego adresu, lokalnego hosta, nazwy zakończonej na `_test`
+i schematu `public`; nie korzysta zastępczo z developerskiego `DATABASE_URL`.
+
+Przy działającym PostgreSQL przygotowanie testów tworzy bazę testową, jeśli jej
+brakuje, i stosuje migracje. Użytkownik z domyślnego Compose ma wymagane
+uprawnienia. Testy używają losowych e-maili i usuwają własne rekordy po każdym
+scenariuszu. Sprawdzają zapis hasha, walidację, granice długości hasła,
+normalizację, duplikaty, równoległe żądania i bezpieczne odpowiedzi na błędy.
 
 ## Uruchomienie podczas nauki
 
@@ -164,6 +228,7 @@ npm --prefix frontend run build
 npm --prefix backend run lint
 npm --prefix backend test
 npm --prefix backend run test:e2e
+npm --prefix backend run test:integration
 npm --prefix backend run build
 ```
 
