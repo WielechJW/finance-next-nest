@@ -225,7 +225,69 @@ z rzeczywistą konfiguracją sieci.
 Usunięcie użytkownika odbiera dostęp jego sesji. Dekorator `@CurrentUser()`
 udostępnia kontrolerowi bezpiecznie wybrane dane. Połączenia magazynu i jego
 timer sprzątający są zamykane przy zakończeniu aplikacji. Podłączenie formularzy
-frontendowych jest etapem #6; CSRF i ograniczanie prób logowania etapem #7.
+frontendowych opisano poniżej; CSRF i ograniczanie prób logowania to etap #7.
+
+## Formularze i panel w przeglądarce
+
+Po instalacji zależności skopiuj konfigurację frontendu:
+
+```bash
+cp frontend/.env.example frontend/.env.local
+```
+
+Domyślne adresy lokalne:
+
+| Ustawienie | Wartość |
+| --- | --- |
+| Frontend w przeglądarce | `http://localhost:3000` |
+| `NEXT_PUBLIC_API_URL` w `frontend/.env.local` | `http://localhost:3001` |
+| `FRONTEND_ORIGIN` w `backend/.env` | `http://localhost:3000` |
+
+Używaj `localhost` dla obu aplikacji; cookie jest przypisane do hosta.
+Po zmianie konfiguracji uruchom aplikacje ponownie. `NEXT_PUBLIC_API_URL`
+jest publicznym adresem API dołączanym do kodu frontendu podczas budowania.
+
+Rejestracja na `/register` tworzy konto i prowadzi do `/login` z potwierdzeniem.
+Poprawne logowanie prowadzi do `/dashboard`, gdzie widać e-mail użytkownika
+i przycisk wylogowania. Odświeżenie strony zachowuje sesję, a wejście bez sesji
+prowadzi do logowania. Formularze blokują kolejne wysłanie podczas żądania,
+pokazują błędy i zachowują wpisane dane przy niepowodzeniu. Potwierdzenie hasła
+nie jest wysyłane do API. Zbyt długie hasło jest odrzucane z komunikatem,
+a jego treść nie jest automatycznie skracana.
+
+Wspólny klient API wysyła `credentials: include` i `cache: no-store`, obsługuje
+odpowiedź `204`, przerwanie żądania i limit oczekiwania 15 sekund. Backend
+udostępnia odpowiedzi przeglądarce z dokładnie skonfigurowanego originu wraz
+z obsługą cookies. CORS nie zastępuje ochrony CSRF zaplanowanej w #7.
+
+Stan sesji rozróżnia ładowanie, zalogowanie, brak sesji i błąd sieci. Panel
+pokazuje stan ładowania do czasu weryfikacji `/auth/me`. Błąd sieci daje
+możliwość ponowienia, a `401` chronionego żądania czyści dane i prowadzi do
+logowania. Błędne dane w formularzu logowania pozostają błędem tego formularza.
+Każdy chroniony endpoint nadal sprawdza uprawnienia w NestJS.
+
+Dane użytkownika są pobierane bezpośrednio w przeglądarce i nie trafiają do
+współdzielonego cache Next.js ani do statycznego HTML panelu. Nie zapisujemy
+identyfikatora sesji, hasła ani profilu w localStorage/sessionStorage.
+Przy wylogowaniu, zmianie konta i sprawdzaniu sesji poprzednie dane są usuwane
+z widoku; spóźniona odpowiedź nie może ich przywrócić. Sesja jest ponownie
+sprawdzana przy nawigacji, powrocie do karty i przywróceniu strony z historii.
+`BroadcastChannel` synchronizuje zmianę sesji między kartami przez komunikat
+bez danych użytkownika; gdy jest niedostępny, pozostaje sprawdzenie przy fokusie.
+
+Ręczne sprawdzenie całej ścieżki:
+
+1. Otwórz `/register`, utwórz konto i zaloguj się z formularza.
+2. Odśwież `/dashboard` i sprawdź e-mail użytkownika.
+3. Wyloguj się, użyj przycisku Wstecz i spróbuj wejść na `/dashboard`.
+4. Zaloguj inne konto i sprawdź, czy widać właściwe dane, również w drugiej karcie.
+5. Sprawdź błędne hasło, zajęty e-mail i ponowienie operacji po błędzie połączenia.
+
+Testy jednostkowe klienta API, formularzy i stanu sesji:
+
+```bash
+npm --prefix frontend test
+```
 
 ## Testy integracyjne z PostgreSQL
 
@@ -275,8 +337,8 @@ Otwórz http://localhost:3001 — API odpowiada `Hello World!`.
 Możesz też sprawdzić je komendą `curl http://localhost:3001`.
 Zmiany w kodzie automatycznie restartują backend. `Ctrl+C` zatrzymuje aplikację.
 
-Obie aplikacje uruchamiasz osobno. Połączenie frontendu z API będzie kolejnym
-ćwiczeniem.
+Obie aplikacje uruchamiasz osobno. Na `http://localhost:3000` formularze
+korzystają już z API działającego na porcie 3001.
 
 ## Od których plików zacząć
 
@@ -296,6 +358,7 @@ Obie aplikacje uruchamiasz osobno. Połączenie frontendu z API będzie kolejnym
 
 ```bash
 npm --prefix frontend run lint
+npm --prefix frontend test
 npm --prefix frontend run build
 npm --prefix backend run lint
 npm --prefix backend test

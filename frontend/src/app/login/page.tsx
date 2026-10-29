@@ -5,6 +5,11 @@ export const metadata: Metadata = {
   title: "Logowanie — Finance",
 };
 
-export default function LoginPage() {
-  return <AuthForm mode="login" />;
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ registered?: string }>;
+}) {
+  const { registered } = await searchParams;
+  return <AuthForm mode="login" registered={registered === "1"} />;
 }
