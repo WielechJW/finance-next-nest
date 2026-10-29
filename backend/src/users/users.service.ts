@@ -47,4 +47,32 @@ export class UsersService {
       throw new InternalServerErrorException('Nie udało się utworzyć konta.');
     }
   }
+
+  async findByEmailForLogin(email: string) {
+    try {
+      return await this.prisma.user.findUnique({
+        where: { email },
+        select: { ...publicUserSelect, passwordHash: true },
+      });
+    } catch {
+      this.logger.error('Nie udało się odczytać użytkownika.');
+      throw new InternalServerErrorException(
+        'Nie udało się sprawdzić danych użytkownika.',
+      );
+    }
+  }
+
+  async findPublicById(id: string): Promise<RegisteredUser | null> {
+    try {
+      return await this.prisma.user.findUnique({
+        where: { id },
+        select: publicUserSelect,
+      });
+    } catch {
+      this.logger.error('Nie udało się odczytać użytkownika.');
+      throw new InternalServerErrorException(
+        'Nie udało się sprawdzić danych użytkownika.',
+      );
+    }
+  }
 }

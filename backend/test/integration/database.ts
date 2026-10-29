@@ -1,4 +1,5 @@
 import { config } from 'dotenv';
+import { randomBytes } from 'node:crypto';
 
 export function getTestDatabaseUrl(value: string | undefined): string {
   if (!value) {
@@ -34,5 +35,11 @@ export function configureTestDatabase(): string {
   config({ path: new URL('../../.env.test', import.meta.url), quiet: true });
   const url = getTestDatabaseUrl(process.env.DATABASE_URL_TEST);
   process.env.DATABASE_URL = url;
+  // Never use the developer's cookie signing secret in integration tests.
+  process.env.SESSION_SECRET =
+    process.env.SESSION_SECRET_TEST?.trim() || randomBytes(32).toString('hex');
+  process.env.SESSION_TTL_SECONDS = '3600';
+  process.env.TRUST_PROXY_HOPS = '0';
+  process.env.NODE_ENV = 'test';
   return url;
 }
