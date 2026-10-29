@@ -83,6 +83,17 @@
   background: #1e40af;
 }
 
+.form button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.hint {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+}
+
 .card :is(input, button, a):focus-visible {
   outline: 3px solid #1d4ed8;
   outline-offset: 3px;
