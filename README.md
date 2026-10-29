@@ -19,6 +19,7 @@ nvm use
 ```
 
 TypeScript i narzędzia frameworków są instalowane lokalnie z zależnościami.
+Do uruchomienia lokalnej bazy potrzebujesz również Dockera z Docker Compose.
 
 ## Instalacja po sklonowaniu repozytorium
 
@@ -28,6 +29,42 @@ W głównym katalogu projektu:
 npm --prefix frontend ci
 npm --prefix backend ci
 ```
+
+## Lokalna baza PostgreSQL
+
+W głównym katalogu projektu skopiuj przykładową konfigurację (jednorazowo):
+
+```bash
+cp .env.example .env
+```
+
+Plik `.env.example` zawiera przykładowe dane do lokalnej nauki. Własne wartości
+ustawiaj w `.env`, który jest ignorowany przez Git.
+
+Uruchom PostgreSQL 18 i poczekaj na gotowość bazy:
+
+```bash
+docker compose up -d --wait db
+```
+
+Baza `finance` jest dostępna na `127.0.0.1:5432`, z użytkownikiem `finance`
+i hasłem z `.env`. Sprawdź połączenie:
+
+```bash
+docker compose exec db psql -U finance -d finance -c "SELECT current_database();"
+```
+
+Oczekiwany wynik to `finance`. Jeśli zmienisz użytkownika lub nazwę bazy
+w `.env`, dostosuj odpowiednio argumenty `-U` i `-d`.
+
+Dane są przechowywane w nazwanym wolumenie `postgres_data` i przetrwają
+zatrzymanie lub odtworzenie kontenera. Aby zatrzymać bazę:
+
+```bash
+docker compose stop db
+```
+
+Backend zostanie podłączony do bazy w kolejnym kroku przez Prisma.
 
 ## Uruchomienie podczas nauki
 
