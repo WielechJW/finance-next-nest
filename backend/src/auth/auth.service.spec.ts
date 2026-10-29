@@ -35,4 +35,43 @@ describe('AuthService failures', () => {
     expect(log).toHaveBeenCalled();
     expect(JSON.stringify(log.mock.calls)).not.toContain(password);
   });
+
+  it('sanitizes verification errors instead of reporting invalid credentials', async () => {
+    const password = 'private-test-password';
+    const log = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    const module = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        {
+          provide: UsersService,
+          useValue: {
+            findByEmailForLogin: vi
+              .fn()
+              .mockResolvedValue({ passwordHash: 'private-hash' }),
+          },
+        },
+        {
+          provide: PasswordService,
+          useValue: {
+            verifyForLogin: vi
+              .fn()
+              .mockRejectedValue(new Error(`${password} private-hash`)),
+          },
+        },
+      ],
+    }).compile();
+
+    await expect(
+      module
+        .get(AuthService)
+        .login({ email: 'test@example.invalid', password }),
+    ).rejects.toEqual(
+      new InternalServerErrorException('Nie udało się zalogować.'),
+    );
+    expect(log).toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain(password);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('private-hash');
+  });
 });

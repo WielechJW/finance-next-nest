@@ -5,6 +5,8 @@ import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
 import { configureApp } from './../src/config/configure-app.js';
+import session from 'express-session';
+import { SessionService } from './../src/sessions/session.service.js';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -16,6 +18,15 @@ describe('AppController (e2e)', () => {
       // The root endpoint does not use the database.
       .overrideProvider(PrismaService)
       .useValue({})
+      .overrideProvider(SessionService)
+      .useValue({
+        config: { trustProxyHops: 0 },
+        middleware: session({
+          secret: 'root-endpoint-test-only-secret-32-bytes',
+          resave: false,
+          saveUninitialized: false,
+        }),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();

@@ -75,6 +75,15 @@ Po sklonowaniu repozytorium przygotuj lokalną konfigurację backendu:
 cp backend/.env.example backend/.env
 ```
 
+Wygeneruj losowy sekret sesji i wklej wynik jako `SESSION_SECRET` w `backend/.env`:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+Zachowaj ten sekret między uruchomieniami backendu. Zmiana sekretu unieważnia
+podpisy istniejących cookies. Plik `.env.example` celowo nie zawiera sekretu.
+
 Ustaw `DATABASE_URL` zgodnie z danymi PostgreSQL w głównym `.env`.
 Przykładowy adres dla domyślnej konfiguracji lokalnej:
 
@@ -157,7 +166,66 @@ do odpowiedzi ani logów rejestracji, także przy błędach zapisu i hashowania.
 | `500` | Nie udało się utworzyć konta; szczegóły techniczne nie trafiają do odpowiedzi. |
 
 Unikalność e-maila rozstrzyga indeks w PostgreSQL. Utworzenie konta jest
-obsługiwane przez moduły `Auth` i `Users`; logowanie oraz sesje to następny etap.
+obsługiwane przez moduły `Auth` i `Users`.
+
+## Logowanie i sesje
+
+| Endpoint | Wynik |
+| --- | --- |
+| `POST /auth/login` | `200`, dane użytkownika i cookie sesji. |
+| `GET /auth/me` | `200` z aktualnymi danymi użytkownika albo `401` bez ważnej sesji. |
+| `POST /auth/logout` | `204`, usunięta sesja i wyczyszczone cookie; powtórzenie jest dozwolone. |
+
+Logowanie przyjmuje `email` i `password`. E-mail jest normalizowany tak jak
+przy rejestracji. Hasło jest wymaganym tekstem do 128 znaków i jest sprawdzane
+w dokładnie podanej postaci. Niepoprawny format żądania daje `400`, a błędne
+hasło i nieistniejący e-mail dają identyczne `401` z komunikatem
+`Nieprawidłowy e-mail lub hasło.`. Weryfikacja Argon2 odbywa się także dla
+nieistniejącego konta, na przygotowanym podczas startu hashu zastępczym.
+
+Przykładowy cykl po utworzeniu konta powyżej, uruchamiany z katalogu głównego:
+
+```bash
+curl -i -c /tmp/finance-cookies.txt http://localhost:3001/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"anna@example.com","password":"Moje testowe haslo 123!"}'
+
+curl -i -b /tmp/finance-cookies.txt http://localhost:3001/auth/me
+
+curl -i -b /tmp/finance-cookies.txt -c /tmp/finance-cookies.txt \
+  -X POST http://localhost:3001/auth/logout
+
+curl -i -b /tmp/finance-cookies.txt http://localhost:3001/auth/me
+```
+
+Ostatnie żądanie zwraca `401`. Logowanie i `/auth/me` zwracają wyłącznie `id`,
+`email` i `createdAt`; odpowiedzi sesyjnych endpointów mają `Cache-Control: no-store`.
+Wylogowanie usuwa rekord w bazie, więc kopia starego cookie także przestaje działać.
+
+Sesje obsługuje `express-session` z magazynem `connect-pg-simple` w PostgreSQL.
+Wersjonowana migracja tworzy tabelę `session` z polami `sid`, `sess` i `expire`.
+W JSON sesji zapisujemy `userId` oraz ustawienia cookie. Cookie `finance.sid`
+zawiera podpisany losowy identyfikator. Każde poprawne logowanie generuje nowy
+identyfikator i czeka na zapis w bazie przed odpowiedzią. Błąd magazynu daje
+ogólny komunikat `500`, bez wypisywania identyfikatorów sesji i danych logowania.
+
+Domyślnie sesja wygasa po godzinie bezczynności. Aktywne żądania odnawiają
+zarówno cookie, jak i termin ważności w bazie. `SESSION_TTL_SECONDS` pozwala
+ustawić od 1 do 604800 sekund. Wygasłe rekordy są okresowo usuwane przez magazyn;
+nie dają dostępu także przed ich fizycznym usunięciem. Sesje przetrwają restart
+backendu dzięki wspólnej bazie i niezmienionemu `SESSION_SECRET`.
+
+Cookie ma `HttpOnly`, `SameSite=Lax` i `Path=/`. Przy `NODE_ENV=production`
+otrzymuje również `Secure` i wymaga HTTPS. Lokalnie korzystamy z HTTP.
+`TRUST_PROXY_HOPS=0` oznacza brak zaufania do nagłówków proxy. Przy HTTPS
+zakończonym na reverse proxy ustaw liczbę zaufanych pośredników zgodną
+z rzeczywistą konfiguracją sieci.
+
+`SessionAuthGuard` sprawdza sesję i odczytuje aktualnego użytkownika z bazy.
+Usunięcie użytkownika odbiera dostęp jego sesji. Dekorator `@CurrentUser()`
+udostępnia kontrolerowi bezpiecznie wybrane dane. Połączenia magazynu i jego
+timer sprzątający są zamykane przy zakończeniu aplikacji. Podłączenie formularzy
+frontendowych jest etapem #6; CSRF i ograniczanie prób logowania etapem #7.
 
 ## Testy integracyjne z PostgreSQL
 
@@ -179,6 +247,10 @@ brakuje, i stosuje migracje. Użytkownik z domyślnego Compose ma wymagane
 uprawnienia. Testy używają losowych e-maili i usuwają własne rekordy po każdym
 scenariuszu. Sprawdzają zapis hasha, walidację, granice długości hasła,
 normalizację, duplikaty, równoległe żądania i bezpieczne odpowiedzi na błędy.
+Testy sesji obejmują logowanie, izolację dwóch kont, rotację identyfikatora,
+restart aplikacji, wygaśnięcie, odnawianie czasu, flagi cookie i wylogowanie.
+Sprawdzają też błędy odczytu, zapisu i usunięcia sesji. Każdy proces testowy
+używa osobnego sekretu sesji, bez korzystania z developerskiego sekretu.
 
 ## Uruchomienie podczas nauki
 

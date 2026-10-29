@@ -23,4 +23,19 @@ describe('PasswordService', () => {
     expect(await verify(first, password)).toBe(true);
     expect(await verify(second, password)).toBe(true);
   });
+
+  it('also verifies a prepared hash when the account does not exist', async () => {
+    const passwords = new PasswordService();
+    await passwords.onModuleInit();
+    const verification = vi.spyOn(passwords, 'verify');
+
+    expect(
+      await passwords.verifyForLogin(undefined, 'incorrect-password'),
+    ).toBe(false);
+    expect(verification).toHaveBeenCalledWith(
+      expect.stringMatching(/^\$argon2id\$/),
+      'incorrect-password',
+    );
+    verification.mockRestore();
+  });
 });
