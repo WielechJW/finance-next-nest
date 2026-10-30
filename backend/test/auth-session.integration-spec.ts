@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { Logger, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { PasswordService } from '../src/auth/password.service.js';
 import { configureApp } from '../src/config/configure-app.js';
+import { getFrontendOrigin } from '../src/config/cors.js';
+import { getAuthRateLimitOptions } from '../src/config/rate-limit.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import {
   getSessionConfig,
@@ -24,6 +27,13 @@ describe('Login and PostgreSQL sessions', () => {
     config?: Partial<SessionConfig>,
   ): Promise<INestApplication<App>> {
     const builder = Test.createTestingModule({ imports: [AppModule] });
+    builder.overrideProvider(getOptionsToken()).useFactory({
+      factory: () =>
+        getAuthRateLimitOptions({
+          AUTH_LOGIN_LIMIT: '1000',
+          AUTH_REGISTER_LIMIT: '1000',
+        }),
+    });
     if (config) {
       builder.overrideProvider(SessionService).useFactory({
         factory: () => new SessionService({ ...getSessionConfig(), ...config }),
@@ -162,6 +172,54 @@ describe('Login and PostgreSQL sessions', () => {
     expect(wrong.headers['set-cookie']).toBeUndefined();
     expect(unknown.headers['set-cookie']).toBeUndefined();
     expect(await prisma.session.count()).toBe(0);
+  });
+
+  it('preserves a real session after foreign login/logout attempts and allows trusted logout', async () => {
+    const user = await register();
+    const origin = getFrontendOrigin();
+    const response = await request(app.getHttpServer())
+      .post('/auth/login')
+      .set('Origin', origin)
+      .set('Sec-Fetch-Site', 'same-site')
+      .send({ email: user.email, password })
+      .expect(200);
+    const cookie = cookieFrom(response);
+    const log = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    for (const path of ['/auth/login', '/auth/logout']) {
+      const rejected = await request(app.getHttpServer())
+        .post(path)
+        .set('Origin', 'http://localhost:4444')
+        .set('Sec-Fetch-Site', 'same-site')
+        .set('Cookie', cookie)
+        .send({ email: user.email, password })
+        .expect(403);
+      expect(rejected.headers['set-cookie']).toBeUndefined();
+      expect(JSON.stringify([rejected.body, log.mock.calls])).not.toContain(
+        password,
+      );
+      expect(JSON.stringify([rejected.body, log.mock.calls])).not.toContain(
+        cookie,
+      );
+    }
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', cookie)
+      .expect(200);
+    const logout = await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Origin', origin)
+      .set('Sec-Fetch-Site', 'same-site')
+      .set('Cookie', cookie)
+      .expect(204);
+    const cleared = (logout.headers['set-cookie'] as string[])[0]!;
+    expect(cleared).toContain('HttpOnly');
+    expect(cleared).toContain('SameSite=Lax');
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', cookie)
+      .expect(401);
   });
 
   it.each([
