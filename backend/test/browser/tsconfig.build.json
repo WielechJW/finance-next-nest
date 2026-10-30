@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "outDir": "../../.browser-dist",
+    "tsBuildInfoFile": "../../.browser-dist/tsconfig.tsbuildinfo"
+  }
+}
