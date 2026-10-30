@@ -225,7 +225,81 @@ z rzeczywistą konfiguracją sieci.
 Usunięcie użytkownika odbiera dostęp jego sesji. Dekorator `@CurrentUser()`
 udostępnia kontrolerowi bezpiecznie wybrane dane. Połączenia magazynu i jego
 timer sprzątający są zamykane przy zakończeniu aplikacji. Podłączenie formularzy
-frontendowych opisano poniżej; CSRF i ograniczanie prób logowania to etap #7.
+frontendowych oraz ochronę żądań opisano poniżej.
+
+## Ochrona żądań i ograniczanie prób
+
+Backend korzysta z wbudowanej ochrony CSRF NestJS (dostępnej od 12.1;
+wersje używane w projekcie zapisuje lockfile). Przy uruchamianiu konfiguracja
+CORS i CSRF korzysta z tego samego, zwalidowanego `FRONTEND_ORIGIN`.
+Lokalnie ustaw `http://localhost:3000`, a przy HTTPS dokładny origin frontendu,
+np. `https://finance.example.com`. Używamy jednego zaufanego originu,
+z obsługą credentials i bez wildcardów.
+
+Ochrona jest globalna i działa przed middleware sesji oraz kontrolerami:
+obejmuje rejestrację, login, logout i przyszłe endpointy zapisujące dane.
+NestJS sprawdza nagłówki przeglądarki `Sec-Fetch-Site` oraz `Origin`.
+Obcy origin, także inny port localhost zgłoszony jako `same-site`, jest
+odrzucany kodem `403`. Zaufany frontend może wysyłać żądania między portami
+3000 i 3001. Formularze korzystają z ochrony bez dodatkowego tokena CSRF.
+
+`GET`, `HEAD` i `OPTIONS` są dozwolone przez ochronę i nie mogą wykonywać
+operacji biznesowych zmieniających dane. Klienci bez obu nagłówków
+`Sec-Fetch-Site` i `Origin`, np. zwykły curl, pozostają dozwoleni.
+Ochrona opiera się na nagłówkach wysyłanych przez współczesne przeglądarki;
+bardzo stare przeglądarki niewysyłające obu nagłówków wymagałyby ochrony
+tokenowej. CORS udostępnia obecnie metody GET, HEAD i POST; przy dodawaniu
+endpointów PATCH/DELETE należy rozszerzyć tę listę. Globalne sprawdzanie
+CSRF już obejmuje te metody.
+
+`@nestjs/throttler` ogranicza osobno login i rejestrację na podstawie IP:
+
+| Zmienna w backend/.env | Domyślnie | Znaczenie |
+| --- | --- | --- |
+| `AUTH_LOGIN_LIMIT` | `10` | Liczba żądań POST /auth/login. |
+| `AUTH_LOGIN_TTL_SECONDS` | `60` | Okres zliczania i długość blokady logowania w sekundach. |
+| `AUTH_REGISTER_LIMIT` | `5` | Liczba żądań POST /auth/register. |
+| `AUTH_REGISTER_TTL_SECONDS` | `900` | Okres zliczania i długość blokady rejestracji w sekundach. |
+
+Liczymy wszystkie próby dopuszczone przez CSRF, także błędne dane wejściowe
+i poprawne logowania. Pierwsze żądanie ponad limit rozpoczyna blokadę danego
+endpointu i zwraca `429` z polskim komunikatem oraz pozostałym czasem.
+Nagłówki `Retry-After-login` i `Retry-After-register` podają czas blokady
+w sekundach dla odpowiedniego limitera. Po upływie blokady można próbować
+ponownie. Logout i odczyt sesji działają również podczas blokady.
+
+Limity muszą być liczbami całkowitymi od 1 do 1000000, a okresy od 1 do
+604800 sekund; błędna konfiguracja zatrzymuje start. Wartości w sekundach
+są przeliczane na milisekundy wymagane przez bibliotekę.
+Liczniki działają w pamięci jednego procesu i zerują się po restarcie.
+Wdrożenie wielu instancji wymaga wspólnego magazynu limitera.
+IP jest ustalane przez Express zgodnie z `TRUST_PROXY_HOPS`; lokalne
+`0` nie ufa podstawionemu `X-Forwarded-For`. Użytkownicy za tym samym
+publicznym IP współdzielą limit danego endpointu.
+
+Odpowiedzi i logi nie zawierają haseł, hashy ani cookies. Frontend pokazuje
+czytelne błędy 403/429, zachowuje dane formularza i pozwala ponowić próbę.
+Te statusy nie są traktowane jak 401 oznaczające brak sesji.
+
+Testy HTTP ochrony i limitera działają bez bazy:
+
+```bash
+npm --prefix backend run test:e2e
+```
+
+Zestaw sprawdza zaufane i obce originy, przyszłe metody zapisu, przekroczenie
+limitów, powrót po blokadzie, niezależność liczników i podstawianie IP.
+Testy konfiguracji limitera uruchamia `npm --prefix backend test`.
+Testy integracyjne PostgreSQL dodatkowo potwierdzają, że obce logowanie
+i wylogowanie nie naruszają istniejącej sesji, oraz sprawdzają flagi cookie.
+W testach rejestracji i sesji progi są podwyższone wyłącznie przez nadpisanie
+dostawcy konfiguracji w teście; dedykowane testy bezpieczeństwa korzystają
+z rzeczywistego limitera z niskimi progami i świeżym magazynem dla każdego
+scenariusza.
+
+Dokumentacja mechanizmów:
+[NestJS CSRF](https://docs.nestjs.com/security/csrf) i
+[NestJS rate limiting](https://docs.nestjs.com/security/rate-limiting).
 
 ## Formularze i panel w przeglądarce
 
@@ -258,7 +332,8 @@ a jego treść nie jest automatycznie skracana.
 Wspólny klient API wysyła `credentials: include` i `cache: no-store`, obsługuje
 odpowiedź `204`, przerwanie żądania i limit oczekiwania 15 sekund. Backend
 udostępnia odpowiedzi przeglądarce z dokładnie skonfigurowanego originu wraz
-z obsługą cookies. CORS nie zastępuje ochrony CSRF zaplanowanej w #7.
+z obsługą cookies. Globalna ochrona CSRF dodatkowo weryfikuje pochodzenie
+żądań zmieniających dane.
 
 Stan sesji rozróżnia ładowanie, zalogowanie, brak sesji i błąd sieci. Panel
 pokazuje stan ładowania do czasu weryfikacji `/auth/me`. Błąd sieci daje

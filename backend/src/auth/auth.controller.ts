@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
 import { SessionService } from '../sessions/session.service.js';
 import type { RegisteredUser } from '../users/users.service.js';
 import { AuthService } from './auth.service.js';
@@ -27,12 +28,16 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @UseGuards(ThrottlerGuard)
+  @SkipThrottle({ login: true })
   @HttpCode(HttpStatus.CREATED)
   register(@Body() input: RegisterDto): Promise<RegisteredUser> {
     return this.auth.register(input);
   }
 
   @Post('login')
+  @UseGuards(ThrottlerGuard)
+  @SkipThrottle({ register: true })
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   async login(

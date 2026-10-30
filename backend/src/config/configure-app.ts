@@ -4,12 +4,15 @@ import { SessionService } from '../sessions/session.service.js';
 import { getFrontendOrigin } from './cors.js';
 
 export function configureApp(app: INestApplication): void {
+  const frontendOrigin = getFrontendOrigin();
   app.enableCors({
-    origin: getFrontendOrigin(),
+    origin: frontendOrigin,
     credentials: true,
     methods: ['GET', 'HEAD', 'POST'],
     allowedHeaders: ['Content-Type'],
   });
+  // Reject foreign browser writes before loading a session or running a handler.
+  app.enableCsrfProtection({ trustedOrigins: [frontendOrigin] });
   const sessions = app.get(SessionService);
   const express = app.getHttpAdapter().getInstance() as Express;
   express.set('trust proxy', sessions.config.trustProxyHops);

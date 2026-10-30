@@ -123,6 +123,43 @@ describe("Authentication forms", () => {
     );
   });
 
+  it.each([
+    [
+      "login",
+      403,
+      "Serwer odrzucił żądanie ze względów bezpieczeństwa. Odśwież stronę i spróbuj ponownie.",
+    ],
+    ["login", 429, "Zbyt wiele prób. Spróbuj ponownie za 60 s."],
+    ["register", 429, "Zbyt wiele prób. Spróbuj ponownie za 900 s."],
+  ] as const)(
+    "keeps %s retryable after HTTP %s",
+    async (mode, status, message) => {
+      const submit = mode === "login" ? mocks.login : mocks.register;
+      submit.mockRejectedValueOnce(new ApiError(status, message));
+      render(<AuthForm mode={mode} />);
+      const user = await fill(mode);
+      const button = screen.getByRole("button", {
+        name: mode === "login" ? "Zaloguj się" : "Zarejestruj się",
+      });
+      await user.click(button);
+      await screen.findByText(message);
+      expect((screen.getByLabelText("E-mail") as HTMLInputElement).value).toBe(
+        email,
+      );
+      expect((screen.getByLabelText("Hasło") as HTMLInputElement).value).toBe(
+        password,
+      );
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+      expect(mocks.replace).not.toHaveBeenCalled();
+      await user.click(button);
+      await waitFor(() =>
+        expect(mocks.replace).toHaveBeenCalledWith(
+          mode === "login" ? "/dashboard" : "/login?registered=1",
+        ),
+      );
+    },
+  );
+
   it("checks registration length and confirmation before sending data", async () => {
     render(<AuthForm mode="register" />);
     fireEvent.change(screen.getByLabelText("E-mail"), {

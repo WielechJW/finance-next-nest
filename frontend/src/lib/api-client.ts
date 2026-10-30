@@ -48,16 +48,21 @@ function requestUrl(path: string): string {
 function errorMessage(status: number, payload: unknown): string {
   if (status >= 500)
     return "Serwer nie mógł wykonać operacji. Spróbuj ponownie.";
+  if (status === 403)
+    return "Serwer odrzucił żądanie ze względów bezpieczeństwa. Odśwież stronę i spróbuj ponownie.";
   if (payload && typeof payload === "object" && "message" in payload) {
     const message = payload.message;
-    if (typeof message === "string") return message;
+    if (typeof message === "string" && message.trim()) return message;
     if (
       Array.isArray(message) &&
+      message.length > 0 &&
       message.every((value) => typeof value === "string")
     ) {
       return message.join(" ");
     }
   }
+  if (status === 429)
+    return "Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.";
   return "Nie udało się wykonać operacji. Spróbuj ponownie.";
 }
 

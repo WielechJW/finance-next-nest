@@ -73,6 +73,51 @@ describe("API client", () => {
     );
   });
 
+  it("replaces technical 403 errors and preserves useful 429 messages without invalidating the session", async () => {
+    const listener = vi.fn();
+    window.addEventListener(UNAUTHORIZED_EVENT, listener);
+    try {
+      fetchMock.mockResolvedValueOnce(
+        json(
+          {
+            message: "Cross-origin request detected from Sec-Fetch-Site header",
+          },
+          403,
+        ),
+      );
+      await expect(
+        apiRequest("/auth/logout", { method: "POST" }),
+      ).rejects.toMatchObject({
+        status: 403,
+        message:
+          "Serwer odrzucił żądanie ze względów bezpieczeństwa. Odśwież stronę i spróbuj ponownie.",
+      });
+      fetchMock.mockResolvedValueOnce(
+        json({ message: "Zbyt wiele prób. Spróbuj ponownie za 60 s." }, 429),
+      );
+      await expect(
+        apiRequest("/auth/login", { method: "POST" }),
+      ).rejects.toMatchObject({
+        status: 429,
+        message: "Zbyt wiele prób. Spróbuj ponownie za 60 s.",
+      });
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(UNAUTHORIZED_EVENT, listener);
+    }
+  });
+
+  it.each([{}, { message: "" }, { message: [] }])(
+    "provides a fallback for a 429 without a message (%#)",
+    async (payload) => {
+      fetchMock.mockResolvedValueOnce(json(payload, 429));
+      await expect(apiRequest("/auth/login")).rejects.toMatchObject({
+        status: 429,
+        message: "Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.",
+      });
+    },
+  );
+
   it("reports a network failure with a retryable message", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     await expect(apiRequest("/auth/me")).rejects.toMatchObject({
