@@ -1,6 +1,11 @@
 # Zależności i pliki generowane
 node_modules/
 .next/
+.next-browser-test/
+.browser-dist/
+test-results/
+playwright-report/
+playwright/.auth/
 out/
 dist/
 build/

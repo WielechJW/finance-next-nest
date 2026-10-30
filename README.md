@@ -389,6 +389,96 @@ restart aplikacji, wygaśnięcie, odnawianie czasu, flagi cookie i wylogowanie.
 Sprawdzają też błędy odczytu, zapisu i usunięcia sesji. Każdy proces testowy
 używa osobnego sekretu sesji, bez korzystania z developerskiego sekretu.
 
+## Testy całej aplikacji w Chromium
+
+Playwright sprawdza prawdziwy frontend Next.js, API NestJS i PostgreSQL.
+Narzędzie i scenariusze znajdują się w backendzie, obok istniejących testów
+integracyjnych. Wymagany jest Node.js 24 oraz zainstalowane zależności obu
+aplikacji. Jednorazowo pobierz przeglądarkę zarządzaną przez Playwright:
+
+```bash
+npm --prefix backend run test:browser:install
+```
+
+W istniejącym `backend/.env.test` uzupełnij `DATABASE_URL_BROWSER_TEST`
+według `backend/.env.test.example`. Jeśli pliku jeszcze nie ma, skopiuj
+przykład. Wartość musi wskazywać osobną lokalną bazę, np.
+`finance_browser_test`, z nazwą zakończoną na `_test` i schematem `public`.
+Nazwa bazy musi być inna niż w `DATABASE_URL_TEST` i `DATABASE_URL`.
+Brak tej zmiennej zatrzymuje testy; nie używamy zastępczo innej bazy.
+Dopasuj dane dostępu do swojego lokalnego PostgreSQL.
+
+Przygotowanie aplikacji testowej tworzy brakującą bazę i stosuje migracje,
+korzystając ze wspólnego mechanizmu testów integracyjnych. Użytkownik bazy
+musi mieć uprawnienia do jej utworzenia, tak jak w domyślnym Compose.
+Uruchom PostgreSQL, a następnie cały zestaw:
+
+```bash
+docker compose up -d --wait db
+npm --prefix backend run test:browser
+```
+
+Testy samodzielnie budują i uruchamiają obie aplikacje:
+
+| Element | Adres | Wynik kompilacji |
+| --- | --- | --- |
+| Frontend | `http://localhost:3100` | `frontend/.next-browser-test/` |
+| Backend | `http://localhost:3101` | `backend/.browser-dist/` |
+
+Używamy osobnych buildów, więc nie trzeba zatrzymywać aplikacji developerskich
+na portach 3000/3001. Porty 3100/3101 muszą być wolne. Playwright nie
+wykorzystuje już działających serwerów: w razie konfliktu zwraca błąd.
+Po zakończeniu zamyka uruchomione przez siebie procesy.
+Frontend jest budowany z testowym `NEXT_PUBLIC_API_URL`, a backend otrzymuje
+testowy origin, losowy sekret i osobny magazyn sesji w bazie przeglądarkowej.
+Ochrona CSRF działa normalnie. Progi limitera są podwyższone tylko w tym
+procesie, aby wielokrotne logowania nie blokowały scenariuszy. Zachowanie
+domyślnych progów nadal sprawdzają testy HTTP z poprzedniego etapu.
+
+Scenariusze `backend/test/browser/*.pw.ts` obejmują:
+
+- Rejestrację z formularza, login, odświeżenie panelu i logout.
+- Odmowę wejścia na panel bez sesji i odrzucenie starego cookie po logout.
+- Błędne hasło, nieistniejące konto i zajęty e-mail po normalizacji.
+- Wygaśnięcie sesji w PostgreSQL przy nadal obecnym cookie przeglądarki.
+- Izolację dwóch kont w oddzielnych kontekstach przeglądarki.
+- Zmianę konta w jednym kontekście i powrót przyciskiem Wstecz po logout.
+
+Każdy scenariusz używa unikalnych kont i osobnego kontekstu przeglądarki.
+Fixtures sprzątają własne konta oraz ich sesje także po niepowodzeniu testu.
+Wygaśnięcie jest wymuszane wyłącznie dla własnego konta w bazie testowej.
+Pozwala to uniknąć oczekiwania na upływ czasu sesji. Istniejący zestaw
+integracyjny dodatkowo zawiera jeden ciągły przepływ rejestracja → login →
+ponowny odczyt sesji → logout → odrzucenie skopiowanego cookie.
+
+Przydatne komendy:
+
+```bash
+# Uruchomienie z widocznym oknem Chromium
+npm --prefix backend run test:browser:headed
+
+# Otwarcie raportu HTML po uruchomieniu testów
+npm --prefix backend run test:browser:report
+
+# Sprawdzenie typów konfiguracji i testów Playwright
+npm --prefix backend run test:browser:typecheck
+
+# Wypisanie scenariuszy bez uruchamiania serwerów
+npm --prefix backend run test:browser -- --list
+```
+
+Raport jest w `backend/playwright-report/`, a zrzuty ekranu i ślady
+nieudanych scenariuszy w `backend/test-results/`. Ślad można otworzyć
+z raportu, aby zobaczyć kolejne akcje, stan strony i żądania sieciowe.
+Artefakty i buildy testowe są ignorowane przez Git.
+
+Jeśli Chromium zgłasza brak bibliotek systemowych w Linuksie, zainstaluj je
+poleceniem `npm --prefix backend run test:browser:install -- --with-deps`.
+Jeśli testy nie mogą połączyć się z bazą, sprawdź gotowość kontenera oraz
+dane w `backend/.env.test`. Jeśli port jest zajęty, zakończ własny proces
+testowy na tym porcie. Pierwsze uruchomienie obejmuje kompilację obu
+aplikacji i może trwać dłużej niż kolejne testy jednostkowe.
+
 ## Uruchomienie podczas nauki
 
 Otwórz dwa terminale w głównym katalogu projektu.
@@ -440,6 +530,8 @@ npm --prefix backend test
 npm --prefix backend run test:e2e
 npm --prefix backend run test:integration
 npm --prefix backend run build
+npm --prefix backend run test:browser:typecheck
+npm --prefix backend run test:browser
 ```
 
 ## Codzienna praca z Gitem
