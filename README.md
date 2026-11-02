@@ -554,6 +554,13 @@ Terminal 2 — backend (po uruchomieniu bazy i zastosowaniu migracji):
 npm --prefix backend run start:dev
 ```
 
+Tryby `start:dev` i `start:debug` zapisują wynik kompilacji oraz cache
+TypeScript w `backend/.dev-dist/`. Produkcyjny `build` korzysta z
+`backend/dist/`, a testy przeglądarkowe z `backend/.browser-dist/`.
+Dzięki osobnym katalogom build nie usuwa plików używanych przez tryb watch.
+Po zmianie tej konfiguracji zatrzymaj poprzedni proces przez `Ctrl+C`
+i uruchom `start:dev` ponownie, aby przejął nowy katalog.
+
 Otwórz http://localhost:3001 — API odpowiada `Hello World!`.
 Możesz też sprawdzić je komendą `curl http://localhost:3001`.
 Zmiany w kodzie automatycznie restartują backend. `Ctrl+C` zatrzymuje aplikację.
