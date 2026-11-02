@@ -71,6 +71,16 @@ describe('POST /auth/register (PostgreSQL)', () => {
       createdAt: expect.any(String),
     });
     const stored = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const wallets = await prisma.wallet.findMany({
+      where: { userId: stored.id },
+    });
+    expect(wallets).toHaveLength(1);
+    expect(wallets[0]).toMatchObject({
+      userId: stored.id,
+      name: 'Mój portfel',
+      currency: 'PLN',
+    });
+    expect(wallets[0].openingBalance.toFixed(2)).toBe('0.00');
     expect(response.body.id).toBe(stored.id);
     expect(response.body.createdAt).toBe(stored.createdAt.toISOString());
     expect(stored.passwordHash).toMatch(/^\$argon2id\$/);
@@ -145,6 +155,7 @@ describe('POST /auth/register (PostgreSQL)', () => {
 
     expect(response.body.message).toBe('Ten adres e-mail jest już zajęty.');
     expect(await prisma.user.count({ where: { email } })).toBe(1);
+    expect(await prisma.wallet.count({ where: { user: { email } } })).toBe(1);
     expect(JSON.stringify(response.body)).not.toContain(password);
   });
 
@@ -165,6 +176,55 @@ describe('POST /auth/register (PostgreSQL)', () => {
         .sort((left, right) => left - right),
     ).toEqual([201, 409]);
     expect(await prisma.user.count({ where: { email } })).toBe(1);
+    expect(await prisma.wallet.count({ where: { user: { email } } })).toBe(1);
+  });
+
+  it('rolls back the user when the database rejects creation of its wallet', async () => {
+    const email = createEmail();
+    const name = 'reject_wallet_' + randomUUID().replaceAll('-', '');
+    const log = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+
+    try {
+      // The trigger only rejects this test's unique account. Unlike a mocked
+      // create() rejection, it exercises rollback after inserting the user.
+      await prisma.$executeRawUnsafe(`
+        CREATE FUNCTION "${name}"() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM "User"
+            WHERE "id" = NEW."userId" AND "email" = TG_ARGV[0]
+          ) THEN
+            RAISE EXCEPTION 'Forced wallet failure' USING ERRCODE = '23514';
+          END IF;
+          RETURN NEW;
+        END;
+        $$
+      `);
+      // email and name are generated above, never supplied by a client.
+      await prisma.$executeRawUnsafe(`
+        CREATE TRIGGER "${name}" BEFORE INSERT ON "Wallet"
+        FOR EACH ROW EXECUTE FUNCTION "${name}"('${email}')
+      `);
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password })
+        .expect(500);
+
+      expect(response.body.message).toBe('Nie udało się utworzyć konta.');
+      expect(await prisma.user.count({ where: { email } })).toBe(0);
+      expect(await prisma.wallet.count({ where: { user: { email } } })).toBe(0);
+      const output = JSON.stringify([response.body, log.mock.calls]);
+      expect(output).not.toContain(password);
+      expect(output).not.toContain('Forced wallet failure');
+    } finally {
+      await prisma.$executeRawUnsafe(
+        `DROP TRIGGER IF EXISTS "${name}" ON "Wallet"`,
+      );
+      await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${name}"()`);
+    }
   });
 
   it('returns a generic 500 and sanitized logs for an unexpected database error', async () => {

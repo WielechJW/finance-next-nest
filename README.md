@@ -105,7 +105,8 @@ npm --prefix backend run prisma:status
 ```
 
 Model `User` ma identyfikator UUID, unikalny e-mail, hash hasła i daty utworzenia
-oraz aktualizacji. Konta można tworzyć przez API rejestracji opisane poniżej.
+oraz aktualizacji. Każde konto otrzymuje prywatny portfel `Wallet` w PLN.
+Konta można tworzyć przez API rejestracji opisane poniżej.
 
 Po kolejnej zmianie schematu utwórz migrację i wygeneruj klienta:
 
@@ -134,8 +135,8 @@ curl -i http://localhost:3001/auth/register \
   -d '{"email":"anna@example.com","password":"Moje testowe haslo 123!"}'
 ```
 
-Poprawne żądanie tworzy użytkownika i zwraca `201 Created` z polami `id`,
-`email` i `createdAt`. Dane zobaczysz też w Prisma Studio:
+Poprawne żądanie tworzy użytkownika razem z portfelem i zwraca `201 Created`
+z polami `id`, `email` i `createdAt`. Dane zobaczysz też w Prisma Studio:
 
 ```bash
 cd backend
@@ -167,6 +168,61 @@ do odpowiedzi ani logów rejestracji, także przy błędach zapisu i hashowania.
 
 Unikalność e-maila rozstrzyga indeks w PostgreSQL. Utworzenie konta jest
 obsługiwane przez moduły `Auth` i `Users`.
+
+## Prywatny portfel i reprezentacja kwot
+
+Model `Wallet` zawiera UUID, unikalny `userId`, nazwę, walutę i saldo początkowe
+`openingBalance`. Domyślne wartości to `Mój portfel`, `PLN` oraz `0.00`.
+Enum PostgreSQL dopuszcza wyłącznie PLN. Klucz obcy wymaga istniejącego
+użytkownika, a unikalny indeks `userId` pozwala przypisać mu najwyżej jeden
+portfel. Usunięcie konta kaskadowo usuwa jego portfel.
+
+`UsersService.create()` używa zagnieżdżonego `wallet.create` w `user.create`.
+Prisma wykonuje oba zapisy w jednej transakcji: błąd portfela wycofuje także
+utworzenie użytkownika. Hashowanie hasła odbywa się przed transakcją.
+Indeks oraz ten przepływ zapewniają dokładnie jeden portfel nowego konta,
+także przy równoległych rejestracjach z tym samym e-mailem. Pole `User.wallet`
+jest opcjonalne w schemacie Prisma, ponieważ klucz obcy jest po stronie
+`Wallet`; sam ten typ nie wymusza istnienia portfela.
+
+Migracja `20261102120000_add_wallet` tworzy strukturę i uzupełnia portfele
+wszystkich dotychczasowych użytkowników w jednej transakcji SQL. Zachowuje
+ich identyfikatory, hasła, daty i sesje. Przy aktualizacji istniejącej instalacji
+zatrzymaj backend, zastosuj migrację, a następnie uruchom nową wersję:
+
+```bash
+npm --prefix backend run prisma:deploy
+npm --prefix backend run prisma:generate
+```
+
+Saldo początkowe jest osobną wartością, a nie transakcją. Może być dodatnie,
+zerowe lub ujemne. W bazie używamy `Decimal(14,2)`: 12 cyfr części całkowitej
+i 2 cyfry groszy, czyli zakres od `-999999999999.99` do `999999999999.99`.
+Kwoty wprowadzamy do `Prisma.Decimal` ze stringów i obliczamy metodami Decimal,
+bez pośredniej konwersji przez `Number` lub `parseFloat`.
+
+Kontrakt przyszłego API portfela przewiduje stringi dziesiętne z kropką
+i dokładnie dwoma miejscami po przecinku, np. `"0.10"` i `"-123.45"`.
+Pomocnicza funkcja `backend/src/wallets/money.ts` serializuje odczytane kwoty
+przez `toFixed(2)`. Przykład dokładnego obliczenia:
+
+```ts
+const sum = new Prisma.Decimal('0.10').plus(new Prisma.Decimal('0.20'));
+formatMoney(sum); // "0.30"
+```
+
+`formatMoney` formatuje zapisane kwoty; walidacja formatu, zakresu i maksymalnie
+dwóch miejsc po przecinku na wejściu będzie częścią endpointów portfela
+w zadaniu #10. PostgreSQL może zaokrąglić nadmiarowe miejsca dziesiętne,
+więc sam typ kolumny nie zastępuje tej walidacji.
+
+`npm --prefix backend test` sprawdza reprezentację kwot. Zestaw
+`npm --prefix backend run test:integration` weryfikuje atomową rejestrację
+(z rzeczywistym błędem zapisu portfela), ograniczenia bazy, granice kwot,
+dokładność groszy i usuwanie kaskadowe. Testy migracji tworzą osobne, losowe
+schematy w zwalidowanej bazie testowej, odtwarzają wcześniejsze migracje
+i sprawdzają aktualizację pustej bazy oraz bazy ze starszymi kontami i sesją.
+Po zakończeniu usuwają wyłącznie własne schematy.
 
 ## Logowanie i sesje
 

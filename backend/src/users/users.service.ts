@@ -31,7 +31,7 @@ export class UsersService {
   async create(input: CreateUserInput): Promise<RegisteredUser> {
     try {
       return await this.prisma.user.create({
-        data: input,
+        data: { ...input, wallet: { create: {} } },
         select: publicUserSelect,
       });
     } catch (error: unknown) {
