@@ -1,0 +1,26 @@
+.nav {
+  display: flex;
+  max-width: 960px;
+  margin: 0 auto 24px;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 12px 20px;
+  border-bottom: 3px solid transparent;
+  color: #475569;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nav a[aria-current="page"] {
+  border-color: #1d4ed8;
+  color: #1d4ed8;
+}
+
+.nav a:hover {
+  background: #e2e8f0;
+}

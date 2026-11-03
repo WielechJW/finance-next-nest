@@ -54,7 +54,7 @@ test('isolates two browser contexts and keeps B logged in after A logs out', asy
     await expect(
       secondPage.getByText(second.email, { exact: true }),
     ).toBeVisible();
-    await expect(secondPage).toHaveURL(/\/dashboard$/);
+    await expect(secondPage).toHaveURL(/\/dashboard\/wallet$/);
   } finally {
     await secondContext.close();
   }
@@ -82,7 +82,7 @@ test('does not restore private account data when navigating back after logout', 
   const account = await accounts.register();
   await login(page, account);
   // Create a previous protected history entry before logout replaces this one.
-  await page.goto('/dashboard?history=1');
+  await page.goto('/dashboard/wallet?history=1');
   await expect(page.getByText(account.email, { exact: true })).toBeVisible();
   await logout(page);
   await page.goBack();

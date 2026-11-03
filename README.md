@@ -462,8 +462,9 @@ Po zmianie konfiguracji uruchom aplikacje ponownie. `NEXT_PUBLIC_API_URL`
 jest publicznym adresem API dołączanym do kodu frontendu podczas budowania.
 
 Rejestracja na `/register` tworzy konto i prowadzi do `/login` z potwierdzeniem.
-Poprawne logowanie prowadzi do `/dashboard`, gdzie widać e-mail użytkownika
-i przycisk wylogowania. Odświeżenie strony zachowuje sesję, a wejście bez sesji
+Poprawne logowanie prowadzi przez `/dashboard` do `/dashboard/wallet`, gdzie
+widać własny portfel, e-mail użytkownika i przycisk wylogowania.
+Odświeżenie strony zachowuje sesję, a wejście bez sesji
 prowadzi do logowania. Formularze blokują kolejne wysłanie podczas żądania,
 pokazują błędy i zachowują wpisane dane przy niepowodzeniu. Potwierdzenie hasła
 nie jest wysyłane do API. Zbyt długie hasło jest odrzucane z komunikatem,
@@ -493,8 +494,8 @@ bez danych użytkownika; gdy jest niedostępny, pozostaje sprawdzenie przy fokus
 Ręczne sprawdzenie całej ścieżki:
 
 1. Otwórz `/register`, utwórz konto i zaloguj się z formularza.
-2. Odśwież `/dashboard` i sprawdź e-mail użytkownika.
-3. Wyloguj się, użyj przycisku Wstecz i spróbuj wejść na `/dashboard`.
+2. Odśwież `/dashboard/wallet` i sprawdź e-mail użytkownika oraz dane portfela.
+3. Wyloguj się, użyj przycisku Wstecz i spróbuj wejść na `/dashboard/wallet`.
 4. Zaloguj inne konto i sprawdź, czy widać właściwe dane, również w drugiej karcie.
 5. Sprawdź błędne hasło, zajęty e-mail i ponowienie operacji po błędzie połączenia.
 
@@ -503,6 +504,53 @@ Testy jednostkowe klienta API, formularzy i stanu sesji:
 ```bash
 npm --prefix frontend test
 ```
+
+## Panel portfela
+
+Po loginie użytkownik trafia na `/dashboard/wallet`. Nawigacja wskazuje
+aktywny Portfel. Widok pobiera dane przez `GET /wallet` i pokazuje nazwę,
+walutę PLN, bieżące saldo oraz osobno saldo początkowe. Kwoty są prezentowane
+w polskim formacie, np. `1 234,50 zł` i `-0,01 zł`. Zera nie są pokazywane
+zastępczo podczas ładowania. Przy zerowym saldzie początkowym pojawia się
+podpowiedź zachęcająca do jego ustawienia.
+
+Formularz ustawień pozwala zmienić nazwę i saldo początkowe. Nazwa musi mieć
+od 1 do 100 znaków po przycięciu białych znaków na końcach. Kwota może używać
+przecinka lub kropki, mieć maksymalnie dwa miejsca po przecinku i być ujemna.
+Przykłady `123`, `123,4` i `-0,05` są wysyłane odpowiednio jako `"123.00"`,
+`"123.40"` i `"-0.05"`. Formularz odrzuca przekroczony zakres, zapis
+wykładniczy, separatory tysięcy, nadmiarowe zera na początku oraz nadmiarowe
+miejsca dziesiętne. Normalizacja działa na stringach, a formatowanie grupuje
+część całkowitą przez BigInt i zachowuje grosze bez konwersji kwoty na Number.
+
+Przycisk zapisu jest nieaktywny, gdy dane nie zmieniły się. PATCH zawiera
+wyłącznie zmienione pola. Podczas zapisu pola oraz przycisk są zablokowane,
+a podsumowanie zachowuje ostatnio zapisane wartości do czasu sukcesu.
+Odpowiedź PATCH odświeża podsumowanie i formularz oraz pokazuje potwierdzenie.
+Błąd zapisu zachowuje wpisane dane i pozwala spróbować ponownie. Błąd
+pobierania ma osobny przycisk ponowienia. Status `401` korzysta ze wspólnej
+obsługi sesji i prowadzi do logowania; `400` i `403` są błędami formularza.
+
+Stan portfela jest powiązany z kontem użytkownika. Zmiana konta, sprawdzanie
+sesji lub opuszczenie ekranu usuwa dane i anuluje żądania. Spóźniona odpowiedź
+poprzedniego odczytu lub zapisu nie może przywrócić cudzego portfela.
+Dane pozostają w pamięci komponentu, bez localStorage i współdzielonego cache.
+
+Ręczne sprawdzenie panelu:
+
+1. Zaloguj się i sprawdź przejście do `/dashboard/wallet` oraz saldo `0,00 zł`
+   nowego konta.
+2. Ustaw nazwę `Budżet domowy` i kwotę `-250,5`, zapisz i sprawdź obie kwoty
+   `-250,50 zł` oraz komunikat `Zmiany zapisane.`.
+3. Odśwież stronę i sprawdź zachowanie nazwy oraz salda.
+4. Sprawdź pustą nazwę, kwotę `0,001` i ponowienie po błędzie połączenia.
+5. Sprawdź formularz klawiaturą: Tab, widoczny fokus i zapis Enterem.
+6. Przy szerokości 375 px sprawdź długą nazwę i graniczne saldo
+   `-999999999999,99`: układ powinien mieć jedną kolumnę bez przewijania w bok.
+
+Testy frontendu obejmują normalizację i prezentację kwot, klienta portfela,
+formularz, blokowanie równoległych zapisów, ponawianie po błędach, nawigację,
+przekierowanie po `401` i spóźnione odpowiedzi po zmianie konta.
 
 ## Testy integracyjne z PostgreSQL
 
@@ -583,6 +631,8 @@ Scenariusze `backend/test/browser/*.pw.ts` obejmują:
 - Wygaśnięcie sesji w PostgreSQL przy nadal obecnym cookie przeglądarki.
 - Izolację dwóch kont w oddzielnych kontekstach przeglądarki.
 - Zmianę konta w jednym kontekście i powrót przyciskiem Wstecz po logout.
+- Edycję portfela z polskim przecinkiem i zachowanie ustawień po odświeżeniu.
+- Zapis Enterem na ekranie 375 px, długą nazwę i graniczne ujemne saldo.
 
 Każdy scenariusz używa unikalnych kont i osobnego kontekstu przeglądarki.
 Fixtures sprzątają własne konta oraz ich sesje także po niepowodzeniu testu.

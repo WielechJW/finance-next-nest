@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "@/lib/api-client";
 import { useSession } from "./session-provider";
+import { DashboardNav } from "./dashboard-nav";
 import styles from "./protected-dashboard.module.css";
 
 export function ProtectedDashboard({ children }: { children: ReactNode }) {
@@ -88,6 +89,7 @@ export function ProtectedDashboard({ children }: { children: ReactNode }) {
           </button>
         </div>
       </header>
+      <DashboardNav />
       {error && (
         <p role="alert" className={styles.error}>
           {error}

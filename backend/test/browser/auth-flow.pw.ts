@@ -22,7 +22,7 @@ test('registers, logs in, survives a reload and revokes access after logout', as
 
   await fillCredentials(page, account);
   await page.getByRole('button', { name: 'Zaloguj się', exact: true }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard\/wallet$/);
   await expect(page.getByText(account.email, { exact: true })).toBeVisible();
   const cookie = (await page.context().cookies(API_URL)).find(
     (entry) => entry.name === 'finance.sid',
