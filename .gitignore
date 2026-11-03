@@ -3,6 +3,7 @@ node_modules/
 .next/
 .next-browser-test/
 .browser-dist/
+.dev-dist/
 test-results/
 playwright-report/
 playwright/.auth/
