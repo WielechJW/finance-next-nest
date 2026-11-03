@@ -201,7 +201,7 @@ i 2 cyfry groszy, czyli zakres od `-999999999999.99` do `999999999999.99`.
 Kwoty wprowadzamy do `Prisma.Decimal` ze stringów i obliczamy metodami Decimal,
 bez pośredniej konwersji przez `Number` lub `parseFloat`.
 
-Kontrakt przyszłego API portfela przewiduje stringi dziesiętne z kropką
+Kontrakt API portfela przewiduje stringi dziesiętne z kropką
 i dokładnie dwoma miejscami po przecinku, np. `"0.10"` i `"-123.45"`.
 Pomocnicza funkcja `backend/src/wallets/money.ts` serializuje odczytane kwoty
 przez `toFixed(2)`. Przykład dokładnego obliczenia:
@@ -211,10 +211,10 @@ const sum = new Prisma.Decimal('0.10').plus(new Prisma.Decimal('0.20'));
 formatMoney(sum); // "0.30"
 ```
 
-`formatMoney` formatuje zapisane kwoty; walidacja formatu, zakresu i maksymalnie
-dwóch miejsc po przecinku na wejściu będzie częścią endpointów portfela
-w zadaniu #10. PostgreSQL może zaokrąglić nadmiarowe miejsca dziesiętne,
-więc sam typ kolumny nie zastępuje tej walidacji.
+`formatMoney` formatuje zapisane kwoty. Endpoint aktualizacji portfela waliduje
+format i zakres przed utworzeniem `Prisma.Decimal`: wymagany jest string
+z dokładnie dwoma miejscami po przecinku. PostgreSQL może zaokrąglić
+nadmiarowe miejsca dziesiętne, więc sam typ kolumny nie zastępuje tej walidacji.
 
 `npm --prefix backend test` sprawdza reprezentację kwot. Zestaw
 `npm --prefix backend run test:integration` weryfikuje atomową rejestrację
@@ -223,6 +223,90 @@ dokładność groszy i usuwanie kaskadowe. Testy migracji tworzą osobne, losowe
 schematy w zwalidowanej bazie testowej, odtwarzają wcześniejsze migracje
 i sprawdzają aktualizację pustej bazy oraz bazy ze starszymi kontami i sesją.
 Po zakończeniu usuwają wyłącznie własne schematy.
+
+## API własnego portfela
+
+| Endpoint | Wynik |
+| --- | --- |
+| `GET /wallet` | `200` z portfelem zalogowanego użytkownika. |
+| `PATCH /wallet` | `200` z portfelem po zmianie nazwy lub salda początkowego. |
+
+Oba endpointy korzystają z tego samego `SessionAuthGuard` co `/auth/me`.
+Właściciel jest ustalany wyłącznie z sesji, a zapytania Prisma używają
+unikalnego `userId`. Parametry zapytania GET nie pozwalają wybrać innego
+użytkownika. Każda poprawna odpowiedź ma `Cache-Control: no-store` i zawiera
+wyłącznie następujące pola:
+
+```json
+{
+  "id": "6f27b471-37dd-4b93-bd55-7e84c4aa2308",
+  "name": "Mój portfel",
+  "currency": "PLN",
+  "openingBalance": "0.00",
+  "balance": "0.00"
+}
+```
+
+Na tym etapie `balance` jest równe `openingBalance`. Nie przechowujemy osobnej
+kolumny salda bieżącego; jego wyliczanie z transakcji dojdzie w etapie 3.
+
+`PATCH /wallet` wymaga obiektu JSON z przynajmniej jednym polem:
+
+- `name`: tekst o długości od 1 do 100 znaków po usunięciu spacji na końcach.
+  Nazwa złożona wyłącznie z białych znaków jest odrzucana.
+- `openingBalance`: string z opcjonalnym minusem, kropką i dokładnie dwoma
+  miejscami po przecinku, w zakresie od `-999999999999.99` do
+  `999999999999.99`. Dopuszczamy np. `"0.10"`, `"-250.50"` i `"0.00"`.
+  `"-0.00"` jest zapisywane i zwracane jako `"0.00"`.
+
+Pominięte pole zachowuje dotychczasową wartość. `null`, pusty obiekt oraz
+dodatkowe pola, w tym `id`, `userId`, `walletId`, `currency` i `balance`, dają
+`400`. Kwoty jako liczby JSON, z przecinkiem, białymi znakami, znakiem plus,
+nadmiarowymi zerami na początku, zapisem wykładniczym albo inną liczbą miejsc
+po przecinku także dają `400`. Błędne żądanie nie zmienia portfela.
+Oba ustawienia są aktualizowane w jednym zapytaniu bazy.
+
+| Status | Znaczenie |
+| --- | --- |
+| `200` | Portfel odczytany lub zaktualizowany. |
+| `400` | Nieprawidłowe dane aktualizacji. |
+| `401` | Brak ważnej sesji, także po jej wygaśnięciu lub wylogowaniu. |
+| `403` | Żądanie zapisujące z obcej strony odrzucone przez globalną ochronę CSRF. |
+| `404` | Brak portfela konta; endpointy nie tworzą go automatycznie. |
+| `500` | Błąd bazy; odpowiedź i log nie zawierają szczegółów zapytania. |
+
+CSRF jest sprawdzane przed sesją, więc obcy origin może otrzymać `403` także
+bez zalogowania. CORS dopuszcza PATCH z zaufanego frontendu z cookies.
+
+Przykładowy odczyt i zmiana po utworzeniu konta z wcześniejszego przykładu:
+
+```bash
+curl -i -c /tmp/finance-wallet-cookies.txt http://localhost:3001/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"anna@example.com","password":"Moje testowe haslo 123!"}'
+
+curl -i -b /tmp/finance-wallet-cookies.txt http://localhost:3001/wallet
+
+curl -i -b /tmp/finance-wallet-cookies.txt -X PATCH http://localhost:3001/wallet \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Budżet domowy","openingBalance":"-250.50"}'
+
+curl -i -b /tmp/finance-wallet-cookies.txt http://localhost:3001/wallet
+
+curl -i -b /tmp/finance-wallet-cookies.txt -c /tmp/finance-wallet-cookies.txt \
+  -X POST http://localhost:3001/auth/logout
+```
+
+Testy `backend/test/wallet-api.integration-spec.ts` sprawdzają rzeczywiste sesje
+i PostgreSQL: odczyt, zapis i częściowe aktualizacje, granice kwot, walidację,
+izolację dwóch kont, CSRF, preflight PATCH, wygaśnięcie sesji, wylogowanie oraz
+bezpieczne błędy. Korzystają z osobnej bazy `DATABASE_URL_TEST` i sprzątają
+własne konta oraz sesje. Przygotowanie bazy opisano w sekcji testów
+integracyjnych. Sam zestaw API portfela uruchomisz poleceniem:
+
+```bash
+npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
+```
 
 ## Logowanie i sesje
 
@@ -304,9 +388,9 @@ operacji biznesowych zmieniających dane. Klienci bez obu nagłówków
 `Sec-Fetch-Site` i `Origin`, np. zwykły curl, pozostają dozwoleni.
 Ochrona opiera się na nagłówkach wysyłanych przez współczesne przeglądarki;
 bardzo stare przeglądarki niewysyłające obu nagłówków wymagałyby ochrony
-tokenowej. CORS udostępnia obecnie metody GET, HEAD i POST; przy dodawaniu
-endpointów PATCH/DELETE należy rozszerzyć tę listę. Globalne sprawdzanie
-CSRF już obejmuje te metody.
+tokenowej. CORS udostępnia obecnie metody GET, HEAD, POST i PATCH; przy dodawaniu
+endpointów DELETE należy rozszerzyć tę listę. Globalne sprawdzanie
+CSRF już obejmuje tę metodę.
 
 `@nestjs/throttler` ogranicza osobno login i rejestrację na podstawie IP:
 
