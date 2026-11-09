@@ -24,3 +24,36 @@ export async function logout(page: Page): Promise<void> {
     page.getByRole('heading', { name: 'Logowanie', exact: true }),
   ).toBeVisible();
 }
+
+export async function saveWallet(
+  page: Page,
+  name: string,
+  openingBalance: string,
+): Promise<void> {
+  await page.getByLabel('Nazwa portfela', { exact: true }).fill(name);
+  await page
+    .getByLabel('Saldo początkowe', { exact: true })
+    .fill(openingBalance);
+  await page.getByRole('button', { name: 'Zapisz zmiany' }).click();
+  await expect(
+    page.getByText('Zmiany zapisane.', { exact: true }),
+  ).toBeVisible();
+}
+
+export async function expectWallet(
+  page: Page,
+  wallet: { name: string; openingBalance: string; balanceText: string },
+): Promise<void> {
+  await expect(
+    page.getByRole('heading', { name: wallet.name, exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Nazwa portfela', { exact: true })).toHaveValue(
+    wallet.name,
+  );
+  await expect(
+    page.getByLabel('Saldo początkowe', { exact: true }),
+  ).toHaveValue(wallet.openingBalance);
+  await expect(page.getByText(wallet.balanceText, { exact: true })).toHaveCount(
+    2,
+  );
+}

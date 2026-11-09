@@ -319,8 +319,23 @@ describe('Private wallet API (PostgreSQL)', () => {
 
     await a.agent
       .patch('/wallet')
-      .send({ openingBalance: '30.30' })
-      .expect(200);
+      .query({ userId: b.user.id, walletId: walletB.id, id: walletB.id })
+      .send({ name: 'Zmieniony portfel A', openingBalance: '30.30' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          name: 'Zmieniony portfel A',
+          openingBalance: '30.30',
+          balance: '30.30',
+        });
+        expect(body.id).not.toBe(walletB.id);
+      });
+    const updatedA = await a.agent.get('/wallet').expect(200);
+    expect(updatedA.body).toMatchObject({
+      name: 'Zmieniony portfel A',
+      openingBalance: '30.30',
+      balance: '30.30',
+    });
     const unchangedB = await b.agent.get('/wallet').expect(200);
     expect(unchangedB.body).toEqual(readB.body);
   });

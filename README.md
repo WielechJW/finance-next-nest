@@ -552,6 +552,26 @@ Testy frontendu obejmują normalizację i prezentację kwot, klienta portfela,
 formularz, blokowanie równoległych zapisów, ponawianie po błędach, nawigację,
 przekierowanie po `401` i spóźnione odpowiedzi po zmianie konta.
 
+Weryfikacja portfela i izolacji kont (etap 2.4, #12):
+
+- Testy API tworzą dwa portfele o różnych nazwach i saldach. Podstawienie
+  identyfikatorów drugiego konta w odczycie lub aktualizacji nie pozwala
+  odczytać ani zmienić jego danych. Niedozwolone pola w treści PATCH dają `400`;
+  parametry URL nie zmieniają właściciela ustalonego z sesji.
+- Playwright zapisuje `Portfel Ani` z saldem `100,50 zł` oraz `Portfel Bartka`
+  z saldem `-20,20 zł`. Sprawdza oba portfele w osobnych kontekstach oraz
+  przełączenie A → wylogowanie → B → wylogowanie → A w jednej przeglądarce.
+  Nazwa, obie kwoty i pola ustawień muszą odpowiadać aktualnemu kontu,
+  także po odświeżeniu.
+- Osobne scenariusze sprawdzają zapis obu granicznych kwot i zachowanie groszy
+  po odświeżeniu. Pusta nazwa, nadmiarowe miejsca dziesiętne, przekroczony
+  zakres i zapis wykładniczy wyświetlają błędy bez wysyłania PATCH.
+  Odświeżenie po błędnej edycji przywraca wcześniej zapisane dane.
+
+Ręcznie można powtórzyć powyższy scenariusz na dwóch kontach: po każdym
+logowaniu sprawdź nazwę, saldo i oba pola ustawień. Po powrocie na konto A
+powinny nadal być widoczne jego wcześniejsze wartości.
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
@@ -631,8 +651,12 @@ Scenariusze `backend/test/browser/*.pw.ts` obejmują:
 - Wygaśnięcie sesji w PostgreSQL przy nadal obecnym cookie przeglądarki.
 - Izolację dwóch kont w oddzielnych kontekstach przeglądarki.
 - Zmianę konta w jednym kontekście i powrót przyciskiem Wstecz po logout.
+- Izolację nazw, sald i ustawień portfela w dwóch kontekstach oraz po zmianie
+  konta A → B → A w jednym kontekście.
 - Edycję portfela z polskim przecinkiem i zachowanie ustawień po odświeżeniu.
 - Zapis Enterem na ekranie 375 px, długą nazwę i graniczne ujemne saldo.
+- Obie graniczne kwoty po odświeżeniu oraz odrzucenie błędnych ustawień
+  bez żądania zapisu i bez zmiany danych w bazie.
 
 Każdy scenariusz używa unikalnych kont i osobnego kontekstu przeglądarki.
 Fixtures sprzątają własne konta oraz ich sesje także po niepowodzeniu testu.
@@ -644,6 +668,10 @@ ponowny odczyt sesji → logout → odrzucenie skopiowanego cookie.
 Przydatne komendy:
 
 ```bash
+# Weryfikacja portfela i izolacji kont z etapu 2.4
+npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
+npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
+
 # Uruchomienie z widocznym oknem Chromium
 npm --prefix backend run test:browser:headed
 
