@@ -18,6 +18,7 @@
     "start:debug": "nest start --debug --watch --path tsconfig.dev.json",
     "start:prod": "node dist/main",
     "lint": "oxlint --type-aware src/ test/ playwright.config.ts",
+    "typecheck": "tsc --noEmit",
     "pretest": "npm run prisma:generate",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -36,7 +37,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:status": "prisma migrate status"
+    "prisma:status": "prisma migrate status",
+    "prisma:seed": "prisma db seed",
+    "prisma:seed:run": "npm run build && node prisma/seed.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.0",

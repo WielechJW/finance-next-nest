@@ -9,6 +9,7 @@ import { configureApp } from '../src/config/configure-app.js';
 import { getFrontendOrigin } from '../src/config/cors.js';
 import { getAuthRateLimitOptions } from '../src/config/rate-limit.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { setCookieHeaders } from './support/cookies.js';
 
 describe('Complete authentication flow (PostgreSQL)', () => {
   const email = 'flow-' + randomUUID() + '@example.invalid';
@@ -77,8 +78,8 @@ describe('Complete authentication flow (PostgreSQL)', () => {
       .send(credentials)
       .expect(200);
     expect(login.body).toEqual(user);
-    const cookieHeader = (login.headers['set-cookie'] as string[]).find(
-      (entry) => entry.startsWith('finance.sid='),
+    const cookieHeader = setCookieHeaders(login).find((entry) =>
+      entry.startsWith('finance.sid='),
     );
     expect(cookieHeader).toBeDefined();
     const cookie = cookieHeader!.split(';')[0]!;

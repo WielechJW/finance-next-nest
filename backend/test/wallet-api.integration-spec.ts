@@ -10,6 +10,7 @@ import { getFrontendOrigin } from '../src/config/cors.js';
 import { getAuthRateLimitOptions } from '../src/config/rate-limit.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import type { WalletResponse } from '../src/wallets/wallet-response.js';
+import { setCookieHeaders } from './support/cookies.js';
 
 describe('Private wallet API (PostgreSQL)', () => {
   const password = 'Wallet integration test password 123!';
@@ -73,7 +74,7 @@ describe('Private wallet API (PostgreSQL)', () => {
       .post('/auth/login')
       .send({ email, password })
       .expect(200);
-    const headers = login.headers['set-cookie'] as string[];
+    const headers = setCookieHeaders(login);
     const cookie = headers
       .find((header) => header.startsWith('finance.sid='))!
       .split(';')[0]!;

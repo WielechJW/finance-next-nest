@@ -5,6 +5,7 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
+    seed: 'npm run prisma:seed:run',
   },
   datasource: {
     // Generation works without a database; migrations require DATABASE_URL.

@@ -101,6 +101,7 @@ Przy działającej bazie zastosuj zapisane migracje:
 
 ```bash
 npm --prefix backend run prisma:deploy
+npm --prefix backend run prisma:seed
 npm --prefix backend run prisma:status
 ```
 
@@ -223,6 +224,28 @@ dokładność groszy i usuwanie kaskadowe. Testy migracji tworzą osobne, losowe
 schematy w zwalidowanej bazie testowej, odtwarzają wcześniejsze migracje
 i sprawdzają aktualizację pustej bazy oraz bazy ze starszymi kontami i sesją.
 Po zakończeniu usuwają wyłącznie własne schematy.
+
+## Modele transakcji i kategorii
+
+Etap 3.1 (#13) dodaje `Transaction`, `Category` i enum `TransactionType`
+(`INCOME`/`EXPENSE`). Transakcja należy do portfela i kategorii, ma dodatnią
+kwotę `Decimal(14,2)`, tytuł, opcjonalną notatkę, datę `occurredOn` typu
+PostgreSQL `DATE` i znaczniki czasu. Złożony klucz obcy wymusza zgodność typu
+transakcji z kategorią. Usunięcie konta lub portfela usuwa jego transakcje;
+kategorie systemowe pozostają.
+
+Po zastosowaniu migracji uruchom powtarzalny seed sześciu kategorii:
+
+```bash
+npm --prefix backend run prisma:deploy
+npm --prefix backend run prisma:seed
+```
+
+Seed buduje backend i zapisuje kategorie po stałych UUID w jednej transakcji.
+Można uruchamiać go wielokrotnie; nie tworzy przykładowych transakcji.
+Szczegóły modeli, identyfikatory kategorii, reguły kwot i dat oraz komendy
+testów opisuje [kontrakt transakcji i kategorii](docs/transactions-api.md).
+Endpointy transakcji, walidacja żądań i wyliczanie salda są kolejnymi zadaniami.
 
 ## API własnego portfela
 
@@ -743,6 +766,8 @@ korzystają już z API działającego na porcie 3001.
 | `backend/src/prisma/prisma.service.ts` | Wspólny klient Prisma i cykl połączenia z bazą. |
 | `backend/prisma/schema.prisma` | Modele danych. |
 | `backend/prisma.config.ts` | Konfiguracja poleceń Prisma i migracji. |
+| `backend/src/categories/system-categories.ts` | Stałe UUID kategorii i ich powtarzalny seed. |
+| `docs/transactions-api.md` | Kontrakt kwot, dat i kategorii transakcji. |
 
 ## Sprawdzenie projektu
 
@@ -751,6 +776,7 @@ npm --prefix frontend run lint
 npm --prefix frontend test
 npm --prefix frontend run build
 npm --prefix backend run lint
+npm --prefix backend run typecheck
 npm --prefix backend test
 npm --prefix backend run test:e2e
 npm --prefix backend run test:integration

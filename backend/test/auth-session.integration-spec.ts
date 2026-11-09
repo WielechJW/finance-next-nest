@@ -15,6 +15,7 @@ import {
   type SessionConfig,
 } from '../src/sessions/session.config.js';
 import { SessionService } from '../src/sessions/session.service.js';
+import { setCookieHeaders } from './support/cookies.js';
 
 describe('Login and PostgreSQL sessions', () => {
   const password = '  Moje testowe hasło 123!  ';
@@ -62,8 +63,8 @@ describe('Login and PostgreSQL sessions', () => {
   }
 
   function cookieFrom(response: request.Response): string {
-    const cookies = response.headers['set-cookie'] as string[] | undefined;
-    const header = cookies?.find((entry) => entry.startsWith('finance.sid='));
+    const cookies = setCookieHeaders(response);
+    const header = cookies.find((entry) => entry.startsWith('finance.sid='));
     expect(header).toBeDefined();
     const cookie = header!.split(';')[0]!;
     sessionIds.add(sidFrom(cookie));
@@ -120,7 +121,7 @@ describe('Login and PostgreSQL sessions', () => {
     const { response, cookie } = await login(`  ${user.email.toUpperCase()} `);
     expect(response.body).toEqual(user);
     expect(response.headers['cache-control']).toBe('no-store');
-    const header = (response.headers['set-cookie'] as string[])[0]!;
+    const header = setCookieHeaders(response)[0]!;
     expect(header).toContain('HttpOnly');
     expect(header).toContain('SameSite=Lax');
     expect(header).toContain('Path=/');
@@ -213,7 +214,7 @@ describe('Login and PostgreSQL sessions', () => {
       .set('Sec-Fetch-Site', 'same-site')
       .set('Cookie', cookie)
       .expect(204);
-    const cleared = (logout.headers['set-cookie'] as string[])[0]!;
+    const cleared = setCookieHeaders(logout)[0]!;
     expect(cleared).toContain('HttpOnly');
     expect(cleared).toContain('SameSite=Lax');
     await request(app.getHttpServer())
@@ -330,7 +331,7 @@ describe('Login and PostgreSQL sessions', () => {
     expect(stored.expire.getTime()).toBeGreaterThan(
       previousExpiry.getTime() + 3000000,
     );
-    const header = (response.headers['set-cookie'] as string[])[0]!;
+    const header = setCookieHeaders(response)[0]!;
     const cookieExpiry = new Date(/Expires=([^;]+)/i.exec(header)![1]!);
     expect(
       Math.abs(cookieExpiry.getTime() - stored.expire.getTime()),
@@ -366,7 +367,7 @@ describe('Login and PostgreSQL sessions', () => {
       .post('/auth/logout')
       .set('Cookie', cookie)
       .expect(204);
-    const header = (response.headers['set-cookie'] as string[])[0]!;
+    const header = setCookieHeaders(response)[0]!;
     expect(header).toMatch(/^finance\.sid=;/);
     expect(header).toContain('Path=/');
     expect(header).toContain('HttpOnly');
@@ -475,15 +476,13 @@ describe('Login and PostgreSQL sessions', () => {
         .send({ email: user.email, password })
         .expect(200);
       const cookie = cookieFrom(response);
-      expect((response.headers['set-cookie'] as string[])[0]).toContain(
-        'Secure',
-      );
+      expect(setCookieHeaders(response)[0]).toContain('Secure');
       const logout = await request(secureApp.getHttpServer())
         .post('/auth/logout')
         .set('X-Forwarded-Proto', 'https')
         .set('Cookie', cookie)
         .expect(204);
-      expect((logout.headers['set-cookie'] as string[])[0]).toContain('Secure');
+      expect(setCookieHeaders(logout)[0]).toContain('Secure');
     } finally {
       await secureApp.close();
     }

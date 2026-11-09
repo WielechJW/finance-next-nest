@@ -23,12 +23,47 @@ enum Currency {
 }
 
 model Wallet {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @unique @db.Uuid
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name           String   @default("Mój portfel")
-  currency       Currency @default(PLN)
-  openingBalance Decimal  @default(0) @db.Decimal(14, 2)
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String        @unique @db.Uuid
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String        @default("Mój portfel")
+  currency       Currency      @default(PLN)
+  openingBalance Decimal       @default(0) @db.Decimal(14, 2)
+  transactions   Transaction[]
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model Category {
+  id           String          @id @default(uuid()) @db.Uuid
+  name         String          @db.VarChar(100)
+  type         TransactionType
+  transactions Transaction[]
+
+  // The composite foreign key also enforces the transaction's direction.
+  @@unique([id, type])
+}
+
+model Transaction {
+  id         String          @id @default(uuid()) @db.Uuid
+  walletId   String          @db.Uuid
+  wallet     Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  type       TransactionType
+  amount     Decimal         @db.Decimal(14, 2)
+  categoryId String          @db.Uuid
+  category   Category        @relation(fields: [categoryId, type], references: [id, type], onDelete: Restrict, onUpdate: Restrict)
+  title      String          @db.VarChar(100)
+  note       String?         @db.VarChar(1000)
+  occurredOn DateTime        @db.Date
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  // SQL migration additionally checks positive finite amounts and ISO date range.
+  @@index([walletId, occurredOn, id])
+  @@index([categoryId, type])
 }
 
 model Session {
