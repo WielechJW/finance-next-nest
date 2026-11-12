@@ -4,7 +4,9 @@ import { isCalendarDate } from "./transaction-input";
 import type {
   CategoryDto,
   CreateTransactionInput,
+  ListTransactionsInput,
   TransactionDto,
+  TransactionListDto,
   TransactionType,
 } from "./transaction-types";
 
@@ -48,7 +50,10 @@ function parseCategory(value: unknown): CategoryDto {
   return { id: value.id, name: value.name, type: value.type };
 }
 
-function parseTransaction(value: unknown): TransactionDto {
+function parseTransaction(
+  value: unknown,
+  message = "Serwer zwrócił nieprawidłowe dane transakcji. Odśwież portfel, aby sprawdzić zapis.",
+): TransactionDto {
   if (
     !value ||
     typeof value !== "object" ||
@@ -80,10 +85,7 @@ function parseTransaction(value: unknown): TransactionDto {
     !("updatedAt" in value) ||
     !isTimestamp(value.updatedAt)
   ) {
-    throw new ApiError(
-      502,
-      "Serwer zwrócił nieprawidłowe dane transakcji. Odśwież portfel, aby sprawdzić zapis.",
-    );
+    throw new ApiError(502, message);
   }
   return {
     id: value.id,
@@ -100,6 +102,79 @@ function parseTransaction(value: unknown): TransactionDto {
 }
 
 export const transactionsApi = {
+  async list(
+    input: ListTransactionsInput = {},
+    signal?: AbortSignal,
+  ): Promise<TransactionListDto> {
+    const params = new URLSearchParams();
+    for (const key of [
+      "type",
+      "categoryId",
+      "from",
+      "to",
+      "page",
+      "pageSize",
+    ] as const) {
+      const value = input[key];
+      if (value !== undefined) params.set(key, String(value));
+    }
+    const query = params.toString();
+    const payload = await apiRequest<unknown>(
+      "/transactions" + (query ? "?" + query : ""),
+      { signal },
+    );
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      !("items" in payload) ||
+      !Array.isArray(payload.items) ||
+      !("page" in payload) ||
+      typeof payload.page !== "number" ||
+      !Number.isSafeInteger(payload.page) ||
+      payload.page < 1 ||
+      payload.page > 2147483647 ||
+      !("pageSize" in payload) ||
+      typeof payload.pageSize !== "number" ||
+      !Number.isSafeInteger(payload.pageSize) ||
+      payload.pageSize < 1 ||
+      payload.pageSize > 100 ||
+      !("total" in payload) ||
+      typeof payload.total !== "number" ||
+      !Number.isSafeInteger(payload.total) ||
+      payload.total < 0 ||
+      payload.page !== (input.page ?? 1) ||
+      payload.pageSize !== (input.pageSize ?? 20) ||
+      payload.items.length !==
+        Math.min(
+          payload.pageSize,
+          Math.max(0, payload.total - (payload.page - 1) * payload.pageSize),
+        )
+    ) {
+      throw new ApiError(
+        502,
+        "Serwer zwrócił nieprawidłową historię transakcji. Spróbuj ponownie.",
+      );
+    }
+    const items = payload.items.map((item) =>
+      parseTransaction(
+        item,
+        "Serwer zwrócił nieprawidłową historię transakcji. Spróbuj ponownie.",
+      ),
+    );
+    if (new Set(items.map((item) => item.id)).size !== items.length) {
+      throw new ApiError(
+        502,
+        "Serwer zwrócił nieprawidłową historię transakcji. Spróbuj ponownie.",
+      );
+    }
+    return {
+      items,
+      page: payload.page,
+      pageSize: payload.pageSize,
+      total: payload.total,
+    };
+  },
+
   async getCategories(signal?: AbortSignal): Promise<CategoryDto[]> {
     const payload = await apiRequest<unknown>("/categories", { signal });
     if (!Array.isArray(payload))

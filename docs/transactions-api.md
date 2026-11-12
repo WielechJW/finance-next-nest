@@ -5,6 +5,7 @@ udostępnia `GET /categories` i `POST /transactions` z walidacją żądań.
 Etap 3.3 (#15) wylicza saldo z historii w GET i PATCH portfela.
 Etap 3.4 (#16) udostępnia listę i szczegóły własnych transakcji.
 Etap 3.5 (#17) dodaje formularz zapisu w zakładce Transakcje.
+Etap 3.6 (#18) łączy historię w panelu z filtrami i paginacją API.
 
 ## Endpointy
 
@@ -313,14 +314,38 @@ odrzucenie zapisu zachowuje dane, a `401` uruchamia wspólne wylogowanie.
 
 POST jest blokowany przed równoległymi wysłaniami. Po sukcesie formularz
 czyści kwotę, tytuł i notatkę, zachowując typ, kategorię i datę. Callback
-`onCreated(transaction)` powiadamia widok o nowej operacji i może zostać
-wykorzystany do odświeżania historii w #18.
+`onCreated(transaction)` powiadamia widok o nowej operacji i uruchamia
+niezależne odświeżenie salda oraz pierwszej strony historii z aktywnymi filtrami.
 
 Odświeżenie salda jest osobnym żądaniem GET po potwierdzonym zapisie.
 Jego błąd zachowuje komunikat sukcesu i udostępnia przycisk ponawiający sam
 odczyt portfela. Klient wybiera jawne pola żądania i sprawdza strukturę
 odpowiedzi, format kwoty i daty. Stan i oczekujące żądania są przypisane
 do aktualnego konta, a opuszczenie widoku anuluje żądania.
+
+## Historia w przeglądarce
+
+Pod formularzem znajduje się lista z datą `DD.MM.RRRR`, tytułem, nazwą
+kategorii, typem oraz kwotą ze znakiem. Daty kalendarzowe są formatowane
+bez przeliczania stref czasowych. Opisy Przychód/Wydatek uzupełniają kolory.
+Kategorie są pobierane wspólnie dla listy, filtrów i formularza dodawania.
+
+Formularz filtrów ma osobny stan wpisywanych wartości. **Filtruj** sprawdza
+zakres dat i zgodność kategorii z typem, a następnie wywołuje GET historii
+od pierwszej strony. **Wyczyść filtry** pomija wszystkie opcjonalne parametry
+i także wraca na stronę 1. Widok korzysta ze stałego `pageSize=20`.
+Zmiana strony zachowuje zastosowane filtry, a `total` wyznacza liczbę stron.
+
+Każdy wynik jest przypisany do konkretnego żądania. Zmiana filtrów, strony,
+ponowienie lub zapis nowej operacji unieważnia poprzedni wynik i anuluje
+zastąpione żądanie. Jeżeli strona przekroczy nowy koniec zbioru, pobierana
+jest ostatnia dostępna strona. Zmiana konta czyści filtry i historię.
+
+Pusta historia udostępnia link do formularza, a brak dopasowań filtra ma
+osobny komunikat z resetem. Błąd odczytu historii można ponowić z tymi
+samymi filtrami. Historia nie ogranicza salda z GET portfela. Sukces POST
+jest prezentowany także wtedy, gdy nowa operacja nie pasuje do filtra,
+a ponowienie błędu historii wykonuje wyłącznie GET.
 
 ## Weryfikacja
 
@@ -333,6 +358,7 @@ npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
 npm --prefix frontend test
 npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
 npm --prefix backend run test:browser -- transactions.pw.ts
+npm --prefix backend run test:browser -- transaction-history.pw.ts
 ```
 
 Testy korzystają wyłącznie z osobnej bazy `DATABASE_URL_TEST`. Sprawdzają
@@ -365,3 +391,10 @@ odpowiedzi API, powtórne wysłania, błędy sieci i spóźnione odpowiedzi po
 zmianie konta. Chromium zapisuje oba typy operacji w rzeczywistej bazie,
 sprawdza aktualizację salda, ponowienie po awarii, wygaśnięcie sesji oraz
 obsługę klawiaturą na wąskim ekranie.
+
+Testy widoku historii sprawdzają serializację parametrów i walidację stron
+API, kalendarzowe daty, nazwy kategorii i znaki kwot, zastosowanie i reset
+filtrów, przełączanie stron oraz spóźnione odpowiedzi. Chromium używa zbioru
+przekraczającego 20 operacji i sprawdza granice dat, globalne saldo,
+odświeżenie po POST z aktywnym filtrem, błędy GET, wygaśnięcie sesji,
+izolację kont i układ na ekranie 375 px.

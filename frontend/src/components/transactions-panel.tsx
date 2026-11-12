@@ -7,6 +7,11 @@ import { walletApi } from "@/lib/wallet-api";
 import type { WalletDto } from "@/lib/wallet-types";
 import { useSession } from "./session-provider";
 import { TransactionForm } from "./transaction-form";
+import {
+  TransactionHistory,
+  type TransactionHistoryQuery,
+} from "./transaction-history";
+import { useTransactionCategories } from "./use-transaction-categories";
 import styles from "./transaction-form.module.css";
 
 type WalletState =
@@ -21,6 +26,12 @@ export function TransactionsPanel() {
 }
 
 function TransactionsContent() {
+  const categories = useTransactionCategories();
+  const [historyQuery, setHistoryQuery] = useState<TransactionHistoryQuery>({
+    filters: {},
+    page: 1,
+    revision: 0,
+  });
   const [wallet, setWallet] = useState<WalletState>({ status: "loading" });
   const [revision, setRevision] = useState(0);
   const walletRequest = useRef<AbortController | null>(null);
@@ -56,6 +67,15 @@ function TransactionsContent() {
     setRevision((value) => value + 1);
   }
 
+  function created() {
+    refreshWallet();
+    setHistoryQuery((previous) => ({
+      ...previous,
+      page: 1,
+      revision: previous.revision + 1,
+    }));
+  }
+
   return (
     <section aria-labelledby="transactions-heading" className={styles.panel}>
       <h1 id="transactions-heading">Transakcje</h1>
@@ -82,7 +102,12 @@ function TransactionsContent() {
           </>
         )}
       </section>
-      <TransactionForm onCreated={refreshWallet} />
+      <TransactionForm onCreated={created} categories={categories} />
+      <TransactionHistory
+        categories={categories}
+        query={historyQuery}
+        setQuery={setHistoryQuery}
+      />
     </section>
   );
 }

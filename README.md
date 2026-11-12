@@ -671,8 +671,8 @@ Po sukcesie formularz pokazuje potwierdzenie i czyści kwotę, tytuł oraz
 notatkę, pozostawiając typ, kategorię i datę dla kolejnej operacji. Saldo jest
 pobierane ponownie z `GET /wallet`. Jeżeli ten odczyt zawiedzie, potwierdzenie
 zapisu pozostaje widoczne, a **Odśwież saldo** ponawia wyłącznie GET.
-Przejście do Portfela również pobiera aktualne dane. Formularz udostępnia
-callback `onCreated` do podłączenia odświeżania historii w etapie 3.6 (#18).
+Przejście do Portfela również pobiera aktualne dane. Callback `onCreated`
+odświeża także historię, zachowując aktywne filtry i wracając na pierwszą stronę.
 Stan widoku jest powiązany z kontem; opuszczenie widoku lub zmiana konta
 anuluje oczekujące żądania i ignoruje ich spóźnione odpowiedzi.
 
@@ -690,6 +690,47 @@ Testy formularza, klienta API, warszawskiej daty, błędów i sesji:
 ```bash
 npm --prefix frontend test
 npm --prefix backend run test:browser -- transactions.pw.ts wallet.pw.ts auth-session.pw.ts
+```
+
+## Historia transakcji w panelu
+
+Etap 3.6 (#18) dodaje historię pod formularzem na `/dashboard/transactions`.
+Każda operacja pokazuje tytuł, datę kalendarzową w formacie `DD.MM.RRRR`,
+nazwę kategorii, typ oraz kwotę. Przychody mają znak `+` i opis Przychód,
+a wydatki znak `−` i opis Wydatek; kolor jest dodatkowym wyróżnieniem.
+Formularz i historia korzystają ze wspólnie pobranych kategorii.
+
+Filtry typu, kategorii oraz dat od–do działają po wybraniu **Filtruj**.
+Obie daty graniczne są wliczane. Zmiana typu czyści kategorię, jeżeli
+nie pasuje ona do nowego typu. Błędny lub odwrócony zakres dat wskazuje
+pole do poprawy. **Wyczyść filtry** przywraca pełną historię.
+
+Lista pokazuje po 20 rekordów, liczbę wyników oraz numer strony.
+Przyciski **Poprzednia strona** i **Następna strona** pobierają kolejne wyniki
+z API w kolejności daty i ID. Zastosowanie lub reset filtrów wraca na stronę 1.
+Gdy po zmianie danych ostatnia strona przestanie istnieć, widok pobiera
+ostatnią dostępną stronę. Saldo nad formularzem pozostaje globalne.
+
+Pusta historia zachęca do dodania pierwszej operacji. Brak wyników filtra
+ma osobny komunikat i przycisk **Pokaż całą historię**. Ładowanie, błąd
+i ponowienie dotyczą historii niezależnie od formularza i salda. Spóźnione
+odpowiedzi dla poprzednich filtrów, strony lub konta są ignorowane,
+a zastąpione żądania są anulowane.
+
+Po dodaniu operacji lista i saldo odświeżają się osobno. Aktywne filtry
+pozostają; nowa operacja pojawi się w historii, jeśli do nich pasuje.
+Komunikat potwierdzający zapis pozostaje widoczny również wtedy, gdy filtr
+wyklucza nowy wpis albo odczyt historii zawiedzie. Ponowienie historii
+wykonuje wyłącznie GET.
+
+Ręcznie sprawdź przejście na drugą stronę przy co najmniej 21 wpisach,
+zastosowanie filtrów i powrót na stronę 1, reset oraz dodanie przychodu
+przy aktywnym filtrze wydatków. Saldo powinno uwzględnić nową operację,
+a historia zachować wybrany filtr.
+
+```bash
+npm --prefix frontend test
+npm --prefix backend run test:browser -- transaction-history.pw.ts transactions.pw.ts
 ```
 
 ## Testy integracyjne z PostgreSQL
@@ -783,6 +824,10 @@ Scenariusze `backend/test/browser/*.pw.ts` obejmują:
 - Zachowanie danych po błędzie sieci, blokowanie równoległych zapisów,
   ponawianie samego odczytu salda i przekierowanie po wygaśnięciu sesji.
 - Walidację pól i zapis klawiaturą na ekranie 375 px.
+- Historię z wieloma stronami, łączone filtry i reset, odświeżenie po zapisie,
+  ponowienie błędu historii i globalne saldo niezależne od filtrów.
+- Izolację historii po zmianie konta, wygaśnięcie sesji przy filtrowaniu
+  i czytelne daty oraz przyciski na ekranie 375 px.
 - Saldo z historii zawierającej przyszłą operację oraz przeliczenie wyniku
   po zmianie salda początkowego i po odświeżeniu strony.
 - Saldo większe od zakresu pojedynczej kwoty z zachowaniem groszy
@@ -804,6 +849,9 @@ npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
 
 # Formularze transakcji i aktualizacja salda (etap 3.5)
 npm --prefix backend run test:browser -- transactions.pw.ts
+
+# Historia, filtry i paginacja (etap 3.6)
+npm --prefix backend run test:browser -- transaction-history.pw.ts
 
 # Uruchomienie z widocznym oknem Chromium
 npm --prefix backend run test:browser:headed
@@ -871,6 +919,8 @@ korzystają już z API działającego na porcie 3001.
 | `frontend/src/app/layout.tsx` | Wspólny układ stron i metadane. |
 | `frontend/src/components/transaction-form.tsx` | Formularz dodawania wydatków i przychodów. |
 | `frontend/src/components/transactions-panel.tsx` | Zakładka Transakcje i odświeżanie salda po zapisie. |
+| `frontend/src/components/transaction-history.tsx` | Historia z filtrami, paginacją i obsługą stanu pobierania. |
+| `frontend/src/components/use-transaction-categories.ts` | Wspólne pobieranie kategorii dla formularza i historii. |
 | `frontend/src/lib/transactions-api.ts` | Klient API kategorii i zapisu transakcji z walidacją odpowiedzi. |
 | `frontend/src/lib/transaction-input.ts` | Dodatnie kwoty, daty kalendarzowe i dzisiejsza data w Warszawie. |
 | `backend/src/main.ts` | Uruchomienie serwera NestJS na porcie 3001. |

@@ -9,7 +9,9 @@ async function openTransactions(page: Page) {
     page.getByRole('link', { name: 'Transakcje', exact: true }),
   ).toHaveAttribute('aria-current', 'page');
   await expect(
-    page.getByRole('option', { name: 'Jedzenie', exact: true }),
+    page
+      .getByRole('form', { name: 'Nowa transakcja', exact: true })
+      .getByRole('option', { name: 'Jedzenie', exact: true }),
   ).toBeAttached();
 }
 
@@ -60,7 +62,9 @@ test('adds an expense and income, refreshes the balance and preserves the result
   await page.getByLabel('Typ operacji', { exact: true }).selectOption('INCOME');
   await expect(page.getByLabel('Kategoria', { exact: true })).toHaveValue('');
   await expect(
-    page.getByRole('option', { name: 'Jedzenie', exact: true }),
+    page
+      .getByRole('form', { name: 'Nowa transakcja', exact: true })
+      .getByRole('option', { name: 'Jedzenie', exact: true }),
   ).toHaveCount(0);
   await fillTransaction(page, true, '50,20');
   await page
@@ -130,7 +134,11 @@ test('preserves all fields after a network error and saves exactly one transacti
   await expect(
     page.getByText('Wydatek zapisany.', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('-12,50 zł', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Saldo portfela', exact: true })
+      .getByText('-12,50 zł', { exact: true }),
+  ).toBeVisible();
   expect(posts).toBe(2);
   await expectTotal(page, 1);
 });
@@ -168,7 +176,11 @@ test('retries only the wallet read after it fails following a confirmed save', a
   await page
     .getByRole('button', { name: 'Odśwież saldo', exact: true })
     .click();
-  await expect(page.getByText('-12,50 zł', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Saldo portfela', exact: true })
+      .getByText('-12,50 zł', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByLabel('Kwota', { exact: true })).toHaveValue('');
   await expectTotal(page, 1);
 });
@@ -271,5 +283,9 @@ test('validates fields and supports keyboard submission on a narrow screen', asy
   await expect(
     page.getByText('Wydatek zapisany.', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('-0,10 zł', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Saldo portfela', exact: true })
+      .getByText('-0,10 zł', { exact: true }),
+  ).toBeVisible();
 });

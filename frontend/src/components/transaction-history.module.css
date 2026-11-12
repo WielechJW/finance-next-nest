@@ -1,0 +1,136 @@
+.history {
+  margin-top: 36px;
+  padding-top: 28px;
+  border-top: 1px solid #e2e8f0;
+}
+.history h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.history h2:focus {
+  outline: none;
+}
+.filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.field label {
+  font-weight: 600;
+}
+.field :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #64748b;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+}
+.field [aria-invalid="true"] {
+  border-color: #b91c1c;
+}
+.field :is(input, select):focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 3px;
+}
+.actions,
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.history .secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.history .secondary:hover {
+  background: #cbd5e1;
+}
+.history .error {
+  color: #b91c1c;
+  font-size: 14px;
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.list li {
+  min-width: 0;
+  padding: 16px 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+}
+.list h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.list dl {
+  display: grid;
+  grid-template-columns: 1.15fr 1.3fr 1fr 1.5fr;
+  gap: 12px;
+  margin: 0;
+}
+.list dl > div {
+  min-width: 0;
+}
+.list dt {
+  color: #475569;
+  font-size: 13px;
+}
+.list dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.income {
+  color: #166534;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.expense {
+  color: #b91c1c;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.empty {
+  padding: 20px;
+  border: 1px dashed #94a3b8;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.empty p {
+  margin-top: 0;
+}
+.empty a {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+@media (max-width: 600px) {
+  .filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .list dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .list li {
+    padding: 16px;
+  }
+  .actions,
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

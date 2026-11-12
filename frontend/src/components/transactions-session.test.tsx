@@ -1,6 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { categories, wallet } from "../../test/transactions";
+import { categories, wallet, historyPage } from "../../test/transactions";
 import { ProtectedDashboard } from "./protected-dashboard";
 import { SessionProvider } from "./session-provider";
 import { TransactionsPanel } from "./transactions-panel";
@@ -12,18 +18,20 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("Transaction session integration", () => {
-  it.each(["categories", "create"] as const)(
+  it.each(["categories", "create", "history"] as const)(
     "redirects to login after a 401 during %s",
     async (operation) => {
       router.replace.mockReset();
       vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:3001");
       vi.stubGlobal(
         "fetch",
-        vi.fn<typeof fetch>().mockImplementation(async (input) => {
+        vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
           const path = new URL(String(input)).pathname;
           const unauthorized =
             (operation === "categories" && path === "/categories") ||
-            path === "/transactions";
+            (path === "/transactions" &&
+              ((operation === "create" && init?.method === "POST") ||
+                operation === "history"));
           return new Response(
             JSON.stringify(
               unauthorized
@@ -36,7 +44,9 @@ describe("Transaction session integration", () => {
                     }
                   : path === "/categories"
                     ? categories
-                    : wallet,
+                    : path === "/transactions"
+                      ? historyPage(1, 0)
+                      : wallet,
             ),
             { status: unauthorized ? 401 : 200 },
           );
@@ -50,7 +60,9 @@ describe("Transaction session integration", () => {
         </SessionProvider>,
       );
       if (operation === "create") {
-        await screen.findByRole("option", { name: "Jedzenie" });
+        await within(
+          await screen.findByRole("form", { name: "Nowa transakcja" }),
+        ).findByRole("option", { name: "Jedzenie" });
         fireEvent.change(screen.getByLabelText("Kwota"), {
           target: { value: "12,50" },
         });

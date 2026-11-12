@@ -8,11 +8,11 @@ import {
   warsawToday,
 } from "@/lib/transaction-input";
 import { isTransactionType, transactionsApi } from "@/lib/transactions-api";
-import type {
-  CategoryDto,
-  TransactionDto,
-  TransactionType,
-} from "@/lib/transaction-types";
+import type { TransactionDto, TransactionType } from "@/lib/transaction-types";
+import {
+  useTransactionCategories,
+  type TransactionCategories,
+} from "./use-transaction-categories";
 import styles from "./transaction-form.module.css";
 
 type Draft = {
@@ -25,10 +25,6 @@ type Draft = {
 };
 type Field = keyof Draft;
 type Errors = Partial<Record<Field, string>>;
-type CategoriesState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; items: CategoryDto[] };
 
 function FieldError({ name, message }: { name: Field; message?: string }) {
   return message ? (
@@ -38,11 +34,29 @@ function FieldError({ name, message }: { name: Field; message?: string }) {
   ) : null;
 }
 
+type FormProps = { onCreated: (transaction: TransactionDto) => void };
+
 export function TransactionForm({
+  categories,
+  ...props
+}: FormProps & { categories?: TransactionCategories }) {
+  return categories ? (
+    <TransactionFormContent {...props} resource={categories} />
+  ) : (
+    <StandaloneTransactionForm {...props} />
+  );
+}
+
+function StandaloneTransactionForm(props: FormProps) {
+  const resource = useTransactionCategories();
+  return <TransactionFormContent {...props} resource={resource} />;
+}
+
+function TransactionFormContent({
   onCreated,
-}: {
-  onCreated: (transaction: TransactionDto) => void;
-}) {
+  resource,
+}: FormProps & { resource: TransactionCategories }) {
+  const { state: categories, retry: retryCategories } = resource;
   const [values, setValues] = useState<Draft>(() => ({
     type: "EXPENSE",
     amount: "",
@@ -51,42 +65,12 @@ export function TransactionForm({
     occurredOn: warsawToday(),
     note: "",
   }));
-  const [categories, setCategories] = useState<CategoriesState>({
-    status: "loading",
-  });
-  const [attempt, setAttempt] = useState(0);
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   const saveController = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void transactionsApi.getCategories(controller.signal).then(
-      (items) => {
-        if (!controller.signal.aborted)
-          setCategories({ status: "ready", items });
-      },
-      (error: unknown) => {
-        if (
-          controller.signal.aborted ||
-          isAbortError(error) ||
-          (error instanceof ApiError && error.status === 401)
-        )
-          return;
-        setCategories({
-          status: "error",
-          message:
-            error instanceof ApiError
-              ? error.message
-              : "Nie udało się pobrać kategorii.",
-        });
-      },
-    );
-    return () => controller.abort();
-  }, [attempt]);
 
   useEffect(
     () => () => {
@@ -211,7 +195,9 @@ export function TransactionForm({
       className={styles.formSection}
       aria-labelledby="transaction-form-heading"
     >
-      <h2 id="transaction-form-heading">Nowa transakcja</h2>
+      <h2 id="transaction-form-heading" tabIndex={-1}>
+        Nowa transakcja
+      </h2>
       {categories.status === "loading" && (
         <p role="status">Ładowanie kategorii…</p>
       )}
@@ -220,13 +206,7 @@ export function TransactionForm({
           <p role="alert">
             Nie udało się pobrać kategorii. {categories.message}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setCategories({ status: "loading" });
-              setAttempt((value) => value + 1);
-            }}
-          >
+          <button type="button" onClick={retryCategories}>
             Ponów pobieranie kategorii
           </button>
         </div>

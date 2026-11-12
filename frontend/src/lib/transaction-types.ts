@@ -22,3 +22,22 @@ export interface TransactionDto extends Omit<CreateTransactionInput, "note"> {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface TransactionFilters {
+  type?: TransactionType;
+  categoryId?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface ListTransactionsInput extends TransactionFilters {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface TransactionListDto {
+  items: TransactionDto[];
+  page: number;
+  pageSize: number;
+  total: number;
+}

@@ -1,4 +1,8 @@
-import type { CategoryDto, TransactionDto } from "../src/lib/transaction-types";
+import type {
+  CategoryDto,
+  TransactionDto,
+  TransactionListDto,
+} from "../src/lib/transaction-types";
 import type { WalletDto } from "../src/lib/wallet-types";
 
 export const categories: CategoryDto[] = [
@@ -38,4 +42,24 @@ export function deferred<T>() {
     resolve = done;
   });
   return { promise, resolve };
+}
+
+export function historyPage(page = 1, total = 1): TransactionListDto {
+  return {
+    page,
+    pageSize: 20,
+    total,
+    items: Array.from(
+      { length: Math.min(20, Math.max(0, total - (page - 1) * 20)) },
+      (_, index) => {
+        const number = (page - 1) * 20 + index + 1;
+        return {
+          ...transaction,
+          id:
+            "20000000-0000-4000-8000-" + number.toString(16).padStart(12, "0"),
+          title: "Operacja " + number,
+        };
+      },
+    ),
+  };
 }

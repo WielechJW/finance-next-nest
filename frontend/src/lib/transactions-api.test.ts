@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { categories, transaction } from "../../test/transactions";
+import { categories, transaction, historyPage } from "../../test/transactions";
 import { UNAUTHORIZED_EVENT } from "./api-client";
 import { transactionsApi } from "./transactions-api";
 
@@ -77,7 +77,60 @@ describe("Transaction API client", () => {
       transactionsApi.create({ ...transaction, note: undefined }),
     ).rejects.toMatchObject({ status: 502 });
   });
-  it.each(["categories", "create"] as const)(
+  it("serializes only active filters and pagination, and validates the returned page", async () => {
+    const data = historyPage(2, 21);
+    fetchMock.mockResolvedValueOnce(json(data));
+    expect(
+      await transactionsApi.list({
+        type: "EXPENSE",
+        categoryId: transaction.categoryId,
+        from: "2026-11-01",
+        to: "2026-11-30",
+        page: 2,
+        pageSize: 20,
+      }),
+    ).toEqual(data);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    const parsed = new URL(String(url));
+    expect(parsed.pathname).toBe("/transactions");
+    expect(Object.fromEntries(parsed.searchParams)).toEqual({
+      type: "EXPENSE",
+      categoryId: transaction.categoryId,
+      from: "2026-11-01",
+      to: "2026-11-30",
+      page: "2",
+      pageSize: "20",
+    });
+    expect(init).toMatchObject({ credentials: "include", cache: "no-store" });
+  });
+  it("omits the query string for an unfiltered default request", async () => {
+    fetchMock.mockResolvedValueOnce(json(historyPage(1, 0)));
+    await transactionsApi.list();
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "http://localhost:3001/transactions",
+    );
+  });
+  it.each([
+    null,
+    {},
+    { ...historyPage(), page: "1" },
+    { ...historyPage(), total: -1 },
+    { ...historyPage(), pageSize: 101 },
+    { ...historyPage(), page: 2 },
+    { ...historyPage(), total: 2 },
+    { ...historyPage(), items: [{ ...transaction, amount: 12.5 }] },
+    { ...historyPage(1, 2), items: [transaction, transaction] },
+  ])(
+    "rejects malformed history or inconsistent pagination (%#)",
+    async (payload) => {
+      fetchMock.mockResolvedValueOnce(json(payload));
+      await expect(transactionsApi.list()).rejects.toMatchObject({
+        status: 502,
+      });
+    },
+  );
+
+  it.each(["categories", "create", "history"] as const)(
     "notifies the session about a 401 during %s",
     async (operation) => {
       const listener = vi.fn();
@@ -87,7 +140,9 @@ describe("Transaction API client", () => {
         await expect(
           operation === "categories"
             ? transactionsApi.getCategories()
-            : transactionsApi.create({ ...transaction, note: undefined }),
+            : operation === "history"
+              ? transactionsApi.list()
+              : transactionsApi.create({ ...transaction, note: undefined }),
         ).rejects.toMatchObject({ status: 401 });
         expect(listener).toHaveBeenCalledOnce();
       } finally {
