@@ -246,14 +246,16 @@ Można uruchamiać go wielokrotnie; nie tworzy przykładowych transakcji.
 Szczegóły modeli, identyfikatory kategorii, reguły kwot i dat oraz komendy
 testów opisuje [kontrakt transakcji i kategorii](docs/transactions-api.md).
 
-## API kategorii i dodawania transakcji
+## API kategorii i transakcji
 
-Etap 3.2 (#14) udostępnia dwa endpointy wymagające aktywnej sesji:
+Etapy 3.2 (#14) i 3.4 (#16) udostępniają endpointy wymagające aktywnej sesji:
 
 | Endpoint | Wynik |
 | --- | --- |
 | `GET /categories?type=EXPENSE` | `200` z kategoriami wydatków. `INCOME` wybiera przychody, brak filtra zwraca wszystkie kategorie. |
 | `POST /transactions` | `201` z transakcją zapisaną w portfelu użytkownika z sesji. |
+| `GET /transactions` | `200` z historią własnego portfela, filtrami, paginacją i licznikiem `total`. |
+| `GET /transactions/:id` | `200` ze szczegółami własnej operacji; cudza lub nieistniejąca daje `404`. |
 
 Transakcja przyjmuje `type`, `amount`, `categoryId`, `title`, `occurredOn`
 i opcjonalne `note`. Kwota jest dodatnim stringiem z dokładnie dwoma miejscami
@@ -261,12 +263,22 @@ po przecinku; API sprawdza również istnienie daty i zgodność typu kategorii.
 Właściciel i portfel wynikają wyłącznie z sesji, a dodatkowe pola żądania
 są odrzucane. Zapis korzysta z istniejącej globalnej ochrony CSRF.
 
+Historia obsługuje opcjonalne filtry `type`, `categoryId`, `from` i `to`,
+które można łączyć. Obie daty graniczne są wliczane. Domyślna paginacja to
+`page=1&pageSize=20`, a maksymalny rozmiar strony wynosi 100. Wyniki są
+sortowane po dacie operacji i identyfikatorze, malejąco. Odpowiedź zawiera
+`items`, `page`, `pageSize` i `total`; licznik dotyczy wszystkich pasujących
+własnych operacji. Lista i licznik są odczytywane z jednego obrazu danych.
+Pusta lub zbyt odległa poprawna strona daje pustą tablicę i status `200`.
+Nieprawidłowe daty, odwrócony zakres i błędna paginacja dają `400`.
+
 Przykłady żądań curl, odpowiedzi i statusy błędów opisuje
 [kontrakt transakcji i kategorii](docs/transactions-api.md).
 Testy API z rzeczywistym PostgreSQL uruchomisz poleceniem:
 
 ```bash
 npm --prefix backend run test:integration -- test/transaction-api.integration-spec.ts
+npm --prefix backend run test:integration -- test/transaction-read.integration-spec.ts
 ```
 
 Etap 3.3 (#15) wylicza saldo portfela z całej historii zapisanych transakcji.
@@ -814,7 +826,8 @@ korzystają już z API działającego na porcie 3001.
 | `backend/prisma.config.ts` | Konfiguracja poleceń Prisma i migracji. |
 | `backend/src/categories/system-categories.ts` | Stałe UUID kategorii i ich powtarzalny seed. |
 | `backend/src/categories/categories.controller.ts` | API odczytu kategorii z filtrem typu. |
-| `backend/src/transactions/transactions.controller.ts` | API dodawania operacji do własnego portfela. |
+| `backend/src/transactions/transactions.controller.ts` | API dodawania, historii i szczegółów własnych transakcji. |
+| `backend/src/transactions/dto/list-transactions.dto.ts` | Walidacja filtrów i paginacji historii. |
 | `backend/src/wallets/wallet-balance.ts` | Wspólna agregacja salda z historii dla GET i PATCH portfela. |
 | `docs/transactions-api.md` | Kontrakt kwot, dat i kategorii transakcji. |
 

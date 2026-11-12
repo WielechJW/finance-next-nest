@@ -12,3 +12,10 @@ export interface TransactionResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface TransactionListResponse {
+  items: TransactionResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+}

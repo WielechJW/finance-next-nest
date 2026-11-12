@@ -3,11 +3,12 @@
 Etap 3.1 (#13) dodaje modele, migrację i seed kategorii. Etap 3.2 (#14)
 udostępnia `GET /categories` i `POST /transactions` z walidacją żądań.
 Etap 3.3 (#15) wylicza saldo z historii w GET i PATCH portfela.
+Etap 3.4 (#16) udostępnia listę i szczegóły własnych transakcji.
 Formularze dodawania operacji są kolejnym zadaniem (#17).
 
 ## Endpointy
 
-Oba endpointy wymagają aktywnej sesji (`finance.sid`) i zwracają
+Wszystkie endpointy wymagają aktywnej sesji (`finance.sid`) i zwracają
 `Cache-Control: no-store`. Przeglądarka wysyła cookie przez
 `credentials: 'include'`. Globalna ochrona CSRF sprawdza zapisujące żądania
 przed odczytem sesji; frontend musi mieć origin zgodny z `FRONTEND_ORIGIN`.
@@ -18,6 +19,8 @@ Bezpośredni klient bez nagłówków przeglądarki, np. curl, także może używ
 | `GET /categories` | `200` z tablicą wszystkich kategorii systemowych. |
 | `GET /categories?type=EXPENSE` | `200` z kategoriami wydatków; `INCOME` wybiera przychody. |
 | `POST /transactions` | `201` z utworzoną transakcją w portfelu użytkownika z sesji. |
+| `GET /transactions` | `200` z własną historią, filtrami i paginacją. |
+| `GET /transactions/:id` | `200` ze szczegółami własnej transakcji. |
 
 Kategorie są sortowane rosnąco po stabilnym UUID. Każda pozycja zawiera
 wyłącznie `id`, `name` i `type`. Brak pasujących kategorii daje pustą tablicę.
@@ -32,13 +35,66 @@ bez treści transakcji i szczegółów zapytań w odpowiedzi lub logach.
 
 | Status | Znaczenie |
 | --- | --- |
-| `200` | Kategorie zostały pobrane. |
+| `200` | Kategorie, historia albo szczegóły transakcji zostały pobrane. |
 | `201` | Transakcja została zapisana. |
-| `400` | Błędne dane, dodatkowe pola, nieprawidłowa kategoria lub zmienione w trakcie zapisu powiązanie. |
+| `400` | Błędne dane, filtry, zakres dat, paginacja lub UUID; dodatkowe pola; nieprawidłowa kategoria zapisu lub zmienione powiązanie. |
 | `401` | Brak sesji, sesja wygasła albo użytkownik został wylogowany. |
 | `403` | Ochrona CSRF odrzuciła zapis z niezaufanego pochodzenia. |
-| `404` | Użytkownik nie ma portfela. |
-| `500` | Nie udało się odczytać kategorii albo zapisać transakcji. |
+| `404` | Przy zapisie użytkownik nie ma portfela; przy odczycie szczegółów transakcja nie istnieje albo należy do innego konta. |
+| `500` | Nie udało się odczytać kategorii lub transakcji albo zapisać transakcji. |
+
+## Historia i szczegóły transakcji
+
+`GET /transactions` zwraca obiekt z polami `items`, `page`, `pageSize` i `total`.
+Każda pozycja `items` ma ten sam format co odpowiedź POST opisana poniżej:
+kwota jest stringiem z dwoma miejscami po przecinku, a `occurredOn` datą
+`YYYY-MM-DD`. Wyniki są sortowane po `occurredOn DESC`, następnie po `id DESC`.
+Identyfikator zapewnia stałą kolejność operacji zapisanych na ten sam dzień.
+
+| Parametr | Reguła |
+| --- | --- |
+| `type` | Opcjonalnie `INCOME` albo `EXPENSE`. |
+| `categoryId` | Opcjonalny UUID kategorii. Poprawny UUID bez pasujących operacji daje pustą listę, także dla nieistniejącej kategorii. |
+| `from` | Opcjonalna istniejąca data `YYYY-MM-DD`; operacje z tego dnia są wliczane. |
+| `to` | Opcjonalna istniejąca data `YYYY-MM-DD`; operacje z tego dnia są wliczane. Przy obu datach `from` musi być wcześniejsze lub równe `to`. |
+| `page` | Domyślnie `1`; dodatnia liczba całkowita, najwyżej `2147483647`. |
+| `pageSize` | Domyślnie `20`; dodatnia liczba całkowita od `1` do `100`. |
+
+Filtry można łączyć; pominięta granica dat pozostawia zakres otwarty z tej
+strony. Przyszłe daty są obsługiwane tak samo jak przy zapisie operacji.
+Paginacja akceptuje cyfry bez znaku, białych znaków, części dziesiętnej,
+zapisu wykładniczego ani zer wiodących. Offset `(page - 1) * pageSize`
+może wynosić najwyżej `2147483647`; większy daje `400`.
+
+Puste wartości, powtórzone parametry, tablice, nieprawidłowe daty, odwrócony
+zakres i nieznane parametry są odrzucane kodem `400`. Obejmuje to próbę
+przekazania `userId` lub `walletId`. Właściciel historii wynika z sesji.
+
+`total` jest liczbą wszystkich własnych rekordów pasujących do filtrów,
+przed podziałem na strony. W ramach jednego żądania lista i licznik korzystają
+z tych samych warunków oraz transakcji z izolacją `RepeatableRead`, aby
+zachować spójność przy równoległych zapisach.
+
+Pusta historia lub brak wyników daje `200`, np.:
+
+```json
+{
+  "items": [],
+  "page": 1,
+  "pageSize": 20,
+  "total": 0
+}
+```
+
+Strona poza końcem zbioru także zwraca `200` z pustym `items` i właściwym
+`total`. Usunięty portfel daje pustą kolekcję i nie jest odtwarzany przez GET.
+Filtry i paginacja historii nie zmieniają globalnego salda portfela.
+
+`GET /transactions/:id` przyjmuje UUID i zwraca pojedynczy obiekt w tym samym
+formacie co POST. Właściciel jest sprawdzany w zapytaniu do bazy. Cudza
+i nieistniejąca transakcja zwracają identyczne `404` z komunikatem
+`Nie znaleziono transakcji.`. Nieprawidłowy format UUID daje `400`,
+a brak lub wygaśnięcie sesji daje `401` dla obu endpointów.
 
 ## Transakcja
 
@@ -153,7 +209,7 @@ na wynik. Endpointy edycji i usuwania transakcji należą do #19.
   wyłącznie część daty. Nie wyznaczamy daty operacji przez lokalną godzinę
   ani konwersję między strefami.
 - Przyszłe daty są dozwolone. Domyślne „dzisiaj” oraz bieżący miesiąc
-  wyznaczamy według `Europe/Warsaw`. Zakresy `from`/`to` w kolejnych zadaniach
+  wyznaczamy według `Europe/Warsaw`. Zakresy `from`/`to` historii
   obejmują obie daty graniczne.
 
 ## Kategorie systemowe
@@ -224,6 +280,9 @@ curl -i -b /tmp/finance-transaction-cookies.txt http://localhost:3001/transactio
   -d '{"type":"EXPENSE","amount":"12.34","categoryId":"10000000-0000-4000-8000-000000000001","title":"Zakupy spożywcze","occurredOn":"2026-11-12","note":"Obiad"}'
 
 curl -i -b /tmp/finance-transaction-cookies.txt http://localhost:3001/wallet
+
+curl -i -b /tmp/finance-transaction-cookies.txt \
+  'http://localhost:3001/transactions?type=EXPENSE&from=2026-11-01&to=2026-11-30&page=1&pageSize=20'
 ```
 
 Żądanie POST zwraca `201` z identyfikatorem transakcji. Następujący po nim
@@ -234,12 +293,17 @@ i kategorię przychodów, np. Wynagrodzenie
 (`10000000-0000-4000-8000-000000000005`). Podanie `"0.00"` albo kategorii
 przychodów dla `EXPENSE` powinno zwrócić `400` bez utworzenia transakcji.
 
+Ostatni GET zwraca historię wydatków z listopada wraz z `total`. Aby pobrać
+szczegóły, skopiuj `id` z odpowiedzi POST lub z `items` i wyślij z tym samym
+cookie `GET /transactions/:id`, zastępując `:id` skopiowaną wartością.
+
 ## Weryfikacja
 
 ```bash
 npm --prefix backend run typecheck
 npm --prefix backend run test:integration -- test/transaction.integration-spec.ts test/transaction-migration.integration-spec.ts
 npm --prefix backend run test:integration -- test/transaction-api.integration-spec.ts
+npm --prefix backend run test:integration -- test/transaction-read.integration-spec.ts
 npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
 npm --prefix frontend test
 npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
@@ -262,3 +326,9 @@ Sprawdzają spójność odpowiedzi PATCH przy równoległych aktualizacjach,
 odczyt zatwierdzonych zmian oraz wycofanie ustawień po błędzie agregacji.
 Chromium sprawdza też zmianę salda początkowego przy istniejącej historii
 i prezentację sumy przekraczającej limit wejściowy na małym ekranie.
+
+Testy odczytu sprawdzają filtry łączone z paginacją, obie granice dat,
+jednodniowe zakresy, stabilne sortowanie po identyfikatorze, komplet stron
+bez duplikacji oraz zgodność `total`. Obejmują też puste wyniki, duże numery
+stron, błędne parametry, zgodność formatu POST/GET, izolację dwóch kont,
+wygasłe i wylogowane sesje, odpowiedzi `404` oraz bezpieczne błędy bazy.
