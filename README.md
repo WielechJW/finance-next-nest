@@ -245,7 +245,32 @@ Seed buduje backend i zapisuje kategorie po stałych UUID w jednej transakcji.
 Można uruchamiać go wielokrotnie; nie tworzy przykładowych transakcji.
 Szczegóły modeli, identyfikatory kategorii, reguły kwot i dat oraz komendy
 testów opisuje [kontrakt transakcji i kategorii](docs/transactions-api.md).
-Endpointy transakcji, walidacja żądań i wyliczanie salda są kolejnymi zadaniami.
+
+## API kategorii i dodawania transakcji
+
+Etap 3.2 (#14) udostępnia dwa endpointy wymagające aktywnej sesji:
+
+| Endpoint | Wynik |
+| --- | --- |
+| `GET /categories?type=EXPENSE` | `200` z kategoriami wydatków. `INCOME` wybiera przychody, brak filtra zwraca wszystkie kategorie. |
+| `POST /transactions` | `201` z transakcją zapisaną w portfelu użytkownika z sesji. |
+
+Transakcja przyjmuje `type`, `amount`, `categoryId`, `title`, `occurredOn`
+i opcjonalne `note`. Kwota jest dodatnim stringiem z dokładnie dwoma miejscami
+po przecinku; API sprawdza również istnienie daty i zgodność typu kategorii.
+Właściciel i portfel wynikają wyłącznie z sesji, a dodatkowe pola żądania
+są odrzucane. Zapis korzysta z istniejącej globalnej ochrony CSRF.
+
+Przykłady żądań curl, odpowiedzi i statusy błędów opisuje
+[kontrakt transakcji i kategorii](docs/transactions-api.md).
+Testy API z rzeczywistym PostgreSQL uruchomisz poleceniem:
+
+```bash
+npm --prefix backend run test:integration -- test/transaction-api.integration-spec.ts
+```
+
+Wyliczanie salda z historii transakcji należy do #15; formularze dodawania
+operacji powstaną w #17.
 
 ## API własnego portfela
 
@@ -767,6 +792,8 @@ korzystają już z API działającego na porcie 3001.
 | `backend/prisma/schema.prisma` | Modele danych. |
 | `backend/prisma.config.ts` | Konfiguracja poleceń Prisma i migracji. |
 | `backend/src/categories/system-categories.ts` | Stałe UUID kategorii i ich powtarzalny seed. |
+| `backend/src/categories/categories.controller.ts` | API odczytu kategorii z filtrem typu. |
+| `backend/src/transactions/transactions.controller.ts` | API dodawania operacji do własnego portfela. |
 | `docs/transactions-api.md` | Kontrakt kwot, dat i kategorii transakcji. |
 
 ## Sprawdzenie projektu

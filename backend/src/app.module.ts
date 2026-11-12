@@ -5,9 +5,18 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { SessionModule } from './sessions/session.module.js';
 import { WalletsModule } from './wallets/wallets.module.js';
+import { CategoriesModule } from './categories/categories.module.js';
+import { TransactionsModule } from './transactions/transactions.module.js';
 
 @Module({
-  imports: [PrismaModule, SessionModule, AuthModule, WalletsModule],
+  imports: [
+    PrismaModule,
+    SessionModule,
+    AuthModule,
+    WalletsModule,
+    CategoriesModule,
+    TransactionsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
