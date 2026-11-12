@@ -4,7 +4,7 @@ Etap 3.1 (#13) dodaje modele, migrację i seed kategorii. Etap 3.2 (#14)
 udostępnia `GET /categories` i `POST /transactions` z walidacją żądań.
 Etap 3.3 (#15) wylicza saldo z historii w GET i PATCH portfela.
 Etap 3.4 (#16) udostępnia listę i szczegóły własnych transakcji.
-Formularze dodawania operacji są kolejnym zadaniem (#17).
+Etap 3.5 (#17) dodaje formularz zapisu w zakładce Transakcje.
 
 ## Endpointy
 
@@ -297,6 +297,31 @@ Ostatni GET zwraca historię wydatków z listopada wraz z `total`. Aby pobrać
 szczegóły, skopiuj `id` z odpowiedzi POST lub z `items` i wyślij z tym samym
 cookie `GET /transactions/:id`, zastępując `:id` skopiowaną wartością.
 
+## Formularz w przeglądarce
+
+`/dashboard/transactions` jest chronioną stroną panelu z bieżącym saldem
+i formularzem. Klient pobiera wszystkie kategorie przez `GET /categories`,
+filtruje je według wybranego typu i usuwa poprzedni wybór po zmianie typu.
+Błąd pobierania kategorii można ponowić bez utraty wpisanego tytułu lub kwoty.
+
+Kwota z polskim przecinkiem jest normalizowana do dodatniego stringa
+z dwoma miejscami po przecinku. Domyślna data jest liczona w `Europe/Warsaw`,
+a do API trafia wyłącznie `YYYY-MM-DD`. Formularz sprawdza zakres kwoty,
+zgodność kategorii i typu, długości tekstu oraz istnienie daty. Błędy mają
+komunikaty przy polach i fokus na pierwszym błędnym polu. Błąd sieci lub
+odrzucenie zapisu zachowuje dane, a `401` uruchamia wspólne wylogowanie.
+
+POST jest blokowany przed równoległymi wysłaniami. Po sukcesie formularz
+czyści kwotę, tytuł i notatkę, zachowując typ, kategorię i datę. Callback
+`onCreated(transaction)` powiadamia widok o nowej operacji i może zostać
+wykorzystany do odświeżania historii w #18.
+
+Odświeżenie salda jest osobnym żądaniem GET po potwierdzonym zapisie.
+Jego błąd zachowuje komunikat sukcesu i udostępnia przycisk ponawiający sam
+odczyt portfela. Klient wybiera jawne pola żądania i sprawdza strukturę
+odpowiedzi, format kwoty i daty. Stan i oczekujące żądania są przypisane
+do aktualnego konta, a opuszczenie widoku anuluje żądania.
+
 ## Weryfikacja
 
 ```bash
@@ -307,6 +332,7 @@ npm --prefix backend run test:integration -- test/transaction-read.integration-s
 npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
 npm --prefix frontend test
 npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
+npm --prefix backend run test:browser -- transactions.pw.ts
 ```
 
 Testy korzystają wyłącznie z osobnej bazy `DATABASE_URL_TEST`. Sprawdzają
@@ -332,3 +358,10 @@ jednodniowe zakresy, stabilne sortowanie po identyfikatorze, komplet stron
 bez duplikacji oraz zgodność `total`. Obejmują też puste wyniki, duże numery
 stron, błędne parametry, zgodność formatu POST/GET, izolację dwóch kont,
 wygasłe i wylogowane sesje, odpowiedzi `404` oraz bezpieczne błędy bazy.
+
+Testy frontendu obejmują polskie kwoty, domyślny dzień w Warszawie przy
+granicach doby i zmianie czasu, walidację pól, zmianę typu, nieprawidłowe
+odpowiedzi API, powtórne wysłania, błędy sieci i spóźnione odpowiedzi po
+zmianie konta. Chromium zapisuje oba typy operacji w rzeczywistej bazie,
+sprawdza aktualizację salda, ponowienie po awarii, wygaśnięcie sesji oraz
+obsługę klawiaturą na wąskim ekranie.

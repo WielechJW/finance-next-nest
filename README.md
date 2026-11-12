@@ -282,7 +282,7 @@ npm --prefix backend run test:integration -- test/transaction-read.integration-s
 ```
 
 Etap 3.3 (#15) wylicza saldo portfela z całej historii zapisanych transakcji.
-Formularze dodawania operacji powstaną w #17.
+Etap 3.5 (#17) pozwala dodawać operacje przez formularz w zakładce Transakcje.
 
 ## API własnego portfela
 
@@ -648,6 +648,50 @@ Ręcznie można powtórzyć powyższy scenariusz na dwóch kontach: po każdym
 logowaniu sprawdź nazwę, saldo i oba pola ustawień. Po powrocie na konto A
 powinny nadal być widoczne jego wcześniejsze wartości.
 
+## Dodawanie transakcji w panelu
+
+Po zalogowaniu wybierz **Transakcje** w nawigacji (`/dashboard/transactions`).
+Strona pokazuje bieżące saldo i formularz z typem operacji, kwotą, kategorią,
+tytułem, datą i opcjonalną notatką. Kategorie są pobierane z API i dopasowane
+do typu. Zmiana typu czyści poprzedni wybór kategorii. Błąd pobierania
+kategorii ma osobny przycisk ponowienia.
+
+Kwota musi być dodatnia, od `0,01` do `999999999999,99`; można użyć przecinka
+lub kropki i najwyżej dwóch miejsc po przecinku. Przykład `12,5` jest wysyłany
+jako string `"12.50"`, bez obliczeń zmiennoprzecinkowych. Domyślną datę
+wyznaczamy według `Europe/Warsaw`. Przyszłe daty są dozwolone i wpływają
+na saldo. Tytuł ma od 1 do 100 znaków po przycięciu, a notatka do 1000 znaków.
+
+Błędy walidacji są wyświetlane przy polach; fokus przechodzi na pierwsze
+błędne pole. Podczas wysyłania pola i przycisk są zablokowane; blokada obejmuje
+również ponowne wywołania zapisu. Błąd zapisu zachowuje wpisane
+dane. Status `401` korzysta ze wspólnej obsługi sesji i prowadzi do logowania.
+
+Po sukcesie formularz pokazuje potwierdzenie i czyści kwotę, tytuł oraz
+notatkę, pozostawiając typ, kategorię i datę dla kolejnej operacji. Saldo jest
+pobierane ponownie z `GET /wallet`. Jeżeli ten odczyt zawiedzie, potwierdzenie
+zapisu pozostaje widoczne, a **Odśwież saldo** ponawia wyłącznie GET.
+Przejście do Portfela również pobiera aktualne dane. Formularz udostępnia
+callback `onCreated` do podłączenia odświeżania historii w etapie 3.6 (#18).
+Stan widoku jest powiązany z kontem; opuszczenie widoku lub zmiana konta
+anuluje oczekujące żądania i ignoruje ich spóźnione odpowiedzi.
+
+Ręczny scenariusz sprawdzenia:
+
+1. Ustaw saldo początkowe `100,00`, a następnie przejdź do Transakcji.
+2. Zapisz wydatek `20,10` z kategorią Jedzenie i sprawdź saldo `79,90 zł`.
+3. Zmień typ na Przychód, wybierz Wynagrodzenie i zapisz `50,20`.
+4. Sprawdź saldo `130,10 zł`, także po przejściu do Portfela i odświeżeniu.
+5. Sprawdź odrzucenie kwoty `0`, komunikat przy pustym tytule oraz obsługę
+   formularza klawiaturą i na ekranie 375 px.
+
+Testy formularza, klienta API, warszawskiej daty, błędów i sesji:
+
+```bash
+npm --prefix frontend test
+npm --prefix backend run test:browser -- transactions.pw.ts wallet.pw.ts auth-session.pw.ts
+```
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
@@ -734,6 +778,11 @@ Scenariusze `backend/test/browser/*.pw.ts` obejmują:
 - Zapis Enterem na ekranie 375 px, długą nazwę i graniczne ujemne saldo.
 - Obie graniczne kwoty po odświeżeniu oraz odrzucenie błędnych ustawień
   bez żądania zapisu i bez zmiany danych w bazie.
+- Dodanie wydatku i przychodu z formularza, kategorie zależne od typu,
+  przyszłe daty i aktualizację salda także po powrocie do Portfela.
+- Zachowanie danych po błędzie sieci, blokowanie równoległych zapisów,
+  ponawianie samego odczytu salda i przekierowanie po wygaśnięciu sesji.
+- Walidację pól i zapis klawiaturą na ekranie 375 px.
 - Saldo z historii zawierającej przyszłą operację oraz przeliczenie wyniku
   po zmianie salda początkowego i po odświeżeniu strony.
 - Saldo większe od zakresu pojedynczej kwoty z zachowaniem groszy
@@ -752,6 +801,9 @@ Przydatne komendy:
 # Weryfikacja portfela, izolacji kont i salda z historii (etapy 2.4 i 3.3)
 npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
 npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
+
+# Formularze transakcji i aktualizacja salda (etap 3.5)
+npm --prefix backend run test:browser -- transactions.pw.ts
 
 # Uruchomienie z widocznym oknem Chromium
 npm --prefix backend run test:browser:headed
@@ -817,6 +869,10 @@ korzystają już z API działającego na porcie 3001.
 | --- | --- |
 | `frontend/src/app/page.tsx` | Strona główna i komponent Reacta. |
 | `frontend/src/app/layout.tsx` | Wspólny układ stron i metadane. |
+| `frontend/src/components/transaction-form.tsx` | Formularz dodawania wydatków i przychodów. |
+| `frontend/src/components/transactions-panel.tsx` | Zakładka Transakcje i odświeżanie salda po zapisie. |
+| `frontend/src/lib/transactions-api.ts` | Klient API kategorii i zapisu transakcji z walidacją odpowiedzi. |
+| `frontend/src/lib/transaction-input.ts` | Dodatnie kwoty, daty kalendarzowe i dzisiejsza data w Warszawie. |
 | `backend/src/main.ts` | Uruchomienie serwera NestJS na porcie 3001. |
 | `backend/src/app.module.ts` | Rejestracja kontrolerów i serwisów. |
 | `backend/src/app.controller.ts` | Obsługa adresów API i metod HTTP. |

@@ -25,5 +25,8 @@ describe("Dashboard navigation", () => {
         .getByRole("link", { name: "Portfel" })
         .getAttribute("aria-current"),
     ).toBeNull();
+    const transactions = screen.getByRole("link", { name: "Transakcje" });
+    expect(transactions.getAttribute("href")).toBe("/dashboard/transactions");
+    expect(transactions.getAttribute("aria-current")).toBe("page");
   });
 });

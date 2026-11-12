@@ -12,6 +12,14 @@ export function DashboardNav() {
       <Link href="/dashboard/wallet" aria-current={active ? "page" : undefined}>
         Portfel
       </Link>
+      <Link
+        href="/dashboard/transactions"
+        aria-current={
+          pathname === "/dashboard/transactions" ? "page" : undefined
+        }
+      >
+        Transakcje
+      </Link>
     </nav>
   );
 }
