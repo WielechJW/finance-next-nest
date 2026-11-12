@@ -32,7 +32,7 @@ describe("Wallet API client", () => {
   });
 
   it("patches only allowed provided fields and reads the authoritative response", async () => {
-    const updated = { ...wallet, openingBalance: "-0.10", balance: "-0.10" };
+    const updated = { ...wallet, openingBalance: "-0.10", balance: "30.00" };
     fetchMock.mockResolvedValueOnce(json(updated));
     const input = {
       openingBalance: "-0.10",
@@ -50,6 +50,15 @@ describe("Wallet API client", () => {
     );
   });
 
+  it.each(["2999999999999.97", "-2999999999999.97"])(
+    "accepts the calculated balance %s beyond the individual amount range",
+    async (balance) => {
+      const loaded = { ...wallet, balance };
+      fetchMock.mockResolvedValueOnce(json(loaded));
+      expect(await walletApi.get()).toEqual(loaded);
+    },
+  );
+
   it.each([
     null,
     [],
@@ -58,8 +67,11 @@ describe("Wallet API client", () => {
     { ...wallet, name: " " },
     { ...wallet, currency: "EUR" },
     { ...wallet, openingBalance: 0 },
+    { ...wallet, openingBalance: "1000000000000.00" },
+    { ...wallet, openingBalance: "-1000000000000.00" },
     { ...wallet, balance: "0,00" },
     { ...wallet, balance: "0.001" },
+    { ...wallet, balance: "1.00\n" },
   ])("rejects invalid wallet responses (%#)", async (payload) => {
     fetchMock.mockResolvedValueOnce(json(payload));
     await expect(walletApi.get()).rejects.toMatchObject({ status: 502 });

@@ -181,13 +181,22 @@ function WalletContent({ onRetry }: { onRetry: () => void }) {
         <dl className={styles.balances}>
           <div className={styles.currentBalance}>
             <dt>Bieżące saldo</dt>
-            <dd>{formatPLN(wallet.balance)}</dd>
+            <dd aria-describedby="wallet-balance-description">
+              {formatPLN(wallet.balance)}
+            </dd>
           </div>
           <div>
             <dt>Saldo początkowe</dt>
             <dd>{formatPLN(wallet.openingBalance)}</dd>
           </div>
         </dl>
+        <p
+          id="wallet-balance-description"
+          className={styles.balanceDescription}
+        >
+          Bieżące saldo to saldo początkowe + przychody − wydatki z całej
+          historii, także z zapisanych operacji z przyszłą datą.
+        </p>
         {wallet.openingBalance === "0.00" && (
           <p className={styles.welcome}>
             Możesz ustawić saldo początkowe swojego portfela.

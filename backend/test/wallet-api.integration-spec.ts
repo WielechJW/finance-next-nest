@@ -5,10 +5,17 @@ import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
+import {
+  seedSystemCategories,
+  SYSTEM_CATEGORIES,
+} from '../src/categories/system-categories.js';
 import { configureApp } from '../src/config/configure-app.js';
 import { getFrontendOrigin } from '../src/config/cors.js';
 import { getAuthRateLimitOptions } from '../src/config/rate-limit.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import type { TransactionType } from '../src/generated/prisma/client.js';
+import type { TransactionResponse } from '../src/transactions/transaction-response.js';
+import * as walletBalance from '../src/wallets/wallet-balance.js';
 import type { WalletResponse } from '../src/wallets/wallet-response.js';
 import { setCookieHeaders } from './support/cookies.js';
 
@@ -35,6 +42,7 @@ describe('Private wallet API (PostgreSQL)', () => {
     configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
+    await seedSystemCategories(prisma);
   });
 
   afterEach(async () => {
@@ -83,6 +91,27 @@ describe('Private wallet API (PostgreSQL)', () => {
       .split('.')[0]!;
     sessionIds.add(sid);
     return { agent, user, cookie, sid };
+  }
+
+  async function addTransaction(
+    account: Awaited<ReturnType<typeof createAccount>>,
+    type: TransactionType,
+    amount: string,
+    occurredOn = '2026-11-12',
+  ): Promise<TransactionResponse> {
+    const category = SYSTEM_CATEGORIES.find((item) => item.type === type)!;
+    const response = await account.agent
+      .post('/transactions')
+      .set('Origin', origin)
+      .send({
+        type,
+        amount,
+        categoryId: category.id,
+        title: 'Operacja testowa',
+        occurredOn,
+      })
+      .expect(201);
+    return response.body as TransactionResponse;
   }
 
   it('requires a session for both reading and updating a wallet', async () => {
@@ -424,6 +453,222 @@ describe('Private wallet API (PostgreSQL)', () => {
     expect(await prisma.wallet.count({ where: { userId: user.id } })).toBe(0);
   });
 
+  it('calculates the complete history, including past and future dates, regardless of list filters', async () => {
+    const account = await createAccount();
+    await account.agent
+      .patch('/wallet')
+      .send({ openingBalance: '100.00' })
+      .expect(200);
+    await addTransaction(account, 'INCOME', '50.20', '0001-01-01');
+    await addTransaction(account, 'EXPENSE', '20.10', '9999-12-31');
+
+    for (const query of [
+      {},
+      {
+        type: 'INCOME',
+        categoryId: SYSTEM_CATEGORIES[4].id,
+        from: '2026-11-01',
+        to: '2026-11-30',
+        page: 2,
+        pageSize: 1,
+      },
+    ]) {
+      const response = await account.agent
+        .get('/wallet')
+        .query(query)
+        .expect(200);
+      expect(response.body).toMatchObject({
+        openingBalance: '100.00',
+        balance: '130.10',
+      });
+    }
+  });
+
+  it('adds 0.10 and 0.20 to exactly 0.30 without modifying the opening balance', async () => {
+    const account = await createAccount();
+    await addTransaction(account, 'INCOME', '0.10');
+    await addTransaction(account, 'INCOME', '0.20');
+    const response = await account.agent.get('/wallet').expect(200);
+    expect(response.body).toMatchObject({
+      openingBalance: '0.00',
+      balance: '0.30',
+    });
+  });
+
+  it.each([
+    ['INCOME', '0.10'],
+    ['EXPENSE', '-0.10'],
+  ] as const)(
+    'calculates a history containing only %s',
+    async (type, balance) => {
+      const account = await createAccount();
+      await addTransaction(account, type, '0.10');
+      const response = await account.agent.get('/wallet').expect(200);
+      expect(response.body).toMatchObject({ openingBalance: '0.00', balance });
+    },
+  );
+
+  it.each([
+    ['INCOME', '999999999999.99', '2999999999999.97'],
+    ['EXPENSE', '-999999999999.99', '-2999999999999.97'],
+  ] as const)(
+    'preserves sums beyond Decimal(14,2) for %s',
+    async (type, openingBalance, balance) => {
+      const account = await createAccount();
+      await account.agent.patch('/wallet').send({ openingBalance }).expect(200);
+      await addTransaction(account, type, '999999999999.99');
+      await addTransaction(account, type, '999999999999.99');
+      const response = await account.agent.get('/wallet').expect(200);
+      expect(response.body).toMatchObject({ openingBalance, balance });
+    },
+  );
+
+  it('isolates account totals and handles negative and cancelling balances exactly', async () => {
+    const a = await createAccount();
+    const b = await createAccount();
+    await addTransaction(a, 'INCOME', '999999999999.99');
+    await addTransaction(a, 'EXPENSE', '999999999999.99');
+    await addTransaction(a, 'INCOME', '0.01');
+    await addTransaction(b, 'EXPENSE', '500.50');
+    const readA = await a.agent
+      .get('/wallet')
+      .query({ userId: b.user.id })
+      .expect(200);
+    expect(readA.body).toMatchObject({
+      openingBalance: '0.00',
+      balance: '0.01',
+    });
+    const readB = await b.agent.get('/wallet').expect(200);
+    expect(readB.body).toMatchObject({
+      openingBalance: '0.00',
+      balance: '-500.50',
+    });
+  });
+
+  it('returns the calculated balance after settings changes and preserves parallel partial updates', async () => {
+    const account = await createAccount();
+    await addTransaction(account, 'INCOME', '50.20');
+    await addTransaction(account, 'EXPENSE', '20.10');
+    const updated = await account.agent
+      .patch('/wallet')
+      .send({ openingBalance: '100.00' })
+      .expect(200);
+    expect(updated.body).toMatchObject({
+      openingBalance: '100.00',
+      balance: '130.10',
+    });
+
+    const [renamed, rebased] = await Promise.all([
+      account.agent
+        .patch('/wallet')
+        .send({ name: 'Portfel z historią' })
+        .expect(200),
+      account.agent
+        .patch('/wallet')
+        .send({ openingBalance: '200.00' })
+        .expect(200),
+    ]);
+    for (const response of [renamed, rebased]) {
+      expect(response.body.balance).toBe(
+        response.body.openingBalance === '100.00' ? '130.10' : '230.10',
+      );
+    }
+    const read = await account.agent.get('/wallet').expect(200);
+    expect(read.body).toMatchObject({
+      name: 'Portfel z historią',
+      openingBalance: '200.00',
+      balance: '230.10',
+    });
+  });
+
+  it('uses the latest stored history after a transaction is changed or removed', async () => {
+    const account = await createAccount();
+    await account.agent
+      .patch('/wallet')
+      .send({ openingBalance: '100.00' })
+      .expect(200);
+    await addTransaction(account, 'INCOME', '50.20');
+    const expense = await addTransaction(account, 'EXPENSE', '20.10');
+    await prisma.transaction.update({
+      where: { id: expense.id },
+      data: { amount: '30.10' },
+    });
+    const changed = await account.agent.get('/wallet').expect(200);
+    expect(changed.body.balance).toBe('120.10');
+    await prisma.transaction.delete({ where: { id: expense.id } });
+    const removed = await account.agent.get('/wallet').expect(200);
+    expect(removed.body.balance).toBe('150.20');
+  });
+
+  it('reads only committed wallet and history changes from the same snapshot', async () => {
+    const account = await createAccount();
+    await account.agent
+      .patch('/wallet')
+      .send({ openingBalance: '100.00' })
+      .expect(200);
+    await addTransaction(account, 'INCOME', '50.20');
+    await addTransaction(account, 'EXPENSE', '20.10');
+    await prisma.$transaction(async (database) => {
+      const wallet = await database.wallet.update({
+        where: { userId: account.user.id },
+        data: { openingBalance: '200.00' },
+      });
+      await database.transaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'EXPENSE',
+          amount: '100.00',
+          categoryId: SYSTEM_CATEGORIES[0].id,
+          title: 'Równoległa operacja',
+          occurredOn: new Date('2026-11-12T00:00:00.000Z'),
+        },
+      });
+      const beforeCommit = await account.agent.get('/wallet').expect(200);
+      expect(beforeCommit.body).toMatchObject({
+        openingBalance: '100.00',
+        balance: '130.10',
+      });
+    });
+    const afterCommit = await account.agent.get('/wallet').expect(200);
+    expect(afterCommit.body).toMatchObject({
+      openingBalance: '200.00',
+      balance: '130.10',
+    });
+  });
+
+  it('rolls back the settings change if reading its calculated balance fails', async () => {
+    const account = await createAccount();
+    await addTransaction(account, 'INCOME', '50.20');
+    const before = await prisma.wallet.findUniqueOrThrow({
+      where: { userId: account.user.id },
+    });
+    const detail = 'private-aggregation-query-and-arguments';
+    const log = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    vi.spyOn(walletBalance, 'findWalletWithBalance').mockRejectedValueOnce(
+      new Error(detail),
+    );
+    const failed = await account.agent
+      .patch('/wallet')
+      .send({ name: 'Niezapisana nazwa', openingBalance: '100.00' })
+      .expect(500);
+    expect(failed.body.message).toBe('Nie udało się zapisać portfela.');
+    expect(log).toHaveBeenCalled();
+    expect(JSON.stringify([failed.body, log.mock.calls])).not.toContain(detail);
+    expect(
+      await prisma.wallet.findUniqueOrThrow({
+        where: { userId: account.user.id },
+      }),
+    ).toEqual(before);
+    const read = await account.agent.get('/wallet').expect(200);
+    expect(read.body).toMatchObject({
+      name: before.name,
+      openingBalance: '0.00',
+      balance: '50.20',
+    });
+  });
+
   it.each(['get', 'patch'] as const)(
     'sanitizes database errors in the %s response and logs',
     async (method) => {
@@ -436,11 +681,11 @@ describe('Private wallet API (PostgreSQL)', () => {
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
       if (method === 'get') {
-        vi.spyOn(prisma.wallet, 'findUnique').mockRejectedValueOnce(
+        vi.spyOn(prisma, '$queryRaw').mockRejectedValueOnce(
           new Error(privateDetail),
         );
       } else {
-        vi.spyOn(prisma.wallet, 'update').mockRejectedValueOnce(
+        vi.spyOn(prisma, '$transaction').mockRejectedValueOnce(
           new Error(privateDetail),
         );
       }

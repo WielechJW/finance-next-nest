@@ -1,5 +1,29 @@
 import { expectWallet, login, saveWallet } from './actions.js';
-import { test, expect } from './fixtures.js';
+import { API_URL, FRONTEND_URL, test, expect } from './fixtures.js';
+import type { Page } from '@playwright/test';
+
+async function addTransaction(
+  page: Page,
+  type: 'INCOME' | 'EXPENSE',
+  amount: string,
+  occurredOn = '2026-11-12',
+): Promise<void> {
+  const response = await page.request.get(API_URL + '/categories?type=' + type);
+  expect(response.status()).toBe(200);
+  const categories = (await response.json()) as { id: string }[];
+  expect(categories.length).toBeGreaterThan(0);
+  const created = await page.request.post(API_URL + '/transactions', {
+    headers: { Origin: FRONTEND_URL },
+    data: {
+      type,
+      amount,
+      categoryId: categories[0]!.id,
+      title: 'Operacja testowa',
+      occurredOn,
+    },
+  });
+  expect(created.status()).toBe(201);
+}
 
 test('edits the wallet with a Polish decimal separator and preserves settings after reload', async ({
   page,
@@ -167,4 +191,65 @@ test('rejects invalid settings without sending a write or changing the saved wal
   await page.reload();
   await expectWallet(page, wallet);
   expect(writes).toBe(0);
+});
+
+test('shows the entire transaction history including future dates and recalculates after changing settings', async ({
+  page,
+  accounts,
+}, testInfo) => {
+  const account = await accounts.register();
+  await login(page, account);
+  await saveWallet(page, 'Portfel z historią', '100,00');
+  await addTransaction(page, 'INCOME', '50.20', '9999-12-31');
+  await addTransaction(page, 'EXPENSE', '20.10');
+  await page.reload();
+  await expect(page.getByText('130,10 zł', { exact: true })).toBeVisible();
+  await expect(page.getByText('100,00 zł', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(/Bieżące saldo to saldo początkowe/),
+  ).toContainText('z przyszłą datą');
+
+  await saveWallet(page, 'Portfel z historią', '200,00');
+  await expect(page.getByText('230,10 zł', { exact: true })).toBeVisible();
+  await expect(page.getByText('200,00 zł', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('230,10 zł', { exact: true })).toBeVisible();
+  await expect(
+    page.getByLabel('Saldo początkowe', { exact: true }),
+  ).toHaveValue('200,00');
+  await page.screenshot({
+    path: testInfo.outputPath('wallet-history-desktop.png'),
+    fullPage: true,
+  });
+});
+
+test('shows an aggregate larger than the input limit on a narrow screen without losing cents', async ({
+  page,
+  accounts,
+}, testInfo) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const account = await accounts.register();
+  await login(page, account);
+  await saveWallet(page, 'Duże saldo', '999999999999,99');
+  await addTransaction(page, 'INCOME', '999999999999.99');
+  await addTransaction(page, 'INCOME', '999999999999.99');
+  await page.reload();
+  await expect(
+    page.getByText('2 999 999 999 999,97 zł', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('999 999 999 999,99 zł', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel('Saldo początkowe', { exact: true }),
+  ).toHaveValue('999999999999,99');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath('wallet-history-mobile.png'),
+    fullPage: true,
+  });
 });

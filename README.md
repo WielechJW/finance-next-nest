@@ -269,8 +269,8 @@ Testy API z rzeczywistym PostgreSQL uruchomisz poleceniem:
 npm --prefix backend run test:integration -- test/transaction-api.integration-spec.ts
 ```
 
-Wyliczanie salda z historii transakcji należy do #15; formularze dodawania
-operacji powstaną w #17.
+Etap 3.3 (#15) wylicza saldo portfela z całej historii zapisanych transakcji.
+Formularze dodawania operacji powstaną w #17.
 
 ## API własnego portfela
 
@@ -280,7 +280,7 @@ operacji powstaną w #17.
 | `PATCH /wallet` | `200` z portfelem po zmianie nazwy lub salda początkowego. |
 
 Oba endpointy korzystają z tego samego `SessionAuthGuard` co `/auth/me`.
-Właściciel jest ustalany wyłącznie z sesji, a zapytania Prisma używają
+Właściciel jest ustalany wyłącznie z sesji, a zapytania do bazy używają
 unikalnego `userId`. Parametry zapytania GET nie pozwalają wybrać innego
 użytkownika. Każda poprawna odpowiedź ma `Cache-Control: no-store` i zawiera
 wyłącznie następujące pola:
@@ -295,8 +295,22 @@ wyłącznie następujące pola:
 }
 ```
 
-Na tym etapie `balance` jest równe `openingBalance`. Nie przechowujemy osobnej
-kolumny salda bieżącego; jego wyliczanie z transakcji dojdzie w etapie 3.
+Powyżej pokazano nowy, pusty portfel. Bieżące `balance` jest wyliczane przy
+odczycie: **saldo początkowe + suma INCOME − suma EXPENSE** z całej historii
+własnego portfela. Wliczamy również zapisane operacje z przyszłą datą.
+Wynik jest niezależny od filtrów, zakresu dat i paginacji historii.
+
+Przykład: `100.00 + 50.20 − 20.10 = 130.10`. Pusta historia zachowuje saldo
+początkowe, a przewaga wydatków może dać ujemny wynik. Saldo bieżące jest
+wartością wyliczaną; saldo początkowe pozostaje osobnym polem portfela.
+
+Agregacja i dodanie salda początkowego odbywają się w jednym zapytaniu
+PostgreSQL na dokładnych wartościach `numeric`, z jednego obrazu danych.
+Prisma zwraca wynik jako `Decimal`, a API serializuje go do stringa z dwoma
+miejscami po przecinku. Suma może przekroczyć zakres pojedynczej kwoty
+`Decimal(14,2)`, np. `"2999999999999.97"`; panel wyświetla ją dokładnie
+przy użyciu stringów i `BigInt`. Limity pojedynczej transakcji i salda
+początkowego pozostają określone w ich kontraktach.
 
 `PATCH /wallet` wymaga obiektu JSON z przynajmniej jednym polem:
 
@@ -312,7 +326,9 @@ dodatkowe pola, w tym `id`, `userId`, `walletId`, `currency` i `balance`, dają
 `400`. Kwoty jako liczby JSON, z przecinkiem, białymi znakami, znakiem plus,
 nadmiarowymi zerami na początku, zapisem wykładniczym albo inną liczbą miejsc
 po przecinku także dają `400`. Błędne żądanie nie zmienia portfela.
-Oba ustawienia są aktualizowane w jednym zapytaniu bazy.
+Oba ustawienia są aktualizowane w jednym zapytaniu bazy. Zapis ustawień
+i odczyt wyliczonego salda są wykonywane w jednej transakcji: odpowiedź PATCH
+zawiera aktualne `balance`, a błąd agregacji wycofuje zmianę ustawień.
 
 | Status | Znaczenie |
 | --- | --- |
@@ -664,8 +680,9 @@ Nazwa bazy musi być inna niż w `DATABASE_URL_TEST` i `DATABASE_URL`.
 Brak tej zmiennej zatrzymuje testy; nie używamy zastępczo innej bazy.
 Dopasuj dane dostępu do swojego lokalnego PostgreSQL.
 
-Przygotowanie aplikacji testowej tworzy brakującą bazę i stosuje migracje,
-korzystając ze wspólnego mechanizmu testów integracyjnych. Użytkownik bazy
+Przygotowanie aplikacji testowej tworzy brakującą bazę, stosuje migracje
+i uruchamia powtarzalny seed kategorii systemowych, korzystając ze wspólnego
+mechanizmu testów integracyjnych. Użytkownik bazy
 musi mieć uprawnienia do jej utworzenia, tak jak w domyślnym Compose.
 Uruchom PostgreSQL, a następnie cały zestaw:
 
@@ -705,6 +722,10 @@ Scenariusze `backend/test/browser/*.pw.ts` obejmują:
 - Zapis Enterem na ekranie 375 px, długą nazwę i graniczne ujemne saldo.
 - Obie graniczne kwoty po odświeżeniu oraz odrzucenie błędnych ustawień
   bez żądania zapisu i bez zmiany danych w bazie.
+- Saldo z historii zawierającej przyszłą operację oraz przeliczenie wyniku
+  po zmianie salda początkowego i po odświeżeniu strony.
+- Saldo większe od zakresu pojedynczej kwoty z zachowaniem groszy
+  i poprawnym układem na ekranie 375 px.
 
 Każdy scenariusz używa unikalnych kont i osobnego kontekstu przeglądarki.
 Fixtures sprzątają własne konta oraz ich sesje także po niepowodzeniu testu.
@@ -716,7 +737,7 @@ ponowny odczyt sesji → logout → odrzucenie skopiowanego cookie.
 Przydatne komendy:
 
 ```bash
-# Weryfikacja portfela i izolacji kont z etapu 2.4
+# Weryfikacja portfela, izolacji kont i salda z historii (etapy 2.4 i 3.3)
 npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
 npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
 
@@ -794,6 +815,7 @@ korzystają już z API działającego na porcie 3001.
 | `backend/src/categories/system-categories.ts` | Stałe UUID kategorii i ich powtarzalny seed. |
 | `backend/src/categories/categories.controller.ts` | API odczytu kategorii z filtrem typu. |
 | `backend/src/transactions/transactions.controller.ts` | API dodawania operacji do własnego portfela. |
+| `backend/src/wallets/wallet-balance.ts` | Wspólna agregacja salda z historii dla GET i PATCH portfela. |
 | `docs/transactions-api.md` | Kontrakt kwot, dat i kategorii transakcji. |
 
 ## Sprawdzenie projektu

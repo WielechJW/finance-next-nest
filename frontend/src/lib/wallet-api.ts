@@ -1,5 +1,5 @@
 import { ApiError, apiRequest } from "./api-client";
-import { isMoneyString } from "./money";
+import { isMoneyString, isOpeningBalanceString } from "./money";
 import type { UpdateWalletInput, WalletDto } from "./wallet-types";
 
 function parseWallet(value: unknown): WalletDto {
@@ -15,7 +15,7 @@ function parseWallet(value: unknown): WalletDto {
     !("currency" in value) ||
     value.currency !== "PLN" ||
     !("openingBalance" in value) ||
-    !isMoneyString(value.openingBalance) ||
+    !isOpeningBalanceString(value.openingBalance) ||
     !("balance" in value) ||
     !isMoneyString(value.balance)
   ) {

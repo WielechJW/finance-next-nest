@@ -1,4 +1,5 @@
-const moneyPattern = /^-?(?:0|[1-9]\d{0,11})\.\d{2}$/;
+const moneyPattern = /^-?(?:0|[1-9]\d*)\.\d{2}$/;
+const openingBalancePattern = /^-?(?:0|[1-9]\d{0,11})\.\d{2}$/;
 const inputPattern = /^(-?)(0|[1-9]\d{0,11})(?:[.,](\d{1,2}))?$/;
 const integers = new Intl.NumberFormat("pl-PL", {
   useGrouping: "always",
@@ -6,7 +7,15 @@ const integers = new Intl.NumberFormat("pl-PL", {
 });
 
 export function isMoneyString(value: unknown): value is string {
-  return typeof value === "string" && moneyPattern.test(value);
+  return (
+    typeof value === "string" &&
+    value === value.trim() &&
+    moneyPattern.test(value)
+  );
+}
+
+export function isOpeningBalanceString(value: unknown): value is string {
+  return isMoneyString(value) && openingBalancePattern.test(value);
 }
 
 export function normalizeMoneyInput(value: string): string {

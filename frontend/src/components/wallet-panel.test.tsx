@@ -105,6 +105,45 @@ describe("Wallet panel", () => {
     expect(mocks.get).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    ["2999999999999.97", "2 999 999 999 999,97 zł"],
+    ["-2999999999999.97", "-2 999 999 999 999,97 zł"],
+  ])(
+    "shows the aggregate balance %s and explains future transactions",
+    async (balance, text) => {
+      mocks.get.mockResolvedValueOnce({ ...wallet, balance });
+      await ready();
+      const amount = screen.getByText(text);
+      const description = document.getElementById(
+        amount.getAttribute("aria-describedby")!,
+      );
+      expect(description?.textContent).toContain("z całej historii");
+      expect(description?.textContent).toContain("z przyszłą datą");
+      expect(balanceField().value).toBe("0,00");
+    },
+  );
+
+  it("shows the server-calculated balance immediately after changing the opening balance", async () => {
+    mocks.get.mockResolvedValueOnce({
+      ...wallet,
+      openingBalance: "100.00",
+      balance: "130.10",
+    });
+    mocks.update.mockResolvedValueOnce({
+      ...wallet,
+      openingBalance: "200.00",
+      balance: "230.10",
+    });
+    await ready();
+    expect(screen.getByText("130,10 zł")).toBeDefined();
+    fireEvent.change(balanceField(), { target: { value: "200" } });
+    await userEvent.setup().click(saveButton());
+    await screen.findByText("Zmiany zapisane.");
+    expect(screen.getByText("230,10 zł")).toBeDefined();
+    expect(screen.getByText("200,00 zł")).toBeDefined();
+    expect(balanceField().value).toBe("200,00");
+  });
+
   it("normalizes a Polish amount, uses the server response and sends only changed fields", async () => {
     await ready();
     const user = userEvent.setup();

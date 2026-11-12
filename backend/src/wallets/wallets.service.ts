@@ -9,16 +9,11 @@ import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { UpdateWalletDto } from './dto/update-wallet.dto.js';
 import { formatMoney } from './money.js';
+import {
+  findWalletWithBalance,
+  type WalletWithBalance,
+} from './wallet-balance.js';
 import type { WalletResponse } from './wallet-response.js';
-
-const walletSelect = {
-  id: true,
-  name: true,
-  currency: true,
-  openingBalance: true,
-} satisfies Prisma.WalletSelect;
-
-type WalletRecord = Prisma.WalletGetPayload<{ select: typeof walletSelect }>;
 
 @Injectable()
 export class WalletsService {
@@ -27,12 +22,9 @@ export class WalletsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getForUser(userId: string): Promise<WalletResponse> {
-    let wallet: WalletRecord | null;
+    let wallet: WalletWithBalance | null;
     try {
-      wallet = await this.prisma.wallet.findUnique({
-        where: { userId },
-        select: walletSelect,
-      });
+      wallet = await findWalletWithBalance(this.prisma, userId);
     } catch {
       this.logger.error('Nie udało się odczytać portfela.');
       throw new InternalServerErrorException('Nie udało się pobrać portfela.');
@@ -58,14 +50,21 @@ export class WalletsService {
       data.openingBalance = new Prisma.Decimal(input.openingBalance);
     }
 
-    let wallet: WalletRecord;
     try {
-      wallet = await this.prisma.wallet.update({
-        where: { userId },
-        data,
-        select: walletSelect,
+      return await this.prisma.$transaction(async (database) => {
+        await database.wallet.update({
+          where: { userId },
+          data,
+          select: { id: true },
+        });
+        // The update holds the wallet row lock until its balance has been read.
+        // An aggregation failure rolls back the settings change as well.
+        const wallet = await findWalletWithBalance(database, userId);
+        if (!wallet) throw new NotFoundException('Nie znaleziono portfela.');
+        return this.toResponse(wallet);
       });
     } catch (error: unknown) {
+      if (error instanceof NotFoundException) throw error;
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2025'
@@ -76,18 +75,15 @@ export class WalletsService {
       this.logger.error('Nie udało się zapisać portfela.');
       throw new InternalServerErrorException('Nie udało się zapisać portfela.');
     }
-
-    return this.toResponse(wallet);
   }
 
-  private toResponse(wallet: WalletRecord): WalletResponse {
-    const openingBalance = formatMoney(wallet.openingBalance);
+  private toResponse(wallet: WalletWithBalance): WalletResponse {
     return {
       id: wallet.id,
       name: wallet.name,
       currency: wallet.currency,
-      openingBalance,
-      balance: openingBalance,
+      openingBalance: formatMoney(wallet.openingBalance),
+      balance: formatMoney(wallet.balance),
     };
   }
 }

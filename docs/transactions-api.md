@@ -2,7 +2,8 @@
 
 Etap 3.1 (#13) dodaje modele, migrację i seed kategorii. Etap 3.2 (#14)
 udostępnia `GET /categories` i `POST /transactions` z walidacją żądań.
-Formularze i wyliczanie salda z historii są kolejnymi zadaniami.
+Etap 3.3 (#15) wylicza saldo z historii w GET i PATCH portfela.
+Formularze dodawania operacji są kolejnym zadaniem (#17).
 
 ## Endpointy
 
@@ -104,8 +105,40 @@ Identyfikatory i znaczniki czasu w tym przykładzie są ilustracyjne.
   API waliduje format przed utworzeniem `Prisma.Decimal` i zapisem w bazie.
 
 Saldo początkowe pozostaje w `Wallet.openingBalance`; migracja i seed nie
-tworzą dla niego transakcji. Wyliczanie salda z całej historii należy do #15:
-saldo początkowe + przychody − wydatki, również dla zapisanych przyszłych dat.
+tworzą dla niego transakcji.
+
+## Saldo portfela
+
+`GET /wallet` oraz odpowiedź `PATCH /wallet` zawierają osobno `openingBalance`
+i wyliczone `balance`. Oba pola są stringami z kropką i dwoma miejscami
+po przecinku. Wzór to:
+
+```text
+balance = openingBalance + suma INCOME − suma EXPENSE
+```
+
+Sumowanie obejmuje całą zapisaną historię portfela użytkownika z sesji,
+również operacje z przyszłą datą. Parametry listy, filtry kategorii i typu,
+zakres dat oraz paginacja nie ograniczają salda. Brak operacji oznacza saldo
+równe początkowemu, a ujemny wynik jest dozwolony. Panel wyjaśnia tę zasadę
+przy bieżącym saldzie.
+
+Przykładowo `openingBalance: "100.00"`, przychód `"50.20"` i wydatek
+`"20.10"` dają `balance: "130.10"`. Po zmianie salda początkowego na
+`"200.00"` odpowiedź PATCH zawiera `balance: "230.10"`.
+
+Agregacja i obliczenie wyniku odbywają się na `numeric` w jednym zapytaniu
+PostgreSQL, z jednego obrazu danych. Wynik jest odczytywany przez Prisma jako
+`Decimal` i serializowany przez `toFixed(2)`, bez arytmetyki zmiennoprzecinkowej.
+Saldo bieżące może przekroczyć zakres `Decimal(14,2)` pojedynczej operacji
+i salda początkowego. Przykład: saldo początkowe `"999999999999.99"` i dwa
+takie przychody dają dokładnie `"2999999999999.97"`. Frontend akceptuje taką
+sumę i prezentuje ją przez `BigInt`, zachowując osobne limity pól wejściowych.
+
+PATCH zapisuje ustawienia i odczytuje saldo wewnątrz jednej transakcji bazy.
+Błąd obliczania salda wycofuje zapis ustawień. Kolejny odczyt korzysta zawsze
+z bieżącej historii, więc zmiana lub usunięcie zapisanej operacji wpływa
+na wynik. Endpointy edycji i usuwania transakcji należą do #19.
 
 ## Daty
 
@@ -189,9 +222,13 @@ curl -i -b /tmp/finance-transaction-cookies.txt http://localhost:3001/transactio
   -H 'Origin: http://localhost:3000' \
   -H 'Content-Type: application/json' \
   -d '{"type":"EXPENSE","amount":"12.34","categoryId":"10000000-0000-4000-8000-000000000001","title":"Zakupy spożywcze","occurredOn":"2026-11-12","note":"Obiad"}'
+
+curl -i -b /tmp/finance-transaction-cookies.txt http://localhost:3001/wallet
 ```
 
-Ostatnie żądanie zwraca `201` z identyfikatorem transakcji. Każde powtórzenie
+Żądanie POST zwraca `201` z identyfikatorem transakcji. Następujący po nim
+GET portfela pokazuje nowe saldo; dla pustego portfela z saldem początkowym
+`"0.00"` będzie to `"-12.34"`. Każde powtórzenie
 poprawnego POST tworzy nową operację. Przychód dodasz przez `type: "INCOME"`
 i kategorię przychodów, np. Wynagrodzenie
 (`10000000-0000-4000-8000-000000000005`). Podanie `"0.00"` albo kategorii
@@ -203,6 +240,9 @@ przychodów dla `EXPENSE` powinno zwrócić `400` bez utworzenia transakcji.
 npm --prefix backend run typecheck
 npm --prefix backend run test:integration -- test/transaction.integration-spec.ts test/transaction-migration.integration-spec.ts
 npm --prefix backend run test:integration -- test/transaction-api.integration-spec.ts
+npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
+npm --prefix frontend test
+npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
 ```
 
 Testy korzystają wyłącznie z osobnej bazy `DATABASE_URL_TEST`. Sprawdzają
@@ -215,3 +255,10 @@ pola, granice długości tekstu, niedozwolone kwoty i daty, dokładny zapis gros
 lata graniczne i dni zmiany czasu. Sprawdzają również izolację dwóch kont,
 wygasłe i wylogowane sesje, ochronę CSRF, brak portfela oraz bezpieczną obsługę
 błędów bazy i zmiany powiązań między odczytem a zapisem.
+
+Testy salda obejmują dokładne grosze, puste i jednostronne historie, przyszłe
+daty, ujemne wyniki, duże sumy, izolację kont i niezależność od filtrów.
+Sprawdzają spójność odpowiedzi PATCH przy równoległych aktualizacjach,
+odczyt zatwierdzonych zmian oraz wycofanie ustawień po błędzie agregacji.
+Chromium sprawdza też zmianę salda początkowego przy istniejącej historii
+i prezentację sumy przekraczającej limit wejściowy na małym ekranie.

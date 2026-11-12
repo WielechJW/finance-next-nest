@@ -22,6 +22,17 @@ try {
     AUTH_REGISTER_LIMIT: '1000',
     AUTH_REGISTER_TTL_SECONDS: '900',
   });
+  const { PrismaService } =
+    await import('../../.browser-dist/prisma/prisma.service.js');
+  const { seedSystemCategories } =
+    await import('../../.browser-dist/categories/system-categories.js');
+  const prisma = new PrismaService();
+  try {
+    await prisma.$connect();
+    await seedSystemCategories(prisma);
+  } finally {
+    await prisma.$disconnect();
+  }
   await import('../../.browser-dist/main.js');
 } catch {
   // Driver/CLI errors can contain credentials; report only the setup context.
