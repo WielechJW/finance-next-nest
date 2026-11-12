@@ -6,6 +6,7 @@ Etap 3.3 (#15) wylicza saldo z historii w GET i PATCH portfela.
 Etap 3.4 (#16) udostępnia listę i szczegóły własnych transakcji.
 Etap 3.5 (#17) dodaje formularz zapisu w zakładce Transakcje.
 Etap 3.6 (#18) łączy historię w panelu z filtrami i paginacją API.
+Etap 3.7 (#19) dodaje edycję i usuwanie własnych operacji przez API.
 
 ## Endpointy
 
@@ -22,6 +23,8 @@ Bezpośredni klient bez nagłówków przeglądarki, np. curl, także może używ
 | `POST /transactions` | `201` z utworzoną transakcją w portfelu użytkownika z sesji. |
 | `GET /transactions` | `200` z własną historią, filtrami i paginacją. |
 | `GET /transactions/:id` | `200` ze szczegółami własnej transakcji. |
+| `PATCH /transactions/:id` | `200` z własną transakcją po częściowej aktualizacji. |
+| `DELETE /transactions/:id` | `204` bez treści po usunięciu własnej transakcji. |
 
 Kategorie są sortowane rosnąco po stabilnym UUID. Każda pozycja zawiera
 wyłącznie `id`, `name` i `type`. Brak pasujących kategorii daje pustą tablicę.
@@ -36,13 +39,14 @@ bez treści transakcji i szczegółów zapytań w odpowiedzi lub logach.
 
 | Status | Znaczenie |
 | --- | --- |
-| `200` | Kategorie, historia albo szczegóły transakcji zostały pobrane. |
+| `200` | Kategorie, historia albo szczegóły zostały pobrane lub transakcja została zaktualizowana. |
 | `201` | Transakcja została zapisana. |
+| `204` | Własna transakcja została usunięta; odpowiedź nie zawiera treści. |
 | `400` | Błędne dane, filtry, zakres dat, paginacja lub UUID; dodatkowe pola; nieprawidłowa kategoria zapisu lub zmienione powiązanie. |
 | `401` | Brak sesji, sesja wygasła albo użytkownik został wylogowany. |
 | `403` | Ochrona CSRF odrzuciła zapis z niezaufanego pochodzenia. |
-| `404` | Przy zapisie użytkownik nie ma portfela; przy odczycie szczegółów transakcja nie istnieje albo należy do innego konta. |
-| `500` | Nie udało się odczytać kategorii lub transakcji albo zapisać transakcji. |
+| `404` | Przy tworzeniu użytkownik nie ma portfela; przy odczycie szczegółów, edycji lub usuwaniu transakcja nie istnieje albo należy do innego konta. |
+| `500` | Nie udało się odczytać, zapisać, zmienić lub usunąć danych; odpowiedź i logi nie zawierają treści transakcji ani zapytań. |
 
 ## Historia i szczegóły transakcji
 
@@ -97,6 +101,56 @@ i nieistniejąca transakcja zwracają identyczne `404` z komunikatem
 `Nie znaleziono transakcji.`. Nieprawidłowy format UUID daje `400`,
 a brak lub wygaśnięcie sesji daje `401` dla obu endpointów.
 
+## Edycja i usuwanie transakcji
+
+`PATCH /transactions/:id` przyjmuje obiekt JSON z przynajmniej jednym polem:
+`type`, `amount`, `categoryId`, `title`, `occurredOn` lub `note`. Format
+i limity pól są takie same jak przy tworzeniu transakcji. Pominięte pole
+zachowuje dotychczasową wartość. Tytuł jest przycinany, a notatka zachowuje
+białe znaki. Pusty obiekt, nieznane pola, nieprawidłowa kwota lub data
+oraz przekroczone długości tekstu dają `400`.
+
+W PATCH `note: null` usuwa notatkę; pusty string jest także dozwolony.
+Jawne `null` w pozostałych polach jest odrzucane. Jest to różnica względem
+POST, w którym jawne `note: null` jest nieprawidłowe.
+
+Przykładowa częściowa edycja:
+
+```json
+{
+  "amount": "30.10",
+  "title": "Poprawiony wydatek",
+  "note": null
+}
+```
+
+Sprawdzana jest para typu i kategorii dla końcowego stanu rekordu:
+
+- Sama zmiana `type` na `INCOME` przy pozostawieniu kategorii wydatków daje `400`.
+- Sama zmiana kategorii na przychodową przy typie `EXPENSE` także daje `400`.
+- Jednoczesna zmiana typu i kategorii na zgodną parę jest poprawna.
+- Pominięty typ lub kategoria pochodzi z aktualnie zapisanego rekordu.
+
+PATCH odczytuje własny rekord z blokadą `FOR UPDATE` w transakcji bazy
+o izolacji `ReadCommitted`. Kolejna edycja czeka na zwolnienie blokady,
+a następnie sprawdza końcową parę względem najnowszego stanu. Aktualizacja
+kopiuje wyłącznie dozwolone pola i ponownie zawiera warunek właściciela.
+Błąd walidacji albo bazy wycofuje całą edycję. Odpowiedź `200` ma ten sam
+format co POST: zachowuje `id`, `walletId` i `createdAt`, a `updatedAt`
+jest ustawiane przez serwer. Kwoty pozostają stringami z dwoma miejscami
+po przecinku, a daty operacji mają format `YYYY-MM-DD`.
+
+`DELETE /transactions/:id` usuwa własny rekord z warunkiem właściciela
+bezpośrednio w zapytaniu bazy i zwraca `204` bez treści. Kolejne usunięcie
+tego samego identyfikatora daje `404`. Cudza i nieistniejąca transakcja
+zwracają identyczne `404` zarówno dla PATCH, jak i DELETE.
+
+Obie operacje wymagają sesji oraz ochrony CSRF. CORS dopuszcza PATCH
+i DELETE z zaufanego frontendu, wraz z cookies i preflight. Nieprawidłowy
+UUID daje `400`, a brak lub wygaśnięcie sesji `401`. Pola `id`, `walletId`,
+`userId`, znaczniki czasu i obiekty relacji są niedozwolone w PATCH;
+parametry URL nie pozwalają zmienić właściciela.
+
 ## Transakcja
 
 | Pole | Reguła |
@@ -107,7 +161,7 @@ a brak lub wygaśnięcie sesji daje `401` dla obu endpointów.
 | `amount` | Dodatnia kwota w PLN jako string dziesiętny z kropką i dokładnie dwoma miejscami po przecinku. |
 | `categoryId` | UUID istniejącej kategorii zgodnej z `type`. |
 | `title` | Tekst od 1 do 100 znaków po przycięciu białych znaków na końcach. |
-| `note` | Opcjonalny tekst do 1000 znaków, bez przycinania; pominięte pole jest zapisywane jako `null`. Pusty string jest dozwolony, jawne `null` w żądaniu jest odrzucane. |
+| `note` | Tekst do 1000 znaków, bez przycinania. W POST pominięte pole daje `null`, a jawne `null` jest odrzucane. W PATCH pominięte pole zachowuje wartość, a jawne `null` usuwa notatkę. Pusty string jest dozwolony. |
 | `occurredOn` | Rzeczywista data kalendarzowa `YYYY-MM-DD`, bez godziny i strefy czasowej. |
 | `createdAt`, `updatedAt` | Znaczniki czasu generowane przez serwer i serializowane jako ISO 8601 w UTC. |
 
@@ -195,7 +249,11 @@ sumę i prezentuje ją przez `BigInt`, zachowując osobne limity pól wejściowy
 PATCH zapisuje ustawienia i odczytuje saldo wewnątrz jednej transakcji bazy.
 Błąd obliczania salda wycofuje zapis ustawień. Kolejny odczyt korzysta zawsze
 z bieżącej historii, więc zmiana lub usunięcie zapisanej operacji wpływa
-na wynik. Endpointy edycji i usuwania transakcji należą do #19.
+na wynik. PATCH i DELETE transakcji korzystają z tego samego wyliczenia
+przy kolejnym GET portfela, bez synchronizowania dodatkowego pola salda.
+Przykład: początkowe `"100.00"`, przychód `"50.20"` i wydatek `"20.10"`
+dają `"130.10"`. Zmiana wydatku na `"30.10"` daje `"120.10"`, a jego
+usunięcie `"150.20"`.
 
 ## Daty
 
@@ -298,6 +356,29 @@ Ostatni GET zwraca historię wydatków z listopada wraz z `total`. Aby pobrać
 szczegóły, skopiuj `id` z odpowiedzi POST lub z `items` i wyślij z tym samym
 cookie `GET /transactions/:id`, zastępując `:id` skopiowaną wartością.
 
+Aby edytować i usunąć tę samą operację, wstaw skopiowany UUID do zmiennej:
+
+```bash
+TRANSACTION_ID="wstaw-uuid-z-odpowiedzi-post"
+
+curl -i -b /tmp/finance-transaction-cookies.txt \
+  -X PATCH "http://localhost:3001/transactions/$TRANSACTION_ID" \
+  -H 'Origin: http://localhost:3000' \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":"30.10","note":null}'
+
+curl -i -b /tmp/finance-transaction-cookies.txt http://localhost:3001/wallet
+
+curl -i -b /tmp/finance-transaction-cookies.txt \
+  -X DELETE "http://localhost:3001/transactions/$TRANSACTION_ID" \
+  -H 'Origin: http://localhost:3000'
+
+curl -i -b /tmp/finance-transaction-cookies.txt http://localhost:3001/wallet
+```
+
+PATCH zwraca `200`, a DELETE `204`. Saldo po każdej operacji uwzględnia
+aktualną historię. Przyciski edycji i usuwania w panelu należą do #20.
+
 ## Formularz w przeglądarce
 
 `/dashboard/transactions` jest chronioną stroną panelu z bieżącym saldem
@@ -354,6 +435,7 @@ npm --prefix backend run typecheck
 npm --prefix backend run test:integration -- test/transaction.integration-spec.ts test/transaction-migration.integration-spec.ts
 npm --prefix backend run test:integration -- test/transaction-api.integration-spec.ts
 npm --prefix backend run test:integration -- test/transaction-read.integration-spec.ts
+npm --prefix backend run test:integration -- test/transaction-mutations.integration-spec.ts
 npm --prefix backend run test:integration -- test/wallet-api.integration-spec.ts
 npm --prefix frontend test
 npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
@@ -398,3 +480,10 @@ filtrów, przełączanie stron oraz spóźnione odpowiedzi. Chromium używa zbio
 przekraczającego 20 operacji i sprawdza granice dat, globalne saldo,
 odświeżenie po POST z aktywnym filtrem, błędy GET, wygaśnięcie sesji,
 izolację kont i układ na ekranie 375 px.
+
+Testy mutacji sprawdzają częściowe edycje, granice kwot i dat, czyszczenie
+notatki, niezmienność pól właściciela i metadanych oraz zgodność typu
+i kategorii. Obejmują dokładne saldo po zmianie i usunięciu, autoryzację
+dwóch kont, sesje, CSRF i preflight DELETE. Scenariusze równoległe sprawdzają
+niezależne pola PATCH, walidację po rzeczywistym oczekiwaniu na blokadę
+PostgreSQL, jednoczesne usunięcia i wyścig edycji z usuwaniem.

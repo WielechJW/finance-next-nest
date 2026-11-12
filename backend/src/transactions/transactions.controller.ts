@@ -2,9 +2,13 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
+  HttpCode,
+  HttpStatus,
   Param,
+  Patch,
   ParseUUIDPipe,
   Post,
   Query,
@@ -15,11 +19,17 @@ import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import type { RegisteredUser } from '../users/users.service.js';
 import { CreateTransactionDto } from './dto/create-transaction.dto.js';
 import { ListTransactionsDto } from './dto/list-transactions.dto.js';
+import { UpdateTransactionDto } from './dto/update-transaction.dto.js';
 import type {
   TransactionListResponse,
   TransactionResponse,
 } from './transaction-response.js';
 import { TransactionsService } from './transactions.service.js';
+
+const transactionIdPipe = new ParseUUIDPipe({
+  exceptionFactory: () =>
+    new BadRequestException('Podaj poprawny identyfikator UUID transakcji.'),
+});
 
 @Controller('transactions')
 @UseGuards(SessionAuthGuard)
@@ -39,15 +49,7 @@ export class TransactionsController {
   @Header('Cache-Control', 'no-store')
   get(
     @CurrentUser() user: RegisteredUser,
-    @Param(
-      'id',
-      new ParseUUIDPipe({
-        exceptionFactory: () =>
-          new BadRequestException(
-            'Podaj poprawny identyfikator UUID transakcji.',
-          ),
-      }),
-    )
+    @Param('id', transactionIdPipe)
     id: string,
   ): Promise<TransactionResponse> {
     return this.transactions.getForUser(user.id, id);
@@ -60,5 +62,25 @@ export class TransactionsController {
     @Body() input: CreateTransactionDto,
   ): Promise<TransactionResponse> {
     return this.transactions.createForUser(user.id, input);
+  }
+
+  @Patch(':id')
+  @Header('Cache-Control', 'no-store')
+  update(
+    @CurrentUser() user: RegisteredUser,
+    @Param('id', transactionIdPipe) id: string,
+    @Body() input: UpdateTransactionDto,
+  ): Promise<TransactionResponse> {
+    return this.transactions.updateForUser(user.id, id, input);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Header('Cache-Control', 'no-store')
+  remove(
+    @CurrentUser() user: RegisteredUser,
+    @Param('id', transactionIdPipe) id: string,
+  ): Promise<void> {
+    return this.transactions.deleteForUser(user.id, id);
   }
 }

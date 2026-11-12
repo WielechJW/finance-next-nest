@@ -8,7 +8,7 @@ export function configureApp(app: INestApplication): void {
   app.enableCors({
     origin: frontendOrigin,
     credentials: true,
-    methods: ['GET', 'HEAD', 'POST', 'PATCH'],
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type'],
   });
   // Reject foreign browser writes before loading a session or running a handler.

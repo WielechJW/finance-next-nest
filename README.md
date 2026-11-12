@@ -248,7 +248,7 @@ testów opisuje [kontrakt transakcji i kategorii](docs/transactions-api.md).
 
 ## API kategorii i transakcji
 
-Etapy 3.2 (#14) i 3.4 (#16) udostępniają endpointy wymagające aktywnej sesji:
+Etapy 3.2 (#14), 3.4 (#16) i 3.7 (#19) udostępniają endpointy wymagające aktywnej sesji:
 
 | Endpoint | Wynik |
 | --- | --- |
@@ -256,6 +256,8 @@ Etapy 3.2 (#14) i 3.4 (#16) udostępniają endpointy wymagające aktywnej sesji:
 | `POST /transactions` | `201` z transakcją zapisaną w portfelu użytkownika z sesji. |
 | `GET /transactions` | `200` z historią własnego portfela, filtrami, paginacją i licznikiem `total`. |
 | `GET /transactions/:id` | `200` ze szczegółami własnej operacji; cudza lub nieistniejąca daje `404`. |
+| `PATCH /transactions/:id` | `200` z własną operacją po częściowej aktualizacji. |
+| `DELETE /transactions/:id` | `204` bez treści po usunięciu własnej operacji. |
 
 Transakcja przyjmuje `type`, `amount`, `categoryId`, `title`, `occurredOn`
 i opcjonalne `note`. Kwota jest dodatnim stringiem z dokładnie dwoma miejscami
@@ -272,6 +274,25 @@ własnych operacji. Lista i licznik są odczytywane z jednego obrazu danych.
 Pusta lub zbyt odległa poprawna strona daje pustą tablicę i status `200`.
 Nieprawidłowe daty, odwrócony zakres i błędna paginacja dają `400`.
 
+PATCH przyjmuje przynajmniej jedno z pól `type`, `amount`, `categoryId`,
+`title`, `occurredOn` i `note`. Pominięte pola zachowują dotychczasową wartość;
+`note: null` usuwa notatkę, a `null` dla pozostałych pól daje `400`.
+Walidacja kwot, dat i długości tekstu jest taka sama jak przy tworzeniu.
+Typ i kategoria muszą pasować do siebie po uwzględnieniu wszystkich zmian.
+Przykładowo zmiana wydatku na przychód wymaga kategorii przychodów.
+
+Edycja blokuje własny rekord w transakcji bazy przed sprawdzeniem końcowego
+typu i kategorii. Równoległe częściowe zmiany korzystają z najnowszego stanu.
+Warunek właściciela jest sprawdzany również w zapytaniu aktualizacji lub
+usunięcia. Cudza i nieistniejąca operacja zwracają identyczne `404`, a pola
+właściciela, portfela, identyfikatora i znaczników czasu są niemodyfikowalne.
+Zapis i usunięcie korzystają z sesji oraz globalnej ochrony CSRF.
+
+Po zmianie kwoty, typu lub usunięciu operacji `GET /wallet` od razu wylicza
+saldo z aktualnej historii. Przykład: `100.00 + 50.20 − 20.10 = 130.10`;
+zmiana wydatku na `30.10` daje `120.10`, a jego usunięcie `150.20`.
+Przyciski edycji i usuwania w panelu należą do etapu 3.8 (#20).
+
 Przykłady żądań curl, odpowiedzi i statusy błędów opisuje
 [kontrakt transakcji i kategorii](docs/transactions-api.md).
 Testy API z rzeczywistym PostgreSQL uruchomisz poleceniem:
@@ -279,6 +300,7 @@ Testy API z rzeczywistym PostgreSQL uruchomisz poleceniem:
 ```bash
 npm --prefix backend run test:integration -- test/transaction-api.integration-spec.ts
 npm --prefix backend run test:integration -- test/transaction-read.integration-spec.ts
+npm --prefix backend run test:integration -- test/transaction-mutations.integration-spec.ts
 ```
 
 Etap 3.3 (#15) wylicza saldo portfela z całej historii zapisanych transakcji.
@@ -464,9 +486,8 @@ operacji biznesowych zmieniających dane. Klienci bez obu nagłówków
 `Sec-Fetch-Site` i `Origin`, np. zwykły curl, pozostają dozwoleni.
 Ochrona opiera się na nagłówkach wysyłanych przez współczesne przeglądarki;
 bardzo stare przeglądarki niewysyłające obu nagłówków wymagałyby ochrony
-tokenowej. CORS udostępnia obecnie metody GET, HEAD, POST i PATCH; przy dodawaniu
-endpointów DELETE należy rozszerzyć tę listę. Globalne sprawdzanie
-CSRF już obejmuje tę metodę.
+tokenowej. CORS udostępnia metody GET, HEAD, POST, PATCH i DELETE.
+Globalne sprawdzanie CSRF obejmuje także edycję i usuwanie transakcji.
 
 `@nestjs/throttler` ogranicza osobno login i rejestrację na podstawie IP:
 
@@ -934,6 +955,7 @@ korzystają już z API działającego na porcie 3001.
 | `backend/src/categories/categories.controller.ts` | API odczytu kategorii z filtrem typu. |
 | `backend/src/transactions/transactions.controller.ts` | API dodawania, historii i szczegółów własnych transakcji. |
 | `backend/src/transactions/dto/list-transactions.dto.ts` | Walidacja filtrów i paginacji historii. |
+| `backend/src/transactions/dto/update-transaction.dto.ts` | Walidacja częściowej edycji transakcji i czyszczenia notatki. |
 | `backend/src/wallets/wallet-balance.ts` | Wspólna agregacja salda z historii dla GET i PATCH portfela. |
 | `docs/transactions-api.md` | Kontrakt kwot, dat i kategorii transakcji. |
 
