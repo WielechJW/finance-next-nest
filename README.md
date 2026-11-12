@@ -794,6 +794,26 @@ notatki, saldo, anulowanie klawiaturą, fokus w oknie, błąd PATCH i ponowienie
 odczytu, usunięcie jedynej pozycji drugiej strony, wygaśnięcie sesji,
 usunięcie operacji w międzyczasie oraz oba okna na ekranie 375 px.
 
+## Weryfikacja całego etapu transakcji
+
+Etap 3.9 (#21) łączy testy API i pełny przebieg w panelu. Integracja sprawdza
+28 operacji z groszami, wspólną datą przekraczającą granicę strony,
+datami granicznymi i dniem przestępnym. Po zmianie typu, kategorii i daty
+oraz usunięciu przychodu i wydatku porównuje komplet stron i globalne saldo.
+Próby dostępu do cudzych transakcji nie zmieniają historii ani salda obu kont.
+
+Scenariusz Chromium prowadzi portfel przez saldo początkowe `100.00`,
+przychód `50.20`, wydatek `20.10` i saldo `130.10`; edycja wydatku na
+`30.10` daje `120.10`, a jego usunięcie `150.20`. Sprawdza też filtry,
+odświeżenie strony, odrębność salda początkowego i zmianę kont A → B → A.
+
+[Mapa kryteriów, dane testowe, pełny przebieg ręczny i komendy regresji](docs/transaction-verification.md).
+
+```bash
+npm --prefix backend run test:integration -- test/transaction-mutations.integration-spec.ts
+npm --prefix backend run test:browser -- transaction-lifecycle.pw.ts
+```
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
@@ -916,6 +936,9 @@ npm --prefix backend run test:browser -- transaction-history.pw.ts
 
 # Edycja i potwierdzenie usunięcia (etap 3.8)
 npm --prefix backend run test:browser -- transaction-mutations.pw.ts
+
+# Pełny przebieg portfela i izolacja po zmianie konta (etap 3.9)
+npm --prefix backend run test:browser -- transaction-lifecycle.pw.ts
 
 # Uruchomienie z widocznym oknem Chromium
 npm --prefix backend run test:browser:headed

@@ -16,7 +16,10 @@ import { getAuthRateLimitOptions } from '../src/config/rate-limit.js';
 import { Prisma } from '../src/generated/prisma/client.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import type { CreateTransactionDto } from '../src/transactions/dto/create-transaction.dto.js';
-import type { TransactionResponse } from '../src/transactions/transaction-response.js';
+import type {
+  TransactionListResponse,
+  TransactionResponse,
+} from '../src/transactions/transaction-response.js';
 import { setCookieHeaders } from './support/cookies.js';
 
 const expense = SYSTEM_CATEGORIES[0];
@@ -111,6 +114,298 @@ describe('Transaction editing and deletion API (PostgreSQL)', () => {
       .expect(201);
     return response.body as TransactionResponse;
   }
+
+  type Account = Awaited<ReturnType<typeof createAccount>>;
+  type LedgerEntry = Pick<
+    TransactionResponse,
+    'id' | 'type' | 'amount' | 'categoryId' | 'title' | 'note' | 'occurredOn'
+  >;
+  type Filters = {
+    type?: 'INCOME' | 'EXPENSE';
+    categoryId?: string;
+    from?: string;
+    to?: string;
+  };
+
+  async function createLedger(account: Account) {
+    // Equal-date pairs cross the default page boundary and cancel exactly.
+    const inputs: CreateTransactionDto[] = Array.from(
+      { length: 11 },
+      (_, index) => [
+        {
+          ...validInput,
+          amount: '0.10',
+          occurredOn: '2024-02-15',
+          title: `Wydatek ${index + 1}`,
+        },
+        {
+          ...validInput,
+          type: 'INCOME' as const,
+          categoryId: income.id,
+          amount: '0.10',
+          occurredOn: '2024-02-15',
+          title: `Przychód ${index + 1}`,
+        },
+      ],
+    ).flat();
+    const boundaries: CreateTransactionDto[] = [
+      {
+        ...validInput,
+        amount: '0.01',
+        occurredOn: '2024-01-31',
+        title: 'Przed okresem',
+      },
+      {
+        ...validInput,
+        amount: '0.10',
+        occurredOn: '2024-02-01',
+        title: 'Pierwszy dzień',
+      },
+      {
+        ...validInput,
+        amount: '0.20',
+        occurredOn: '2024-02-29',
+        title: 'Dzień przestępny',
+      },
+      {
+        ...validInput,
+        type: 'INCOME',
+        categoryId: income.id,
+        amount: '0.30',
+        occurredOn: '2024-03-01',
+        title: 'Po okresie',
+      },
+      {
+        ...validInput,
+        amount: '0.10',
+        occurredOn: '0001-01-01',
+        title: 'Najstarsza data',
+      },
+      {
+        ...validInput,
+        type: 'INCOME',
+        categoryId: income.id,
+        amount: '0.20',
+        occurredOn: '9999-12-31',
+        title: 'Przyszła data',
+      },
+    ];
+    const entries: LedgerEntry[] = [];
+    for (const input of [...inputs, ...boundaries]) {
+      const created = await createTransaction(account, input);
+      expect(created).toMatchObject(input);
+      entries.push({
+        id: created.id,
+        type: input.type,
+        amount: input.amount,
+        categoryId: input.categoryId,
+        title: input.title,
+        note: input.note ?? null,
+        occurredOn: input.occurredOn,
+      });
+    }
+    return entries;
+  }
+
+  async function expectPages(
+    account: Account,
+    entries: LedgerEntry[],
+    filters: Filters = {},
+    pageSize = 20,
+  ) {
+    // Expected rows come from test inputs, never from API list/aggregate results.
+    const expected = entries
+      .filter(
+        (entry) =>
+          (!filters.type || entry.type === filters.type) &&
+          (!filters.categoryId || entry.categoryId === filters.categoryId) &&
+          (!filters.from || entry.occurredOn >= filters.from) &&
+          (!filters.to || entry.occurredOn <= filters.to),
+      )
+      .sort((a, b) => {
+        const left = a.occurredOn + a.id;
+        const right = b.occurredOn + b.id;
+        return left < right ? 1 : left > right ? -1 : 0;
+      });
+    const seen: string[] = [];
+    const lastPage = Math.max(1, Math.ceil(expected.length / pageSize));
+    // Also check the first page beyond the result to catch stale counts.
+    for (let page = 1; page <= lastPage + 1; page += 1) {
+      const response = await account.agent
+        .get('/transactions')
+        .query({ ...filters, page, pageSize })
+        .expect(200);
+      const body = response.body as TransactionListResponse;
+      expect(body).toMatchObject({ total: expected.length, page, pageSize });
+      const projected = body.items.map(
+        ({ id, type, amount, categoryId, title, note, occurredOn }) => ({
+          id,
+          type,
+          amount,
+          categoryId,
+          title,
+          note,
+          occurredOn,
+        }),
+      );
+      expect(projected).toEqual(
+        expected.slice((page - 1) * pageSize, page * pageSize),
+      );
+      expect(
+        body.items.every((entry) => entry.walletId === account.wallet.id),
+      ).toBe(true);
+      seen.push(...body.items.map((entry) => entry.id));
+    }
+    expect(seen).toEqual(expected.map((entry) => entry.id));
+    expect(new Set(seen).size).toBe(expected.length);
+  }
+
+  async function expectBalance(
+    account: Account,
+    openingBalance: string,
+    balance: string,
+  ) {
+    const response = await account.agent.get('/wallet').expect(200);
+    expect(response.body).toMatchObject({
+      id: account.wallet.id,
+      openingBalance,
+      balance,
+    });
+  }
+
+  it('keeps a mixed ledger exact across paged filters, type/date/category changes and both deletion directions', async () => {
+    const account = await createAccount();
+    await account.agent
+      .patch('/wallet')
+      .send({ openingBalance: '100.00' })
+      .expect(200);
+    let entries = await createLedger(account);
+    const first = entries.find((entry) => entry.title === 'Pierwszy dzień')!;
+    const leap = entries.find((entry) => entry.title === 'Dzień przestępny')!;
+    const filters = {
+      type: 'EXPENSE',
+      categoryId: expense.id,
+      from: '2024-02-01',
+      to: '2024-02-29',
+    } as const;
+
+    await expectPages(account, entries);
+    await expectPages(account, entries, filters, 5);
+    await expectBalance(account, '100.00', '100.09');
+
+    const correction = {
+      type: 'INCOME',
+      categoryId: income.id,
+      amount: '0.20',
+      occurredOn: '2024-02-29',
+      title: 'Przychód po korekcie',
+      note: null,
+    } as const;
+    const changed = await account.agent
+      .patch('/transactions/' + first.id)
+      .set('Origin', origin)
+      .send(correction)
+      .expect(200);
+    expect(changed.body).toMatchObject({ id: first.id, ...correction });
+    entries = entries.map((entry) =>
+      entry.id === first.id ? { ...entry, ...correction } : entry,
+    );
+    await expectPages(account, entries);
+    await expectPages(account, entries, filters, 5);
+    await expectBalance(account, '100.00', '100.39');
+
+    const moved = {
+      amount: '0.10',
+      occurredOn: '2024-03-01',
+      categoryId: transport.id,
+    };
+    await account.agent
+      .patch('/transactions/' + leap.id)
+      .set('Origin', origin)
+      .send(moved)
+      .expect(200);
+    entries = entries.map((entry) =>
+      entry.id === leap.id ? { ...entry, ...moved } : entry,
+    );
+    await expectPages(account, entries);
+    await expectPages(account, entries, filters, 5);
+    await expectPages(
+      account,
+      entries,
+      { from: '2024-02-29', to: '2024-02-29' },
+      5,
+    );
+    await expectPages(
+      account,
+      entries,
+      { categoryId: transport.id, from: '2024-03-01', to: '2024-03-01' },
+      5,
+    );
+    await expectBalance(account, '100.00', '100.49');
+
+    for (const [id, balance] of [
+      [first.id, '100.29'],
+      [leap.id, '100.39'],
+    ] as const) {
+      await account.agent
+        .delete('/transactions/' + id)
+        .set('Origin', origin)
+        .expect(204);
+      entries = entries.filter((entry) => entry.id !== id);
+      await account.agent.get('/transactions/' + id).expect(404);
+      await expectPages(account, entries);
+      await expectPages(account, entries, filters, 5);
+      await expectBalance(account, '100.00', balance);
+    }
+  });
+
+  it('preserves both complete ledgers and aggregates after foreign reads, edits and deletions', async () => {
+    const a = await createAccount();
+    const b = await createAccount();
+    await a.agent
+      .patch('/wallet')
+      .send({ openingBalance: '100.00' })
+      .expect(200);
+    await b.agent
+      .patch('/wallet')
+      .send({ openingBalance: '-100.00' })
+      .expect(200);
+    const entriesA = await createLedger(a);
+    const entriesB = await createLedger(b);
+    const firstA = entriesA[0]!;
+    const firstB = entriesB[0]!;
+    const originalA = (
+      await a.agent.get('/transactions/' + firstA.id).expect(200)
+    ).body as TransactionResponse;
+    const originalB = (
+      await b.agent.get('/transactions/' + firstB.id).expect(200)
+    ).body as TransactionResponse;
+    for (const [attacker, owner, target, original] of [
+      [a, b, firstB, originalB],
+      [b, a, firstA, originalA],
+    ] as const) {
+      for (const method of ['get', 'patch', 'delete'] as const) {
+        const attempt = attacker.agent[method]('/transactions/' + target.id)
+          .set('Origin', origin)
+          .query({ userId: owner.user.id, walletId: owner.wallet.id });
+        if (method === 'patch')
+          attempt.send({
+            amount: '999999999999.99',
+            type: 'INCOME',
+            categoryId: income.id,
+          });
+        await attempt.expect(404);
+        const detail = await owner.agent
+          .get('/transactions/' + target.id)
+          .expect(200);
+        expect(detail.body).toEqual(original);
+        await expectPages(a, entriesA);
+        await expectPages(b, entriesB);
+        await expectBalance(a, '100.00', '100.09');
+        await expectBalance(b, '-100.00', '-99.91');
+      }
+    }
+  });
 
   it('requires a session for both mutation endpoints', async () => {
     const path = '/transactions/' + randomUUID();

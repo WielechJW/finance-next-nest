@@ -9,6 +9,8 @@ Etap 3.6 (#18) łączy historię w panelu z filtrami i paginacją API.
 Etap 3.7 (#19) dodaje edycję i usuwanie własnych operacji przez API.
 Etap 3.8 (#20) udostępnia te operacje w panelu, z potwierdzeniem usunięcia
 oraz odświeżaniem historii i salda przy zachowaniu filtrów.
+Etap 3.9 (#21) domyka [weryfikację historii i salda](transaction-verification.md)
+testami mieszanych operacji, izolacji kont i pełnego przebiegu w panelu.
 
 ## Endpointy
 
@@ -443,6 +445,7 @@ npm --prefix frontend test
 npm --prefix backend run test:browser -- wallet.pw.ts auth-session.pw.ts
 npm --prefix backend run test:browser -- transactions.pw.ts
 npm --prefix backend run test:browser -- transaction-history.pw.ts
+npm --prefix backend run test:browser -- transaction-mutations.pw.ts transaction-lifecycle.pw.ts
 ```
 
 Testy korzystają wyłącznie z osobnej bazy `DATABASE_URL_TEST`. Sprawdzają
