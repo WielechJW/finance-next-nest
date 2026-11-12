@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("Transaction session integration", () => {
-  it.each(["categories", "create", "history"] as const)(
+  it.each(["categories", "create", "history", "update", "remove"] as const)(
     "redirects to login after a 401 during %s",
     async (operation) => {
       router.replace.mockReset();
@@ -28,6 +28,8 @@ describe("Transaction session integration", () => {
         vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
           const path = new URL(String(input)).pathname;
           const unauthorized =
+            ((operation === "update" || operation === "remove") &&
+              path.startsWith("/transactions/")) ||
             (operation === "categories" && path === "/categories") ||
             (path === "/transactions" &&
               ((operation === "create" && init?.method === "POST") ||
@@ -45,7 +47,12 @@ describe("Transaction session integration", () => {
                   : path === "/categories"
                     ? categories
                     : path === "/transactions"
-                      ? historyPage(1, 0)
+                      ? historyPage(
+                          1,
+                          operation === "update" || operation === "remove"
+                            ? 1
+                            : 0,
+                        )
                       : wallet,
             ),
             { status: unauthorized ? 401 : 200 },
@@ -74,10 +81,26 @@ describe("Transaction session integration", () => {
         });
         fireEvent.submit(screen.getByRole("form", { name: "Nowa transakcja" }));
       }
+      if (operation === "update" || operation === "remove") {
+        fireEvent.click(
+          await screen.findByRole("button", {
+            name: `${operation === "update" ? "Edytuj" : "Usuń"}: Operacja 1`,
+          }),
+        );
+        const dialog = within(screen.getByRole("dialog"));
+        if (operation === "update") fireEvent.submit(dialog.getByRole("form"));
+        else
+          fireEvent.click(
+            dialog.getByRole("button", { name: "Usuń transakcję" }),
+          );
+      }
       await waitFor(() =>
         expect(router.replace).toHaveBeenCalledWith("/login"),
       );
       expect(screen.queryByText("Wydatek zapisany.")).toBeNull();
+      expect(
+        screen.queryByText(/Transakcja (zaktualizowana|usunięta)\./),
+      ).toBeNull();
     },
   );
 });

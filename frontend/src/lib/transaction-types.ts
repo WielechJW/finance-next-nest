@@ -15,6 +15,10 @@ export interface CreateTransactionInput {
   note?: string;
 }
 
+export type UpdateTransactionInput = Partial<
+  Omit<CreateTransactionInput, "note">
+> & { note?: string | null };
+
 export interface TransactionDto extends Omit<CreateTransactionInput, "note"> {
   id: string;
   walletId: string;

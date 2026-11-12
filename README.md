@@ -754,6 +754,46 @@ npm --prefix frontend test
 npm --prefix backend run test:browser -- transaction-history.pw.ts transactions.pw.ts
 ```
 
+## Edycja i usuwanie w panelu
+
+Etap 3.8 (#20) dodaje przy każdej pozycji historii akcje **Edytuj** i **Usuń**.
+Edycja otwiera formularz wypełniony typem, kwotą, kategorią, tytułem,
+datą i notatką. Korzysta z tych samych reguł co dodawanie: dodatnia kwota
+z polskim przecinkiem, kategoria zgodna z typem oraz data kalendarzowa.
+Wyczyszczenie notatki wysyła `note: null`. Szkic nowej transakcji pozostaje
+niezależny od formularza edycji.
+
+Usunięcie wymaga potwierdzenia w oknie z tytułem i kwotą operacji.
+**Anuluj** lub Escape zamyka okno bez zapisu i oddaje fokus przyciskowi,
+który je otworzył. Podczas żądania zapis, usuwanie i zamykanie okna są
+zablokowane, aby uniknąć równoległych mutacji. Fokus pozostaje w oknie.
+Po sukcesie przechodzi na nagłówek historii.
+
+Zapis i usunięcie odświeżają historię oraz saldo niezależnie, zachowując
+aktywne filtry i bieżącą stronę. Jeżeli ostatnia strona przestanie istnieć,
+widok przechodzi na ostatnią poprawną stronę. Zmieniona operacja może
+zniknąć z listy, gdy przestanie pasować do filtrów. Potwierdzenie sukcesu
+pozostaje widoczne również po błędzie odczytu; ponowienie odświeżenia
+wysyła tylko GET.
+
+Błąd mutacji pozostawia okno otwarte i zachowuje wpisane dane.
+Odpowiedź `404` odświeża historię i saldo, blokuje dalszy zapis tej pozycji
+i pokazuje komunikat o niedostępnej transakcji. Wygaśnięcie sesji kieruje
+do logowania. Zmiana konta zamyka okno, anuluje żądanie po stronie klienta
+i ignoruje jego spóźnioną odpowiedź.
+
+Testy komponentów i klienta API oraz scenariusze Chromium:
+
+```bash
+npm --prefix frontend test -- --maxWorkers=2
+npm --prefix backend run test:browser -- transaction-mutations.pw.ts transaction-history.pw.ts transactions.pw.ts wallet.pw.ts auth-session.pw.ts
+```
+
+Scenariusze sprawdzają rzeczywisty zapis zmienionych pól, wyczyszczenie
+notatki, saldo, anulowanie klawiaturą, fokus w oknie, błąd PATCH i ponowienie
+odczytu, usunięcie jedynej pozycji drugiej strony, wygaśnięcie sesji,
+usunięcie operacji w międzyczasie oraz oba okna na ekranie 375 px.
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
@@ -873,6 +913,9 @@ npm --prefix backend run test:browser -- transactions.pw.ts
 
 # Historia, filtry i paginacja (etap 3.6)
 npm --prefix backend run test:browser -- transaction-history.pw.ts
+
+# Edycja i potwierdzenie usunięcia (etap 3.8)
+npm --prefix backend run test:browser -- transaction-mutations.pw.ts
 
 # Uruchomienie z widocznym oknem Chromium
 npm --prefix backend run test:browser:headed

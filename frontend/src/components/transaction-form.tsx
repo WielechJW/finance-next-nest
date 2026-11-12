@@ -26,15 +26,32 @@ type Draft = {
 type Field = keyof Draft;
 type Errors = Partial<Record<Field, string>>;
 
-function FieldError({ name, message }: { name: Field; message?: string }) {
+function FieldError({
+  name,
+  message,
+  prefix,
+}: {
+  name: Field;
+  message?: string;
+  prefix: string;
+}) {
   return message ? (
-    <p id={`transaction-${name}-error`} className={styles.error}>
+    <p id={`${prefix}-${name}-error`} className={styles.error}>
       {message}
     </p>
   ) : null;
 }
 
-type FormProps = { onCreated: (transaction: TransactionDto) => void };
+type FormProps =
+  | { mode?: "create"; onCreated: (transaction: TransactionDto) => void }
+  | {
+      mode: "edit";
+      transaction: TransactionDto;
+      onSaved: (transaction: TransactionDto) => void;
+      onCancel: () => void;
+      onUnavailable: () => void;
+      onPendingChange: (pending: boolean) => void;
+    };
 
 export function TransactionForm({
   categories,
@@ -52,23 +69,38 @@ function StandaloneTransactionForm(props: FormProps) {
   return <TransactionFormContent {...props} resource={resource} />;
 }
 
-function TransactionFormContent({
-  onCreated,
-  resource,
-}: FormProps & { resource: TransactionCategories }) {
+function TransactionFormContent(
+  props: FormProps & { resource: TransactionCategories },
+) {
+  const { resource } = props;
+  const editing = props.mode === "edit";
+  const prefix = editing ? "edit-transaction" : "transaction";
+  const heading = editing ? "Edycja transakcji" : "Nowa transakcja";
   const { state: categories, retry: retryCategories } = resource;
-  const [values, setValues] = useState<Draft>(() => ({
-    type: "EXPENSE",
-    amount: "",
-    categoryId: "",
-    title: "",
-    occurredOn: warsawToday(),
-    note: "",
-  }));
+  const [values, setValues] = useState<Draft>(() =>
+    editing
+      ? {
+          type: props.transaction.type,
+          amount: props.transaction.amount,
+          categoryId: props.transaction.categoryId,
+          title: props.transaction.title,
+          occurredOn: props.transaction.occurredOn,
+          note: props.transaction.note ?? "",
+        }
+      : {
+          type: "EXPENSE",
+          amount: "",
+          categoryId: "",
+          title: "",
+          occurredOn: warsawToday(),
+          note: "",
+        },
+  );
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const pending = useRef(false);
   const saveController = useRef<AbortController | null>(null);
 
@@ -95,7 +127,7 @@ function TransactionFormContent({
       [field]: undefined,
       ...(field === "type" ? { categoryId: undefined } : {}),
     }));
-    setFormError("");
+    if (!unavailable) setFormError("");
     setNotice("");
   }
 
@@ -103,7 +135,7 @@ function TransactionFormContent({
     return {
       "aria-invalid": Boolean(errors[field]),
       "aria-describedby":
-        [hint, errors[field] ? `transaction-${field}-error` : undefined]
+        [hint, errors[field] ? `${prefix}-${field}-error` : undefined]
           .filter(Boolean)
           .join(" ") || undefined,
     };
@@ -111,7 +143,12 @@ function TransactionFormContent({
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending.current || categories.status !== "ready" || !available.length)
+    if (
+      pending.current ||
+      unavailable ||
+      categories.status !== "ready" ||
+      !available.length
+    )
       return;
     const form = event.currentTarget;
     const next: Errors = {};
@@ -144,32 +181,43 @@ function TransactionFormContent({
     }
 
     pending.current = true;
+    if (editing) props.onPendingChange(true);
     setSaving(true);
     const controller = new AbortController();
     saveController.current = controller;
     let created: TransactionDto | undefined;
     try {
-      created = await transactionsApi.create(
-        {
-          type: values.type,
-          amount,
-          categoryId: values.categoryId,
-          title,
-          occurredOn: values.occurredOn,
-          ...(values.note ? { note: values.note } : {}),
-        },
-        controller.signal,
-      );
+      const input = {
+        type: values.type,
+        amount,
+        categoryId: values.categoryId,
+        title,
+        occurredOn: values.occurredOn,
+      };
+      created = editing
+        ? await transactionsApi.update(
+            props.transaction.id,
+            { ...input, note: values.note || null },
+            controller.signal,
+          )
+        : await transactionsApi.create(
+            { ...input, ...(values.note ? { note: values.note } : {}) },
+            controller.signal,
+          );
       if (controller.signal.aborted) return;
-      setValues((previous) => ({
-        ...previous,
-        amount: "",
-        title: "",
-        note: "",
-      }));
-      setNotice(
-        created.type === "INCOME" ? "Przychód zapisany." : "Wydatek zapisany.",
-      );
+      if (!editing) {
+        setValues((previous) => ({
+          ...previous,
+          amount: "",
+          title: "",
+          note: "",
+        }));
+        setNotice(
+          created.type === "INCOME"
+            ? "Przychód zapisany."
+            : "Wydatek zapisany.",
+        );
+      }
     } catch (error) {
       if (
         controller.signal.aborted ||
@@ -177,26 +225,39 @@ function TransactionFormContent({
         (error instanceof ApiError && error.status === 401)
       )
         return;
-      setFormError(
-        error instanceof ApiError
-          ? error.message
-          : "Nie udało się zapisać operacji. Spróbuj ponownie.",
-      );
+      if (editing && error instanceof ApiError && error.status === 404) {
+        setUnavailable(true);
+        setFormError(
+          "Ta transakcja nie jest już dostępna. Odświeżamy historię. Możesz zamknąć edycję.",
+        );
+        props.onUnavailable();
+      } else
+        setFormError(
+          error instanceof ApiError
+            ? error.message
+            : "Nie udało się zapisać operacji. Spróbuj ponownie.",
+        );
     } finally {
       pending.current = false;
-      if (!controller.signal.aborted) setSaving(false);
+      if (!controller.signal.aborted) {
+        setSaving(false);
+        if (editing) props.onPendingChange(false);
+      }
     }
-    // Refreshing the wallet/history is separate from the confirmed POST.
-    if (created && !controller.signal.aborted) onCreated(created);
+    // Refreshing reads is separate from the confirmed mutation.
+    if (created && !controller.signal.aborted) {
+      if (editing) props.onSaved(created);
+      else props.onCreated(created);
+    }
   }
 
   return (
     <section
       className={styles.formSection}
-      aria-labelledby="transaction-form-heading"
+      aria-labelledby={`${prefix}-form-heading`}
     >
-      <h2 id="transaction-form-heading" tabIndex={-1}>
-        Nowa transakcja
+      <h2 id={`${prefix}-form-heading`} tabIndex={-1}>
+        {heading}
       </h2>
       {categories.status === "loading" && (
         <p role="status">Ładowanie kategorii…</p>
@@ -218,13 +279,13 @@ function TransactionFormContent({
         onSubmit={submit}
         noValidate
         aria-busy={saving}
-        aria-labelledby="transaction-form-heading"
+        aria-labelledby={`${prefix}-form-heading`}
       >
         <div className={styles.fields}>
           <div className={styles.field}>
-            <label htmlFor="transaction-type">Typ operacji</label>
+            <label htmlFor={`${prefix}-type`}>Typ operacji</label>
             <select
-              id="transaction-type"
+              id={`${prefix}-type`}
               name="type"
               value={values.type}
               onChange={(event) => change("type", event.target.value)}
@@ -234,12 +295,12 @@ function TransactionFormContent({
               <option value="EXPENSE">Wydatek</option>
               <option value="INCOME">Przychód</option>
             </select>
-            <FieldError name="type" message={errors.type} />
+            <FieldError prefix={prefix} name="type" message={errors.type} />
           </div>
           <div className={styles.field}>
-            <label htmlFor="transaction-amount">Kwota</label>
+            <label htmlFor={`${prefix}-amount`}>Kwota</label>
             <input
-              id="transaction-amount"
+              id={`${prefix}-amount`}
               name="amount"
               type="text"
               inputMode="decimal"
@@ -247,17 +308,17 @@ function TransactionFormContent({
               value={values.amount}
               onChange={(event) => change("amount", event.target.value)}
               disabled={saving}
-              {...accessible("amount", "transaction-amount-hint")}
+              {...accessible("amount", `${prefix}-amount-hint`)}
             />
-            <p id="transaction-amount-hint" className={styles.hint}>
+            <p id={`${prefix}-amount-hint`} className={styles.hint}>
               Dodatnia kwota w PLN. Możesz użyć przecinka, np. 12,50.
             </p>
-            <FieldError name="amount" message={errors.amount} />
+            <FieldError prefix={prefix} name="amount" message={errors.amount} />
           </div>
           <div className={styles.field}>
-            <label htmlFor="transaction-categoryId">Kategoria</label>
+            <label htmlFor={`${prefix}-categoryId`}>Kategoria</label>
             <select
-              id="transaction-categoryId"
+              id={`${prefix}-categoryId`}
               name="categoryId"
               required
               value={values.categoryId}
@@ -274,12 +335,16 @@ function TransactionFormContent({
                 </option>
               ))}
             </select>
-            <FieldError name="categoryId" message={errors.categoryId} />
+            <FieldError
+              prefix={prefix}
+              name="categoryId"
+              message={errors.categoryId}
+            />
           </div>
           <div className={styles.field}>
-            <label htmlFor="transaction-title">Tytuł</label>
+            <label htmlFor={`${prefix}-title`}>Tytuł</label>
             <input
-              id="transaction-title"
+              id={`${prefix}-title`}
               name="title"
               type="text"
               required
@@ -288,12 +353,12 @@ function TransactionFormContent({
               disabled={saving}
               {...accessible("title")}
             />
-            <FieldError name="title" message={errors.title} />
+            <FieldError prefix={prefix} name="title" message={errors.title} />
           </div>
           <div className={styles.field}>
-            <label htmlFor="transaction-occurredOn">Data operacji</label>
+            <label htmlFor={`${prefix}-occurredOn`}>Data operacji</label>
             <input
-              id="transaction-occurredOn"
+              id={`${prefix}-occurredOn`}
               name="occurredOn"
               type="date"
               min="0001-01-01"
@@ -302,29 +367,33 @@ function TransactionFormContent({
               value={values.occurredOn}
               onChange={(event) => change("occurredOn", event.target.value)}
               disabled={saving}
-              {...accessible("occurredOn", "transaction-date-hint")}
+              {...accessible("occurredOn", `${prefix}-date-hint`)}
             />
-            <p id="transaction-date-hint" className={styles.hint}>
-              Domyślnie dziś w Polsce. Przyszłe daty są dozwolone i wpływają na
-              saldo.
+            <p id={`${prefix}-date-hint`} className={styles.hint}>
+              {!editing && "Domyślnie dziś w Polsce. "}
+              Przyszłe daty są dozwolone i wpływają na saldo.
             </p>
-            <FieldError name="occurredOn" message={errors.occurredOn} />
+            <FieldError
+              prefix={prefix}
+              name="occurredOn"
+              message={errors.occurredOn}
+            />
           </div>
           <div className={styles.field}>
-            <label htmlFor="transaction-note">Notatka (opcjonalnie)</label>
+            <label htmlFor={`${prefix}-note`}>Notatka (opcjonalnie)</label>
             <textarea
-              id="transaction-note"
+              id={`${prefix}-note`}
               name="note"
               rows={3}
               value={values.note}
               onChange={(event) => change("note", event.target.value)}
               disabled={saving}
-              {...accessible("note", "transaction-note-hint")}
+              {...accessible("note", `${prefix}-note-hint`)}
             />
-            <p id="transaction-note-hint" className={styles.hint}>
+            <p id={`${prefix}-note-hint`} className={styles.hint}>
               Do 1000 znaków.
             </p>
-            <FieldError name="note" message={errors.note} />
+            <FieldError prefix={prefix} name="note" message={errors.note} />
           </div>
         </div>
         <div role="alert" aria-atomic="true">
@@ -337,11 +406,28 @@ function TransactionFormContent({
           <button
             type="submit"
             disabled={
-              saving || categories.status !== "ready" || !available.length
+              saving ||
+              unavailable ||
+              categories.status !== "ready" ||
+              !available.length
             }
           >
-            {saving ? "Zapisywanie…" : "Zapisz transakcję"}
+            {saving
+              ? "Zapisywanie…"
+              : editing
+                ? "Zapisz zmiany"
+                : "Zapisz transakcję"}
           </button>
+          {editing && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={props.onCancel}
+              className={styles.secondary}
+            >
+              Anuluj
+            </button>
+          )}
           <p role="status" aria-atomic="true" className={styles.success}>
             {notice}
           </p>

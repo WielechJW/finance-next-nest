@@ -16,6 +16,7 @@ import type {
   TransactionFilters,
   TransactionListDto,
   TransactionType,
+  TransactionDto,
 } from "@/lib/transaction-types";
 import type { TransactionCategories } from "./use-transaction-categories";
 import styles from "./transaction-history.module.css";
@@ -43,10 +44,14 @@ export function TransactionHistory({
   categories,
   query,
   setQuery,
+  onEdit,
+  onDelete,
 }: {
   categories: TransactionCategories;
   query: TransactionHistoryQuery;
   setQuery: Dispatch<SetStateAction<TransactionHistoryQuery>>;
+  onEdit?: (transaction: TransactionDto, trigger: HTMLButtonElement) => void;
+  onDelete?: (transaction: TransactionDto, trigger: HTMLButtonElement) => void;
 }) {
   const [draft, setDraft] = useState<Draft>(() => ({
     ...emptyFilters,
@@ -379,6 +384,29 @@ export function TransactionHistory({
                         </dd>
                       </div>
                     </dl>
+                    <div className={styles.actions}>
+                      {onEdit && (
+                        <button
+                          type="button"
+                          aria-label={`Edytuj: ${item.title}`}
+                          onClick={(event) => onEdit(item, event.currentTarget)}
+                        >
+                          Edytuj
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          type="button"
+                          className={styles.secondary}
+                          aria-label={`Usuń: ${item.title}`}
+                          onClick={(event) =>
+                            onDelete(item, event.currentTarget)
+                          }
+                        >
+                          Usuń
+                        </button>
+                      )}
+                    </div>
                   </li>
                 );
               })}

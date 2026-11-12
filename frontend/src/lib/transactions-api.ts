@@ -8,6 +8,7 @@ import type {
   TransactionDto,
   TransactionListDto,
   TransactionType,
+  UpdateTransactionInput,
 } from "./transaction-types";
 
 export function isTransactionType(value: unknown): value is TransactionType {
@@ -102,6 +103,40 @@ function parseTransaction(
 }
 
 export const transactionsApi = {
+  async update(
+    id: string,
+    input: UpdateTransactionInput,
+    signal?: AbortSignal,
+  ): Promise<TransactionDto> {
+    const transaction = parseTransaction(
+      await apiRequest<unknown>(`/transactions/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        signal,
+        body: JSON.stringify({
+          type: input.type,
+          amount: input.amount,
+          categoryId: input.categoryId,
+          title: input.title,
+          occurredOn: input.occurredOn,
+          note: input.note,
+        }),
+      }),
+    );
+    if (transaction.id !== id)
+      throw new ApiError(
+        502,
+        "Serwer zwrócił inną transakcję. Odśwież historię, aby sprawdzić zapis.",
+      );
+    return transaction;
+  },
+
+  async remove(id: string, signal?: AbortSignal): Promise<void> {
+    await apiRequest<void>(`/transactions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      signal,
+    });
+  },
+
   async list(
     input: ListTransactionsInput = {},
     signal?: AbortSignal,

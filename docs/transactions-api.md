@@ -7,6 +7,8 @@ Etap 3.4 (#16) udostępnia listę i szczegóły własnych transakcji.
 Etap 3.5 (#17) dodaje formularz zapisu w zakładce Transakcje.
 Etap 3.6 (#18) łączy historię w panelu z filtrami i paginacją API.
 Etap 3.7 (#19) dodaje edycję i usuwanie własnych operacji przez API.
+Etap 3.8 (#20) udostępnia te operacje w panelu, z potwierdzeniem usunięcia
+oraz odświeżaniem historii i salda przy zachowaniu filtrów.
 
 ## Endpointy
 

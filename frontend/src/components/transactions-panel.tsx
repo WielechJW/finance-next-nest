@@ -12,6 +12,10 @@ import {
   type TransactionHistoryQuery,
 } from "./transaction-history";
 import { useTransactionCategories } from "./use-transaction-categories";
+import {
+  TransactionMutationDialog,
+  type TransactionSelection,
+} from "./transaction-mutation-dialog";
 import styles from "./transaction-form.module.css";
 
 type WalletState =
@@ -35,6 +39,8 @@ function TransactionsContent() {
   const [wallet, setWallet] = useState<WalletState>({ status: "loading" });
   const [revision, setRevision] = useState(0);
   const walletRequest = useRef<AbortController | null>(null);
+  const [selection, setSelection] = useState<TransactionSelection | null>(null);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -68,6 +74,7 @@ function TransactionsContent() {
   }
 
   function created() {
+    setNotice("");
     refreshWallet();
     setHistoryQuery((previous) => ({
       ...previous,
@@ -76,10 +83,28 @@ function TransactionsContent() {
     }));
   }
 
+  function refreshHistoryAndWallet() {
+    refreshWallet();
+    setHistoryQuery((previous) => ({
+      ...previous,
+      revision: previous.revision + 1,
+    }));
+  }
+
+  function changed() {
+    setNotice(
+      selection?.kind === "edit"
+        ? "Transakcja zaktualizowana."
+        : "Transakcja usunięta.",
+    );
+    setSelection(null);
+    refreshHistoryAndWallet();
+  }
+
   return (
     <section aria-labelledby="transactions-heading" className={styles.panel}>
       <h1 id="transactions-heading">Transakcje</h1>
-      <p>Dodaj przychód lub wydatek do swojego portfela.</p>
+      <p>Dodawaj, przeglądaj i poprawiaj operacje swojego portfela.</p>
       <section aria-label="Saldo portfela" className={styles.balance}>
         {wallet.status === "loading" && <p role="status">Odświeżanie salda…</p>}
         {wallet.status === "ready" && (
@@ -103,11 +128,31 @@ function TransactionsContent() {
         )}
       </section>
       <TransactionForm onCreated={created} categories={categories} />
+      <p role="status" aria-atomic="true" className={styles.success}>
+        {notice}
+      </p>
       <TransactionHistory
         categories={categories}
         query={historyQuery}
         setQuery={setHistoryQuery}
+        onEdit={(transaction, trigger) => {
+          setNotice("");
+          setSelection({ kind: "edit", transaction, trigger });
+        }}
+        onDelete={(transaction, trigger) => {
+          setNotice("");
+          setSelection({ kind: "delete", transaction, trigger });
+        }}
       />
+      {selection && (
+        <TransactionMutationDialog
+          selection={selection}
+          categories={categories}
+          onCancel={() => setSelection(null)}
+          onChanged={changed}
+          onUnavailable={refreshHistoryAndWallet}
+        />
+      )}
     </section>
   );
 }

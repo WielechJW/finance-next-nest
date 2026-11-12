@@ -110,6 +110,77 @@ describe("Transaction API client", () => {
       "http://localhost:3001/transactions",
     );
   });
+  it("PATCHes only allowed fields, preserves omitted fields and explicitly clears a note", async () => {
+    fetchMock.mockResolvedValueOnce(json(transaction));
+    const input = {
+      amount: "12.50",
+      note: null,
+      walletId: "foreign",
+      id: "foreign",
+    };
+    expect(await transactionsApi.update(transaction.id, input)).toEqual(
+      transaction,
+    );
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe(`http://localhost:3001/transactions/${transaction.id}`);
+    expect(init).toMatchObject({
+      method: "PATCH",
+      credentials: "include",
+      cache: "no-store",
+    });
+    expect(JSON.parse(init!.body as string)).toEqual({
+      amount: "12.50",
+      note: null,
+    });
+  });
+  it.each([
+    { ...transaction, amount: "invalid" },
+    { ...transaction, id: "20000000-0000-4000-8000-000000000002" },
+  ])(
+    "rejects malformed or mismatched PATCH responses (%#)",
+    async (payload) => {
+      fetchMock.mockResolvedValueOnce(json(payload));
+      await expect(
+        transactionsApi.update(transaction.id, { title: "Zmiana" }),
+      ).rejects.toMatchObject({ status: 502 });
+    },
+  );
+  it("DELETEs with session cookies and accepts an empty 204 response", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(
+      transactionsApi.remove(transaction.id),
+    ).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls[0]).toEqual([
+      `http://localhost:3001/transactions/${transaction.id}`,
+      expect.objectContaining({
+        method: "DELETE",
+        credentials: "include",
+        cache: "no-store",
+      }),
+    ]);
+  });
+  it.each(["update", "remove"] as const)(
+    "propagates cancellation during %s",
+    async (operation) => {
+      const controller = new AbortController();
+      fetchMock.mockImplementationOnce(async (_input, init) => {
+        controller.abort();
+        expect(init?.signal?.aborted).toBe(true);
+        return operation === "update"
+          ? json(transaction)
+          : new Response(null, { status: 204 });
+      });
+      await expect(
+        operation === "update"
+          ? transactionsApi.update(
+              transaction.id,
+              { title: "Zmiana" },
+              controller.signal,
+            )
+          : transactionsApi.remove(transaction.id, controller.signal),
+      ).rejects.toMatchObject({ name: "AbortError" });
+    },
+  );
   it.each([
     null,
     {},

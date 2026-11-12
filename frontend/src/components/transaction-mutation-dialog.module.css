@@ -1,0 +1,53 @@
+.dialog {
+  width: min(640px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 24px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 24px 64px #0f172a40;
+}
+.dialog::backdrop {
+  background: #0f172a99;
+}
+.dialog h2 {
+  margin-top: 0;
+  font-size: 20px;
+}
+.dialog p {
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+.dialog .secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.dialog .secondary:hover {
+  background: #cbd5e1;
+}
+.dialog .danger {
+  background: #b91c1c;
+}
+.dialog .danger:hover {
+  background: #991b1b;
+}
+.dialog .error {
+  color: #b91c1c;
+}
+@media (max-width: 600px) {
+  .dialog {
+    padding: 20px;
+  }
+  .actions {
+    flex-direction: column;
+  }
+}
