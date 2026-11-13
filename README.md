@@ -897,6 +897,34 @@ npm --prefix frontend test -- --maxWorkers=2
 npm --prefix backend run test:browser -- analytics.pw.ts
 ```
 
+## Przejście całej pierwszej wersji
+
+Etap 4.5 (#26) weryfikuje wspólną historię dwóch kont: podsumowanie,
+kategorie, trendy dzienne i miesięczne oraz globalne saldo po każdej
+zmianie kwoty, kategorii, daty, typu i po usunięciu operacji.
+
+Po przygotowaniu środowiska według wcześniejszych sekcji:
+
+1. Zarejestruj konto i zaloguj się do panelu.
+2. W Portfelu ustaw saldo początkowe `100,00`.
+3. W Transakcjach dodaj siedem operacji A z
+   [tabeli danych weryfikacyjnych](docs/analytics-verification.md#dane-wspólnego-scenariusza).
+   Globalne saldo wyniesie `141,10 zł`.
+4. W Analityce wybierz styczeń 2024: przychody `50,20 zł`, wydatki
+   `20,30 zł`, wynik `29,90 zł`. Sprawdź kategorie oraz obie serie trendu.
+   Wybranie innego okresu zachowuje globalne saldo portfela.
+5. Wykonaj kolejne mutacje i porównaj karty, tabele i saldo z
+   [oczekiwanymi wynikami](docs/analytics-verification.md#oczekiwania-po-kolejnych-mutacjach-a).
+6. Utwórz drugie konto z saldem `-50,00` i danymi B. Jego saldo
+   `-43,58 zł` i raporty pozostają niezależne od zmian A. Wyloguj konto A.
+
+[Pełny przebieg ręczny, dane obu kont, mapa kryteriów i komendy regresji](docs/analytics-verification.md).
+
+```bash
+npm --prefix backend run test:integration -- test/analytics-consistency.integration-spec.ts
+npm --prefix backend run test:browser -- analytics-verification.pw.ts
+```
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
@@ -1109,13 +1137,15 @@ korzystają już z API działającego na porcie 3001.
 | `backend/src/analytics/analytics.controller.ts` | API podsumowania przychodów, wydatków i wyniku okresu. |
 | `backend/src/analytics/analytics-period.ts` | Wspólny zakres raportów i domyślny miesiąc według Europe/Warsaw. |
 | `docs/analytics-api.md` | Kontrakt podsumowania i różnica między wynikiem okresu a saldem. |
+| `backend/test/support/analytics-scenario.ts` | Wspólne dane dwóch kont i jawne oczekiwane wyniki końcowej weryfikacji. |
+| `docs/analytics-verification.md` | Jeden przebieg przez cztery etapy, oczekiwane raporty i mapa kryteriów #26. |
 | `docs/transactions-api.md` | Kontrakt kwot, dat i kategorii transakcji. |
 
 ## Sprawdzenie projektu
 
 ```bash
 npm --prefix frontend run lint
-npm --prefix frontend test
+npm --prefix frontend test -- --maxWorkers=2
 npm --prefix frontend run build
 npm --prefix backend run lint
 npm --prefix backend run typecheck
