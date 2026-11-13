@@ -10,6 +10,10 @@ Poniższe modele, moduły i endpointy są propozycją implementacji. Checkboxy
 oznaczają przyszłe zadania. Kolejność jest przeznaczona do pracy etapami;
 każde zadanie z identyfikatorem można przenieść do osobnego issue.
 
+Realizacja na GitHubie: [główne issue #43](https://github.com/WielechJW/finance-next-nest/issues/43)
+zawiera 60 powiązanych zadań, kolejność prac i podział na wersje A–E.
+Punkt startowy: [INV 0.1 — decyzje domenowe i zakres](https://github.com/WielechJW/finance-next-nest/issues/44).
+
 ## 1. Punkt wyjścia i zakres
 
 Projekt ma już Next.js, NestJS, PostgreSQL, Prisma, sesje, portfel finansowy,
