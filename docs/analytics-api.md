@@ -2,6 +2,7 @@
 
 Etap 4.1 (#22) dodaje podsumowanie przychodów, wydatków i wyniku okresu.
 Etap 4.2 (#23) dodaje podział wydatków na kategorie i ich udział procentowy.
+Etap 4.3 (#24) dodaje dzienne i miesięczne serie przychodów oraz wydatków.
 Wspólne DTO `AnalyticsPeriodDto` i funkcja `resolveAnalyticsPeriod` ustalają
 zakres dat dla raportów analitycznych.
 
@@ -136,6 +137,86 @@ przez zero. Usunięty portfel daje `404` i nie jest odtwarzany przez odczyt.
 Edycja kwoty, kategorii, typu i daty oraz usunięcie transakcji są uwzględniane
 w następnym odczycie, bez zapisanego wcześniej raportu.
 
+## Trendy przychodów i wydatków
+
+```http
+GET /analytics/trends?from=2026-11-01&to=2026-11-02&granularity=day
+```
+
+Endpoint korzysta ze wspólnych reguł `from` i `to`, sesji użytkownika,
+izolacji portfela i `Cache-Control: no-store`. Bez dat obejmuje cały bieżący
+miesiąc według `Europe/Warsaw`, również zapisane przyszłe operacje w tym
+miesiącu. Własny zakres wymaga obu granic i wlicza obie daty.
+
+| Parametr      | Reguła                                                                              |
+| ------------- | ----------------------------------------------------------------------------------- |
+| `granularity` | `day` (domyślnie) albo `month`. Pusty, nieznany lub powtórzony parametr daje `400`. |
+| `from`, `to`  | Wspólne istniejące daty kalendarzowe `YYYY-MM-DD`, z `from <= to`.                  |
+
+Przykładowa odpowiedź `200`:
+
+```json
+{
+  "from": "2026-11-01",
+  "to": "2026-11-02",
+  "currency": "PLN",
+  "granularity": "day",
+  "items": [
+    {
+      "period": "2026-11-01",
+      "income": "50.20",
+      "expenses": "20.10",
+      "periodResult": "30.10"
+    },
+    {
+      "period": "2026-11-02",
+      "income": "0.00",
+      "expenses": "0.00",
+      "periodResult": "0.00"
+    }
+  ]
+}
+```
+
+Każdy punkt zawiera `income`, `expenses` i `periodResult = income − expenses`
+jako dokładne stringi z dwoma miejscami po przecinku. Wynik może być ujemny.
+Saldo początkowe nie wchodzi do serii. `period` ma format `YYYY-MM-DD`
+dla dni i `YYYY-MM` dla miesięcy. Punkty są uporządkowane chronologicznie,
+bez duplikacji. Seria zawiera każdy dzień lub miesiąc zakresu, również
+z trzema kwotami `"0.00"`, gdy w danym okresie nie ma transakcji.
+Istniejący pusty portfel daje pełną serię zer; brak portfela daje `404`.
+
+Dla `granularity=month&from=2026-11-15&to=2027-02-10` odpowiedź ma cztery
+punkty: `2026-11`, `2026-12`, `2027-01` i `2027-02`. Pierwszy uwzględnia
+wyłącznie 15–30 listopada, ostatni wyłącznie 1–10 lutego. Pusty styczeń
+otrzymuje zera. Przesunięcie początku filtra na 31. dzień miesiąca nie
+powoduje pominięcia kolejnego miesiąca.
+
+Limity dotyczą liczby punktów, z wliczonymi granicami:
+
+- `day`: najwyżej 366 dni. Pełny rok 2024 mieści się w limicie;
+  zakres `2024-01-01`–`2025-01-01` ma 367 dni i daje `400`.
+- `month`: najwyżej 120 miesięcy kalendarzowych. Zakres
+  `2020-01-31`–`2029-12-01` ma 120 punktów; przedłużenie do `2030-01-01`
+  daje 121 punktów i `400`.
+
+Liczba punktów jest sprawdzana przed zapytaniem i generowaniem serii.
+Te limity nie ograniczają endpointów podsumowania i kategorii.
+Serie nie mają paginacji; dodatkowe parametry, w tym `type`, `categoryId`,
+`userId`, `walletId` i `page`, dają `400`.
+
+Jedno parametryzowane zapytanie SQL generuje ograniczoną serię dat,
+grupuje operacje według `occurredOn` i uzupełnia luki. Obliczenia kwot
+wykorzystują PostgreSQL `numeric`. Daty i miesiące są liczone kalendarzowo;
+nie następuje konwersja dat operacji między strefami czasowymi ani
+przesunięcie punktów podczas zmiany czasu.
+
+Dla tego samego zakresu i stanu danych suma `income`, `expenses` oraz
+`periodResult` ze wszystkich punktów odpowiada tym samym polom z
+`/analytics/summary`, dla obu granularności. Niezależne żądania mogą
+zobaczyć inne dane, jeśli między nimi nastąpi edycja lub usunięcie operacji.
+Kolejny odczyt trendów uwzględnia aktualną historię.
+
 ## Wynik okresu a saldo
 
 Saldo początkowe nie jest przychodem i nie wpływa na raport:
@@ -152,13 +233,13 @@ przepływy wybranego okresu i nie dodaje do nich salda początkowego.
 
 ## Statusy i błędy
 
-| Status | Znaczenie                                                               |
-| ------ | ----------------------------------------------------------------------- |
-| `200`  | Podsumowanie lub zestawienie kategorii, także dla pustego okresu.       |
-| `400`  | Błędne lub dodatkowe parametry, niepełny albo odwrócony zakres dat.     |
-| `401`  | Brak sesji, wygaśnięcie lub wylogowanie.                                |
-| `404`  | Użytkownik nie ma portfela; odczyt nie tworzy go ponownie.              |
-| `500`  | Błąd odczytu; odpowiedź i logi nie ujawniają zapytań ani treści danych. |
+| Status | Znaczenie                                                                                                               |
+| ------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `200`  | Podsumowanie, kategorie lub trendy, także dla pustego okresu.                                                           |
+| `400`  | Błędne lub dodatkowe parametry, niepełny albo odwrócony zakres dat, błędna granularność lub przekroczony limit trendów. |
+| `401`  | Brak sesji, wygaśnięcie lub wylogowanie.                                                                                |
+| `404`  | Użytkownik nie ma portfela; odczyt nie tworzy go ponownie.                                                              |
+| `500`  | Błąd odczytu; odpowiedź i logi nie ujawniają zapytań ani treści danych.                                                 |
 
 ## Weryfikacja
 
@@ -167,8 +248,10 @@ Przygotowanie lokalnej bazy oraz oddzielnej `DATABASE_URL_TEST` opisuje
 
 ```bash
 npm --prefix backend test -- src/analytics/analytics-period.spec.ts
+npm --prefix backend test -- src/analytics/analytics-trends.spec.ts
 npm --prefix backend run test:integration -- test/analytics-summary.integration-spec.ts
 npm --prefix backend run test:integration -- test/analytics-categories.integration-spec.ts
+npm --prefix backend run test:integration -- test/analytics-trends.integration-spec.ts
 ```
 
 Testy jednostkowe sprawdzają domyślny miesiąc, zimowy i letni czas Warszawy,
@@ -182,6 +265,12 @@ nazwy różnych kategorii, zgodność sum z podsumowaniem, zaokrąglanie udział
 kategorie z zerowym procentem i przeliczenie po zmianie kwoty, kategorii,
 daty i typu oraz usunięciu ostatniego wydatku.
 
+Testy trendów sprawdzają kompletność i kolejność obu serii, częściowe
+miesiące, zerowe luki, datę 29 lutego, przełom roku, zmianę czasu,
+daty z lat 0001 i 9999, dokładne kwoty oraz zgodność sum z podsumowaniem.
+Obejmują również limity i ich przekroczenie przed zapytaniem, domyślny
+miesiąc, izolację kont, mutacje i niezależność od salda początkowego.
+
 Ręcznie można sprawdzić przykład z sekcji „Wynik okresu a saldo”:
 utwórz obie operacje w lutym 2024, zaloguj się i odczytaj endpoint z podanym
 zakresem. Następnie zmień wydatek na `30.10` — wynik wyniesie `20.10`.
@@ -191,3 +280,9 @@ Dla kategorii dodaj w wybranym okresie wydatki Jedzenie `50.00` i `25.00`
 oraz Transport `25.00`. Raport kategorii powinien zwrócić odpowiednio
 `75.00` / `75.00%` i `25.00` / `25.00%`, a podsumowanie `expenses: "100.00"`.
 Dodanie przychodu lub zmiana salda początkowego zachowuje to zestawienie.
+
+Dla trendów dodaj przychód `50.20` z `2024-02-28` i wydatek `20.10`
+z `2024-03-02`, a następnie wybierz zakres `2024-02-28`–`2024-03-02`.
+Seria dzienna ma cztery punkty, w tym zera dla 29 lutego i 1 marca.
+Seria miesięczna ma dwa punkty: luty z wynikiem `50.20` i marzec z wynikiem
+`-20.10`. Podsumowanie dla tego zakresu ma wynik `30.10`.
