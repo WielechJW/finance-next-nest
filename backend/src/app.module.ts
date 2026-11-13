@@ -7,6 +7,7 @@ import { SessionModule } from './sessions/session.module.js';
 import { WalletsModule } from './wallets/wallets.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TransactionsModule } from './transactions/transactions.module.js';
     WalletsModule,
     CategoriesModule,
     TransactionsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
