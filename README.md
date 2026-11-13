@@ -814,6 +814,26 @@ npm --prefix backend run test:integration -- test/transaction-mutations.integrat
 npm --prefix backend run test:browser -- transaction-lifecycle.pw.ts
 ```
 
+## API podsumowania analityki
+
+Etap 4.1 (#22) udostępnia `GET /analytics/summary?from=YYYY-MM-DD&to=YYYY-MM-DD`.
+Endpoint zwraca przychody (`income`), wydatki (`expenses`) i wynik okresu
+(`periodResult = income − expenses`) wyłącznie dla portfela użytkownika z sesji.
+Kwoty są dokładnymi stringami z dwoma miejscami po przecinku.
+
+Bez parametrów wybierany jest cały bieżący miesiąc według `Europe/Warsaw`.
+Własny zakres wymaga obu dat; obie granice są wliczane. Pusty okres daje
+trzy kwoty `"0.00"`, a wynik może być ujemny. Saldo początkowe nie wchodzi
+do podsumowania: dla `100.00 + 50.20 − 20.10` wynik okresu wynosi `30.10`,
+podczas gdy `GET /wallet` zwraca saldo `130.10`.
+
+[Kontrakt, walidacja, przykładowa odpowiedź i ręczna weryfikacja](docs/analytics-api.md).
+
+```bash
+npm --prefix backend test -- src/analytics/analytics-period.spec.ts
+npm --prefix backend run test:integration -- test/analytics-summary.integration-spec.ts
+```
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
@@ -1023,6 +1043,9 @@ korzystają już z API działającego na porcie 3001.
 | `backend/src/transactions/dto/list-transactions.dto.ts` | Walidacja filtrów i paginacji historii. |
 | `backend/src/transactions/dto/update-transaction.dto.ts` | Walidacja częściowej edycji transakcji i czyszczenia notatki. |
 | `backend/src/wallets/wallet-balance.ts` | Wspólna agregacja salda z historii dla GET i PATCH portfela. |
+| `backend/src/analytics/analytics.controller.ts` | API podsumowania przychodów, wydatków i wyniku okresu. |
+| `backend/src/analytics/analytics-period.ts` | Wspólny zakres raportów i domyślny miesiąc według Europe/Warsaw. |
+| `docs/analytics-api.md` | Kontrakt podsumowania i różnica między wynikiem okresu a saldem. |
 | `docs/transactions-api.md` | Kontrakt kwot, dat i kategorii transakcji. |
 
 ## Sprawdzenie projektu
