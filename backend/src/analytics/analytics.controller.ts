@@ -5,9 +5,11 @@ import type { RegisteredUser } from '../users/users.service.js';
 import type {
   AnalyticsCategoriesResponse,
   AnalyticsSummaryResponse,
+  AnalyticsTrendsResponse,
 } from './analytics-response.js';
 import { AnalyticsService } from './analytics.service.js';
 import { AnalyticsPeriodDto } from './dto/analytics-period.dto.js';
+import { AnalyticsTrendsDto } from './dto/analytics-trends.dto.js';
 
 @Controller('analytics')
 @UseGuards(SessionAuthGuard)
@@ -30,5 +32,14 @@ export class AnalyticsController {
     @Query() input: AnalyticsPeriodDto,
   ): Promise<AnalyticsCategoriesResponse> {
     return this.analytics.categoriesForUser(user.id, input);
+  }
+
+  @Get('trends')
+  @Header('Cache-Control', 'no-store')
+  trends(
+    @CurrentUser() user: RegisteredUser,
+    @Query() input: AnalyticsTrendsDto,
+  ): Promise<AnalyticsTrendsResponse> {
+    return this.analytics.trendsForUser(user.id, input);
   }
 }

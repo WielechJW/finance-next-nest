@@ -854,6 +854,29 @@ oraz `items: []`. Przychody i saldo początkowe nie wchodzą do zestawienia.
 npm --prefix backend run test:integration -- test/analytics-categories.integration-spec.ts
 ```
 
+## API trendów przychodów i wydatków
+
+Etap 4.3 (#24) dodaje `GET /analytics/trends` z parametrami `from`, `to`
+oraz `granularity=day|month` (domyślnie `day`). Wspólne reguły dat wybierają
+domyślnie cały bieżący miesiąc według `Europe/Warsaw`.
+
+Raport zwraca wszystkie dni lub miesiące zakresu, chronologicznie,
+z przychodami, wydatkami i wynikiem. Okresy bez operacji otrzymują `"0.00"`.
+Częściowe miesiące uwzględniają wyłącznie daty filtra, a suma punktów
+odpowiada podsumowaniu dla tego samego zakresu i stanu historii.
+Saldo początkowe nie wchodzi do serii.
+
+Raport dzienny może zawierać najwyżej 366 punktów, a miesięczny 120.
+Przekroczenie limitu daje `400` przed zapytaniem do bazy; podsumowanie
+i kategorie zachowują własne reguły zakresu.
+
+[Kontrakt trendów, limity i przykład częściowych miesięcy](docs/analytics-api.md#trendy-przychodów-i-wydatków).
+
+```bash
+npm --prefix backend test -- src/analytics/analytics-trends.spec.ts
+npm --prefix backend run test:integration -- test/analytics-trends.integration-spec.ts
+```
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
