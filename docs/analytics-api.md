@@ -1,6 +1,7 @@
 # Kontrakt analityki portfela
 
 Etap 4.1 (#22) dodaje podsumowanie przychodów, wydatków i wyniku okresu.
+Etap 4.2 (#23) dodaje podział wydatków na kategorie i ich udział procentowy.
 Wspólne DTO `AnalyticsPeriodDto` i funkcja `resolveAnalyticsPeriod` ustalają
 zakres dat dla raportów analitycznych.
 
@@ -62,6 +63,79 @@ przychody, wydatki i ich różnicę na tym samym stanie danych, używając
 dokładnego typu PostgreSQL `numeric`. Serializacja Decimal nie przechodzi
 przez JavaScript `number`.
 
+## Wydatki według kategorii
+
+```http
+GET /analytics/categories?from=2024-02-01&to=2024-02-29
+```
+
+Endpoint korzysta z tych samych reguł dat co podsumowanie: obie granice są
+wliczane, własny zakres wymaga obu parametrów, a brak parametrów wybiera
+cały bieżący miesiąc według `Europe/Warsaw`. Obowiązują ta sama sesja,
+izolacja portfela, walidacja i `Cache-Control: no-store`. `categoryId`,
+`type`, parametry właściciela oraz paginacja nie są dozwolonymi filtrami.
+
+Przykładowa odpowiedź `200`:
+
+```json
+{
+  "from": "2024-02-01",
+  "to": "2024-02-29",
+  "currency": "PLN",
+  "totalExpenses": "100.00",
+  "items": [
+    {
+      "categoryId": "10000000-0000-4000-8000-000000000001",
+      "categoryName": "Jedzenie",
+      "amount": "75.00",
+      "percentage": "75.00"
+    },
+    {
+      "categoryId": "10000000-0000-4000-8000-000000000002",
+      "categoryName": "Transport",
+      "amount": "25.00",
+      "percentage": "25.00"
+    }
+  ]
+}
+```
+
+`items` zawiera wyłącznie kategorie z wydatkami (`EXPENSE`) w wybranym
+okresie i portfelu. Każda pozycja ma identyfikator i nazwę kategorii,
+sumę `amount` oraz `percentage` — udział w całkowitych wydatkach okresu.
+Kategorie bez wydatków są pominięte. Grupowanie odbywa się po identyfikatorze;
+różne kategorie o tej samej nazwie pozostają osobnymi pozycjami.
+Wyniki są sortowane według kwoty malejąco, a przy remisie według UUID
+kategorii rosnąco.
+
+`totalExpenses` to dokładna suma `amount` ze wszystkich pozycji. Dla tego
+samego okresu i stanu historii odpowiada polu `expenses` z
+`/analytics/summary`. Przychody i saldo początkowe nie wchodzą do zestawienia.
+Oba endpointy wykonują niezależne odczyty; zmiana historii między żądaniami
+może zmienić ich wyniki.
+
+Jedno parametryzowane zapytanie SQL grupuje wydatki i oblicza sumę oraz
+procenty na tym samym stanie danych. Obliczenia korzystają z PostgreSQL
+`numeric`, a kwoty i procenty są stringami z dwoma miejscami po przecinku,
+bez konwersji na JavaScript `number`.
+
+Udział to `amount / totalExpenses × 100`, zaokrąglony do dwóch miejsc
+po przecinku, z połówkami w górę. Procenty są wartościami prezentacyjnymi:
+
+- Trzy równe kategorie mogą mieć po `"33.33"`, łącznie `99.99%`.
+- Kwoty `1.00` i `31.00` dają `"3.13"` oraz `"96.88"`, łącznie `100.01%`.
+- Bardzo mała dodatnia kategoria może mieć `"0.00"` procent, zachowując
+  swoją dokładną kwotę i miejsce w zestawieniu.
+
+Nie korygujemy procentów, aby wymusić sumę `100.00%`. Suma kwot pozostaje
+dokładna niezależnie od zaokrągleń udziałów.
+
+Brak wydatków daje `200`, `totalExpenses: "0.00"` i `items: []`, również
+przy samych przychodach lub operacjach spoza okresu. Nie występuje dzielenie
+przez zero. Usunięty portfel daje `404` i nie jest odtwarzany przez odczyt.
+Edycja kwoty, kategorii, typu i daty oraz usunięcie transakcji są uwzględniane
+w następnym odczycie, bez zapisanego wcześniej raportu.
+
 ## Wynik okresu a saldo
 
 Saldo początkowe nie jest przychodem i nie wpływa na raport:
@@ -80,7 +154,7 @@ przepływy wybranego okresu i nie dodaje do nich salda początkowego.
 
 | Status | Znaczenie                                                               |
 | ------ | ----------------------------------------------------------------------- |
-| `200`  | Podsumowanie, także dla pustego okresu.                                 |
+| `200`  | Podsumowanie lub zestawienie kategorii, także dla pustego okresu.       |
 | `400`  | Błędne lub dodatkowe parametry, niepełny albo odwrócony zakres dat.     |
 | `401`  | Brak sesji, wygaśnięcie lub wylogowanie.                                |
 | `404`  | Użytkownik nie ma portfela; odczyt nie tworzy go ponownie.              |
@@ -94,6 +168,7 @@ Przygotowanie lokalnej bazy oraz oddzielnej `DATABASE_URL_TEST` opisuje
 ```bash
 npm --prefix backend test -- src/analytics/analytics-period.spec.ts
 npm --prefix backend run test:integration -- test/analytics-summary.integration-spec.ts
+npm --prefix backend run test:integration -- test/analytics-categories.integration-spec.ts
 ```
 
 Testy jednostkowe sprawdzają domyślny miesiąc, zimowy i letni czas Warszawy,
@@ -102,7 +177,17 @@ Testy HTTP z rzeczywistym PostgreSQL sprawdzają kwoty, granice okresu,
 ujemny i pusty wynik, duże sumy, domyślny miesiąc, odrębność salda,
 izolację kont, sesje, walidację, mutacje i bezpieczne błędy bazy.
 
+Testy kategorii dodatkowo sprawdzają grupowanie i sortowanie, identyczne
+nazwy różnych kategorii, zgodność sum z podsumowaniem, zaokrąglanie udziałów,
+kategorie z zerowym procentem i przeliczenie po zmianie kwoty, kategorii,
+daty i typu oraz usunięciu ostatniego wydatku.
+
 Ręcznie można sprawdzić przykład z sekcji „Wynik okresu a saldo”:
 utwórz obie operacje w lutym 2024, zaloguj się i odczytaj endpoint z podanym
 zakresem. Następnie zmień wydatek na `30.10` — wynik wyniesie `20.10`.
 Po jego usunięciu wynik wyniesie `50.20`.
+
+Dla kategorii dodaj w wybranym okresie wydatki Jedzenie `50.00` i `25.00`
+oraz Transport `25.00`. Raport kategorii powinien zwrócić odpowiednio
+`75.00` / `75.00%` i `25.00` / `25.00%`, a podsumowanie `expenses: "100.00"`.
+Dodanie przychodu lub zmiana salda początkowego zachowuje to zestawienie.

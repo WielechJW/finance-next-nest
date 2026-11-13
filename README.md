@@ -834,6 +834,26 @@ npm --prefix backend test -- src/analytics/analytics-period.spec.ts
 npm --prefix backend run test:integration -- test/analytics-summary.integration-spec.ts
 ```
 
+## API wydatków według kategorii
+
+Etap 4.2 (#23) dodaje `GET /analytics/categories` z tym samym zakresem dat
+co podsumowanie analityki. Raport zawiera `totalExpenses` i listę `items`:
+identyfikator i nazwę kategorii, dokładną kwotę oraz udział procentowy.
+Uwzględnia wyłącznie własne wydatki z okresu, sortując kategorie według
+kwoty malejąco i UUID rosnąco przy remisie.
+
+Udziały są stringami z dwoma miejscami po przecinku, zaokrąglonymi
+z połówkami w górę. Są prezentacyjne, więc ich suma może wynieść np.
+`99.99%`; kwoty kategorii sumują się dokładnie do wydatków podsumowania
+dla tego samego okresu i stanu danych. Pusty okres daje `totalExpenses: "0.00"`
+oraz `items: []`. Przychody i saldo początkowe nie wchodzą do zestawienia.
+
+[Kontrakt i przykłady udziałów procentowych](docs/analytics-api.md#wydatki-według-kategorii).
+
+```bash
+npm --prefix backend run test:integration -- test/analytics-categories.integration-spec.ts
+```
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.
