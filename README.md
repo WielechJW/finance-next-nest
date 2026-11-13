@@ -877,6 +877,26 @@ npm --prefix backend test -- src/analytics/analytics-trends.spec.ts
 npm --prefix backend run test:integration -- test/analytics-trends.integration-spec.ts
 ```
 
+## Zakładka analityki
+
+Etap 4.4 (#25) dodaje `/dashboard/analytics` i link **Analityka**.
+Widok zawiera karty przychodów, wydatków i wyniku okresu, wykres kategorii
+oraz trend przychodów i wydatków. Rozwijane tabele udostępniają dokładne
+wartości także bez korzystania z wykresów.
+
+Wspólny filtr oferuje bieżący i poprzedni miesiąc według `Europe/Warsaw`
+oraz własny zakres. Zatwierdzony okres i podział dzienny/miesięczny są
+zachowywane w adresie. Każda sekcja ma osobny stan błędu i ponowienie;
+zmiana okresu anuluje stare zapytania. Powrót po edycji lub usunięciu
+transakcji odświeża raporty. Wynik okresu pomija saldo początkowe.
+
+[Obsługa filtrów, dostępność, świeżość danych i scenariusz ręczny](docs/analytics-dashboard.md).
+
+```bash
+npm --prefix frontend test -- --maxWorkers=2
+npm --prefix backend run test:browser -- analytics.pw.ts
+```
+
 ## Testy integracyjne z PostgreSQL
 
 Podstawowe testy (`test` i `test:e2e`) nie wymagają działającej bazy.

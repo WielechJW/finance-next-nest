@@ -20,6 +20,12 @@ export function DashboardNav() {
       >
         Transakcje
       </Link>
+      <Link
+        href="/dashboard/analytics"
+        aria-current={pathname === "/dashboard/analytics" ? "page" : undefined}
+      >
+        Analityka
+      </Link>
     </nav>
   );
 }
