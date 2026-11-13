@@ -1180,6 +1180,14 @@ Szczegółowy zakres i zależności zadań opisuje
 3. Przychody i wydatki: dodawanie, historia, filtry, edycja i usuwanie.
 4. Analityka: podsumowania okresów, kategorie i trendy.
 
+## Dalszy rozwój: portfel inwestycyjny GPW i USA
+
+[Plan implementacji platformy inwestycyjnej](docs/investment-roadmap.md)
+opisuje kolejne etapy: model i prowadzenie portfela, notowania i wycenę,
+watchlistę i alerty na telefon, analizę spółek, import historii, strategie,
+testy historyczne, handel symulowany oraz integrację rzeczywistych zleceń.
+Każdy etap zawiera zadania, zależności i kryteria ukończenia.
+
 ## Dokumentacja
 
 - [TypeScript — podstawy](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html)
