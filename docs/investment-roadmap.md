@@ -14,6 +14,10 @@ Realizacja na GitHubie: [główne issue #43](https://github.com/WielechJW/financ
 zawiera 60 powiązanych zadań, kolejność prac i podział na wersje A–E.
 Punkt startowy: [INV 0.1 — decyzje domenowe i zakres](https://github.com/WielechJW/finance-next-nest/issues/44).
 
+[Decyzje domenowe INV 0.1](investment-decisions.md) precyzują zakres, FIFO,
+prowizje, precyzję, daty i korekty oraz zawierają policzone przykłady.
+Stanowią kontrakt dla implementacji kolejnych etapów.
+
 ## 1. Punkt wyjścia i zakres
 
 Projekt ma już Next.js, NestJS, PostgreSQL, Prisma, sesje, portfel finansowy,
