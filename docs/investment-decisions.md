@@ -151,6 +151,16 @@ Powyższe typy dotyczą nowych modeli inwestycyjnych. Dotychczasowy
    a koszt, wynik i kurs z 8. Agregaty obliczamy bez ograniczenia do rozmiaru
    pojedynczego wpisu; ewentualny zapis agregatu wymaga osobnej kontroli zakresu.
 
+Kontrakt przyszłego API inwestycji przyjmuje wyłącznie kanoniczne stringi
+dziesiętne z kropką, bez wiodących zer (poza samym `0`), spacji i notacji
+wykładniczej. `backend/src/investments/precision.ts` odrzuca nadmiarową skalę
+przed przekazaniem wartości do Prisma; serializacja zwraca dokładnie 2 miejsca
+dla rozliczanej gotówki i brutto transakcji, 10 dla ilości/ceny oraz 8 dla
+kursu i wyników. `CashEntry.amount` i `Trade.grossAmount` mają dodatkowy
+warunek PostgreSQL wymuszający wielokrotność `0.01`. Migracja nie zaokrągla
+wcześniejszych wpisów z ułamkiem grosza: wymaga uprzedniego wyjaśnienia
+takich danych.
+
 ### Kwoty wymiany walut
 
 Rejestr FX przechowuje obie rzeczywiście rozliczone kwoty, ich waluty oraz
@@ -203,6 +213,15 @@ Przykład: wpłata i kupno z tego samego dnia, bez znanych godzin, wymagają
 ustalenia kolejności. Wpłata przed kupnem może zapewniać środki; odwrotna
 kolejność jest odrzucana, jeśli powoduje ujemną gotówkę. Ten sam czas
 dwóch zakupów również wymaga stabilnego rozstrzygnięcia dla późniejszego FIFO.
+
+`InvestmentEvent.daySequence` jest dodatnią, unikalną pozycją w ramach rachunku
+i daty ewidencyjnej. Nadający ją zapis musi uwzględnić znane czasy wykonania;
+remisy i zdarzenia znane tylko co do daty wymagają jawnej pozycji. Zdarzenia
+sprzed migracji 1.3 otrzymują techniczny porządek oraz
+`orderingSource=MIGRATED_UNVERIFIED`: przed księgowaniem lub odtwarzaniem
+historii trzeba potwierdzić ich faktyczną kolejność. `timePrecision=DATE`
+oznacza `executedAt=NULL`; dla `INSTANT` wymagane są `executedAt` i strefa
+źródłowa IANA. `marketSessionOn` i `settledOn` mogą pozostać puste.
 
 Zdarzenia wykonane mogą być historyczne lub bieżące. `occurredOn` nie może
 przekraczać dzisiejszej daty w strefie rachunku, a znany `executedAt`

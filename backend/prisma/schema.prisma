@@ -99,25 +99,44 @@ enum InvestmentEventSource {
   SYSTEM
 }
 
+enum InvestmentTimePrecision {
+  DATE
+  INSTANT
+}
+
+enum InvestmentOrderingSource {
+  EXPLICIT
+  MIGRATED_UNVERIFIED
+}
+
 model InvestmentEvent {
-  id               String                @id @default(uuid()) @db.Uuid
-  accountId        String                @db.Uuid
-  account          InvestmentAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id               String                   @id @default(uuid()) @db.Uuid
+  accountId        String                   @db.Uuid
+  account          InvestmentAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
   type             InvestmentEventType
-  source           InvestmentEventSource @default(MANUAL)
-  occurredOn       DateTime              @db.Date
-  recordedAt       DateTime              @default(now()) @db.Timestamptz(3)
-  correctionOfId   String?               @db.Uuid
-  correctionOf     InvestmentEvent?      @relation("InvestmentCorrections", fields: [correctionOfId, accountId], references: [id, accountId], onDelete: Cascade)
-  corrections      InvestmentEvent[]     @relation("InvestmentCorrections")
-  correctionReason String?               @db.VarChar(500)
+  source           InvestmentEventSource    @default(MANUAL)
+  occurredOn       DateTime                 @db.Date
+  timePrecision    InvestmentTimePrecision  @default(DATE)
+  executedAt       DateTime?                @db.Timestamptz(3)
+  sourceTimeZone   String?                  @db.VarChar(64)
+  marketSessionOn  DateTime?                @db.Date
+  settledOn        DateTime?                @db.Date
+  daySequence      Int
+  orderingSource   InvestmentOrderingSource @default(EXPLICIT)
+  recordedAt       DateTime                 @default(now()) @db.Timestamptz(3)
+  fxRatePlnPerUsd  Decimal?                 @db.Decimal(28, 8)
+  correctionOfId   String?                  @db.Uuid
+  correctionOf     InvestmentEvent?         @relation("InvestmentCorrections", fields: [correctionOfId, accountId], references: [id, accountId], onDelete: Cascade)
+  corrections      InvestmentEvent[]        @relation("InvestmentCorrections")
+  correctionReason String?                  @db.VarChar(500)
   trade            Trade?
   cashEntries      CashEntry[]
   securityEntries  SecurityEntry[]
 
-  // Timing precision, ordering and idempotency are completed in INV 1.3/1.4.
+  // Migrated ordering must be reviewed before posting or replaying legacy events.
+  // Source idempotency and audit fields are completed in INV 1.4.
   @@unique([id, accountId])
-  @@index([accountId, occurredOn, id])
+  @@unique([accountId, occurredOn, daySequence])
   @@index([correctionOfId])
 }
 
