@@ -105,6 +105,10 @@ npm --prefix backend run prisma:seed
 npm --prefix backend run prisma:status
 ```
 
+Opcjonalny katalog fikcyjnych instrumentów dla testów inwestycyjnych można
+dodać przez `prisma:seed` z `SEED_INVESTMENT_TEST_CATALOG=1`. Domyślny seed
+nie dodaje tych instrumentów.
+
 Model `User` ma identyfikator UUID, unikalny e-mail, hash hasła i daty utworzenia
 oraz aktualizacji. Każde konto otrzymuje prywatny portfel `Wallet` w PLN.
 Konta można tworzyć przez API rejestracji opisane poniżej.

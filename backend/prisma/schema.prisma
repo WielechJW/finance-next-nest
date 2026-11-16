@@ -115,6 +115,10 @@ model InvestmentEvent {
   account          InvestmentAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
   type             InvestmentEventType
   source           InvestmentEventSource    @default(MANUAL)
+  sourceKey        String                   @db.VarChar(100)
+  externalOperationId String?               @db.VarChar(128)
+  idempotencyKey   String?                  @db.VarChar(128)
+  recordedBy       String                   @db.VarChar(128)
   occurredOn       DateTime                 @db.Date
   timePrecision    InvestmentTimePrecision  @default(DATE)
   executedAt       DateTime?                @db.Timestamptz(3)
@@ -134,9 +138,12 @@ model InvestmentEvent {
   securityEntries  SecurityEntry[]
 
   // Migrated ordering must be reviewed before posting or replaying legacy events.
-  // Source idempotency and audit fields are completed in INV 1.4.
+  // Source and actor identifiers are immutable snapshots; service ownership checks follow in INV 2.1.
   @@unique([id, accountId])
   @@unique([accountId, occurredOn, daySequence])
+  @@unique([accountId, source, sourceKey, externalOperationId], map: "InvestmentEvent_external_identity_key")
+  @@unique([accountId, idempotencyKey])
+  @@index([accountId, recordedAt, id])
   @@index([correctionOfId])
 }
 

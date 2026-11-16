@@ -250,6 +250,22 @@ zdarzenia wykrywa równoczesne edycje. Ponowienie po utracie odpowiedzi
 korzysta z klucza idempotencji i nie zapisuje drugiego wykonania.
 Izolację właściciela sprawdzamy również w imporcie i zadaniach tła.
 
+Identyfikator operacji zewnętrznej (`externalOperationId`) jest unikalny w
+ramach rachunku, rodzaju źródła i konkretnego `sourceKey` (np. brokera lub
+kanału importu). Ręczne wpisy używają `sourceKey=manual` i opcjonalnego
+`idempotencyKey`, unikalnego w rachunku; przyszłe API wymaga tego klucza przy
+zapisie, aby ponowienie po utracie odpowiedzi mogło odczytać wcześniejszy
+wynik. Brak identyfikatora operacji u dostawcy pozostaje `NULL`, a nie
+identyfikatorem z daty i kwoty. Autor `recordedBy` ma trwałą, nazwową postać
+`user:<uuid>`, `broker:<id>` lub `system:<id>`; korekta zachowuje oryginał, własnego autora,
+powód i czas zapisu. Migracja starszych wpisów zapisuje `legacy:unknown`,
+ponieważ nie można wiarygodnie odtworzyć autora ani źródła.
+
+Fikcyjny katalog instrumentów `TESTPL`/`TESTUS` jest osobnym, powtarzalnym
+seedem. Polecenie `prisma:seed` uruchamia go tylko z
+`SEED_INVESTMENT_TEST_CATALOG=1`, aby domyślny seed nie dodawał danych
+testowych do rzeczywistej bazy.
+
 ## 7. Policzone przykłady odbioru
 
 Kwoty i kursy poniżej są umownymi danymi obliczeniowymi. Przykłady zakładają
