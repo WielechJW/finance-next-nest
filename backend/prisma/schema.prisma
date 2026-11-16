@@ -135,6 +135,9 @@ model InvestmentEvent {
   correctionOf     InvestmentEvent?         @relation("InvestmentCorrections", fields: [correctionOfId, accountId], references: [id, accountId], onDelete: Cascade)
   corrections      InvestmentEvent[]        @relation("InvestmentCorrections")
   correctionReason String?                  @db.VarChar(500)
+  revision         Int                      @default(0)
+  // 1 is the effective revision; NULL keeps superseded versions in the audit trail.
+  activeSlot       Int?                     @default(1)
   trade            Trade?
   openingLot       OpeningLot?
   cashEntries      CashEntry[]
@@ -143,7 +146,7 @@ model InvestmentEvent {
   // Migrated ordering must be reviewed before posting or replaying legacy events.
   // Source and actor identifiers are snapshots; posting checks account ownership.
   @@unique([id, accountId])
-  @@unique([accountId, occurredOn, daySequence])
+  @@unique([accountId, occurredOn, daySequence, activeSlot])
   @@unique([accountId, source, sourceKey, externalOperationId], map: "InvestmentEvent_external_identity_key")
   @@unique([accountId, idempotencyKey])
   @@index([accountId, recordedAt, id])

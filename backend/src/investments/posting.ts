@@ -187,6 +187,8 @@ export type ReplayEvent = {
   executedAt: Date | null;
   orderingSource: 'EXPLICIT' | 'MIGRATED_UNVERIFIED';
   type: string;
+  revision?: number;
+  correctionOfId?: string | null;
   cashEntries: { currency: InvestmentCurrency; amount: { toString(): string } }[];
   securityEntries: { instrumentId: string; quantity: { toString(): string } }[];
 };
@@ -201,7 +203,9 @@ export function replayBalances(events: ReplayEvent[]) {
   let previousSequence = 0;
   let previousInstant: Date | null = null;
   for (const event of ordered) {
-    if (event.orderingSource !== 'EXPLICIT' || event.type === 'CORRECTION') {
+    if (event.orderingSource !== 'EXPLICIT' || (event.type === 'CORRECTION' &&
+        !(event.revision && event.revision > 0 && event.correctionOfId &&
+          event.cashEntries.length === 0 && event.securityEntries.length === 0))) {
       throw new ConflictException('Historia wymaga potwierdzenia kolejności lub korekty przed księgowaniem.');
     }
     const date = event.occurredOn.toISOString().slice(0, 10);
