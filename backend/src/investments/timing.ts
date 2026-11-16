@@ -19,6 +19,8 @@ function calendarDate(value: string, field: string): Date {
   return date;
 }
 
+export { calendarDate as parseInvestmentCalendarDate };
+
 function dateInWarsaw(value: Date): string {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Warsaw',

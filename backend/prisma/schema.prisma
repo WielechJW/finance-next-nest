@@ -57,6 +57,7 @@ model Instrument {
   isin             String?                     @db.VarChar(12)
   providerMappings InstrumentProviderMapping[]
   trades           Trade[]
+  openingLots      OpeningLot[]
   securityEntries  SecurityEntry[]
   createdAt        DateTime                    @default(now())
   updatedAt        DateTime                    @updatedAt
@@ -135,6 +136,7 @@ model InvestmentEvent {
   corrections      InvestmentEvent[]        @relation("InvestmentCorrections")
   correctionReason String?                  @db.VarChar(500)
   trade            Trade?
+  openingLot       OpeningLot?
   cashEntries      CashEntry[]
   securityEntries  SecurityEntry[]
 
@@ -157,6 +159,19 @@ model Trade {
   quantity     Decimal         @db.Decimal(28, 10)
   unitPrice    Decimal         @db.Decimal(28, 10)
   grossAmount  Decimal         @db.Decimal(28, 8)
+
+  @@index([instrumentId])
+}
+
+model OpeningLot {
+  id           String          @id @default(uuid()) @db.Uuid
+  eventId      String          @unique @db.Uuid
+  event        InvestmentEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  instrumentId String          @db.Uuid
+  instrument   Instrument      @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  quantity     Decimal         @db.Decimal(28, 10)
+  totalCost    Decimal         @db.Decimal(28, 8)
+  acquiredOn   DateTime        @db.Date
 
   @@index([instrumentId])
 }

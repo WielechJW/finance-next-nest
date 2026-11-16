@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { InvestmentCurrency } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { replayFifo, type FifoEvent } from './fifo.js';
 import { preparePosting, replayBalances, type PostInvestmentInput, type ReplayEvent } from './posting.js';
 
 @Injectable()
@@ -23,7 +24,7 @@ export class InvestmentPostingService {
       if (account.length !== 1) throw new NotFoundException('Nie znaleziono rachunku inwestycyjnego.');
 
       let instrumentCurrency: InvestmentCurrency | undefined;
-      if (input.type === 'BUY' || input.type === 'SELL') {
+      if (input.type === 'BUY' || input.type === 'SELL' || input.type === 'OPENING_POSITION') {
         const instrument = await tx.instrument.findUnique({
           where: { id: input.instrumentId }, select: { currency: true },
         });
@@ -58,7 +59,12 @@ export class InvestmentPostingService {
       const history = await tx.investmentEvent.findMany({
         where: { accountId: input.accountId },
         orderBy: [{ occurredOn: 'asc' }, { daySequence: 'asc' }],
-        include: { cashEntries: true, securityEntries: true },
+        include: {
+          cashEntries: true,
+          securityEntries: true,
+          trade: { include: { instrument: { select: { currency: true } } } },
+          openingLot: { include: { instrument: { select: { currency: true } } } },
+        },
       });
       const candidate: ReplayEvent = {
         occurredOn: posting.timing.occurredOn,
@@ -70,6 +76,14 @@ export class InvestmentPostingService {
         securityEntries: posting.securityEntries,
       };
       replayBalances([...history, candidate]);
+      const fifoCandidate: FifoEvent = {
+        ...candidate,
+        id: 'candidate',
+        cashEntries: posting.cashEntries,
+        trade: posting.trade ? { ...posting.trade, instrument: { currency: instrumentCurrency! } } : null,
+        openingLot: posting.openingLot ? { ...posting.openingLot, instrument: { currency: instrumentCurrency! } } : null,
+      };
+      replayFifo([...history, fifoCandidate]);
 
       const event = await tx.investmentEvent.create({
         data: {
@@ -88,9 +102,14 @@ export class InvestmentPostingService {
       if (posting.trade) {
         await tx.trade.create({ data: { eventId: event.id, ...posting.trade } });
       }
-      await tx.cashEntry.createMany({
-        data: posting.cashEntries.map((entry) => ({ eventId: event.id, ...entry })),
-      });
+      if (posting.openingLot) {
+        await tx.openingLot.create({ data: { eventId: event.id, ...posting.openingLot } });
+      }
+      if (posting.cashEntries.length > 0) {
+        await tx.cashEntry.createMany({
+          data: posting.cashEntries.map((entry) => ({ eventId: event.id, ...entry })),
+        });
+      }
       if (posting.securityEntries.length > 0) {
         await tx.securityEntry.createMany({
           data: posting.securityEntries.map((entry) => ({ eventId: event.id, ...entry })),
@@ -111,5 +130,24 @@ export class InvestmentPostingService {
       include: { cashEntries: true, securityEntries: true },
     });
     return replayBalances(events);
+  }
+
+  async positionsForUser(userId: string, accountId: string) {
+    const account = await this.prisma.investmentAccount.findFirst({
+      where: { id: accountId, portfolio: { userId } }, select: { id: true },
+    });
+    if (!account) throw new NotFoundException('Nie znaleziono rachunku inwestycyjnego.');
+    const events = await this.prisma.investmentEvent.findMany({
+      where: { accountId },
+      orderBy: [{ occurredOn: 'asc' }, { daySequence: 'asc' }],
+      include: {
+        cashEntries: true,
+        securityEntries: true,
+        trade: { include: { instrument: { select: { currency: true } } } },
+        openingLot: { include: { instrument: { select: { currency: true } } } },
+      },
+    });
+    replayBalances(events);
+    return replayFifo(events);
   }
 }
