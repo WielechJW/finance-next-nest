@@ -2,7 +2,7 @@ import { Prisma } from '../generated/prisma/client.js';
 
 // Investment calculations must not inherit Decimal's default 20-digit context
 // or change the configuration used by the existing budget domain.
-const InvestmentCalculation = Prisma.Decimal.clone({
+export const InvestmentCalculation = Prisma.Decimal.clone({
   precision: 80,
   rounding: Prisma.Decimal.ROUND_HALF_UP,
 });
