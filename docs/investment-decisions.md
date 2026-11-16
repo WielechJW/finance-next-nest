@@ -1,6 +1,6 @@
 # Decyzje domenowe platformy inwestycyjnej — GPW i USA
 
-Data: 15 listopada 2026 r. Zakres: [INV 0.1 — #44](https://github.com/WielechJW/finance-next-nest/issues/44).
+Data: 15 listopada 2026 r. Zakres: INV 0.1.
 
 Dokument ustala reguły dla implementacji opisanej w
 [roadmapie inwestycyjnej](investment-roadmap.md). Modele, API i interfejs
@@ -296,9 +296,9 @@ Próba anulowania wpłaty również zostaje odrzucona, bo kupno wymaga środków
 Audyt i aktywna wersja pozostają spójne; saldo i wynik z przykładu A
 nie zmieniają się po odrzuceniu korekty.
 
-## 8. Zależne zadania i odbiór #44
+## 8. Zależne zadania i odbiór INV 0.1
 
-| Kryterium #44 | Miejsce w dokumencie |
+| Kryterium INV 0.1 | Miejsce w dokumencie |
 | --- | --- |
 | Zakres, PLN/USD, FIFO, precyzja i odrębne domeny | Sekcje 1–4. |
 | Daty, czas zapisu, strefy, plany i korekty | Sekcje 5–6 oraz przykład D. |
