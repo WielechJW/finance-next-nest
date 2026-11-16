@@ -6,14 +6,17 @@ Zakres: [decyzje domenowe](investment-decisions.md) i etap 0
 
 **Wynik:** EODHD jest preferowanym kandydatem technicznym dla dziennych
 danych MVP. Demo potwierdziło dane pięciu spółek USA. Pięć spółek GPW
-zwróciło `403`; ich dane API wymagają weryfikacji kluczem użytkownika.
-Publiczne karty potwierdzają symbole i pokazują ceny w złotych, ale nie
-zastępują tej próby. Alternatywą jest Twelve Data.
+zwróciło `403`; ich dane API wymagają weryfikacji własnym kluczem.
+Publiczna próba Agent Rynku potwierdziła wybrane dane GPW dla 5/5 spółek,
+ale nie dostarczyła splitów ani waluty notowania i nie nadaje się jako
+automatyczny magazyn danych dla aplikacji. Alternatywą do dalszego
+sprawdzenia pozostaje Twelve Data.
 
-Użytkownik nie ma konta ani klucza dostawcy i wybrał sprawdzenie dostępnych
-danych oraz opis ograniczeń. Nie kupowano subskrypcji. Analiza i próba demo
-są wykonane; pełne potwierdzenie pokrycia GPW pozostaje warunkiem odbioru
-#45. Nie oznaczamy tego etapu roadmapy jako ukończonego.
+Użytkownik nie ma konta ani klucza EODHD i wybrał sprawdzenie dostępnych
+źródeł. Nie kupowano subskrypcji. Analiza, próba demo i próba publiczna
+są wykonane; pełne potwierdzenie pokrycia GPW u dostawcy nadającego się
+do MVP pozostaje warunkiem odbioru #45. Nie oznaczamy tego punktu jako
+ukończonego.
 
 ## 1. Metoda i materiał do odtworzenia
 
@@ -184,11 +187,51 @@ Nie potwierdzono API ani kompletności fundamentów GPW tego dostawcy.
 
 Rekomendacja warunkowa: **EODHD do dziennych danych prywatnego MVP,
 po udanej próbie GPW; przed udostępnieniem innym użytkownikom osobna oferta
-obejmująca ten sposób użycia.** Fundamenty można dołączyć w etapie 8.
+obejmująca ten sposób użycia.** Publiczna próba z sekcji 8 nie znosi tego
+warunku. Fundamenty można dołączyć w etapie 8.
 Decyzje integracyjne należą do #46, adapter do #60. Broker i dane
 do rzeczywistych zleceń mają odrębny zakres.
 
-## 8. Powtórzenie próby i odbiór
+## 8. Publiczna próba uzupełniająca GPW: Agent Rynku
+
+16 listopada 2026 r. wykonano 20 wywołań czterech publicznych narzędzi MCP
+bez konta i klucza: wyszukiwania spółek, historii cen, uchwał dywidendowych
+i kwartalnych KPI. [Skrypt](../scripts/verify-public-gpw.mjs) ogranicza
+próbkę do tych samych pięciu spółek GPW co EODHD i zapisuje tylko statusy,
+liczniki oraz metadane w [raporcie](market-data/agent-rynku-public-2026-11-16.json).
+Nie zapisuje cen, kwot dywidend ani liczb z raportów.
+
+| EODHD | Symbol Agent Rynku | Identyfikacja | Historia dzienna | Dywidendy | KPI kwartalne | Splity |
+| --- | --- | --- | --- | --- | --- | --- |
+| `CDR.WAR` | `CDPROJEKT` | ISIN obecny | 10 świec | 0 | 2 | Brak publicznego narzędzia |
+| `PKN.WAR` | `PKNORLEN` | ISIN obecny | 10 świec | 0 | 2 | Brak publicznego narzędzia |
+| `PKO.WAR` | `PKOBP` | ISIN obecny | 10 świec | 0 | 2 | Brak publicznego narzędzia |
+| `PZU.WAR` | `PZU` | ISIN obecny | 10 świec | 1 | 2 | Brak publicznego narzędzia |
+| `KGH.WAR` | `KGHM` | ISIN obecny | 10 świec | 0 | 2 | Brak publicznego narzędzia |
+
+Wynik wyszukiwania skrótu `CDR` był niejednoznaczny; pełna nazwa
+`CD PROJEKT` dała jeden kanoniczny symbol. Historia ma limit 10 w tej
+próbie, dlatego wszystkie serie są oznaczone jako ucięte. Dwa wiersze KPI
+na spółkę potwierdzają wybrane liczby kwartalne, nie kompletne sprawozdania.
+`0` dywidend oznacza pustą odpowiedź dla danego zapytania, a nie dowód, że spółka nigdy
+nie wypłaciła dywidendy. Publiczne dywidendy obejmują znane uchwały WZA,
+bez gwarancji pełnej historii. [Wyszukiwanie](https://agentrynku.pl/docs/wyszukiwarka-spolek-gpw),
+[historia](https://agentrynku.pl/docs/historia-cen-gpw),
+[dywidendy](https://agentrynku.pl/docs/dywidendy-gpw),
+[KPI](https://agentrynku.pl/docs/wyniki-kwartalne-gpw).
+
+Wszystkie dzienne serie w próbce mają `priceScale: adjusted` i `currency: null`.
+Waluta PLN w odpowiedziach KPI oznacza walutę sprawozdania; nie potwierdza
+waluty notowania. Do wyceny według [decyzji domenowych](investment-decisions.md)
+potrzebny jest surowy close i jawna waluta. Publiczny katalog narzędzi nie
+zawiera splitów. Agent Rynku udostępnia 200 publicznych wywołań dziennie
+bez konta, lecz [regulamin](https://agentrynku.pl/regulamin) zabrania
+redystrybucji oraz systematycznego pobierania w celu utrzymywania kopii.
+Ta próba dostępności nie upoważnia do zasilania nią aplikacji; oferta PRO
+nie oznacza zgody na takie wykorzystanie.
+[Źródło limitów i katalogu](https://agentrynku.pl/en/mcp).
+
+## 9. Powtórzenie próby i odbiór
 
 Z katalogu głównego, Node.js 24, bez dodatkowych zależności:
 
@@ -202,12 +245,20 @@ node --env-file-if-exists=backend/.env scripts/verify-eodhd.mjs > /tmp/eodhd-key
 
 # Testy z wymyślonymi danymi, bez sieci i klucza.
 node scripts/verify-eodhd.test.mjs
+
+# Publiczna próba GPW; 20 wywołań, raport bez surowych wartości.
+node scripts/verify-public-gpw.mjs > /tmp/agent-rynku-public.json
 ```
 
-Kod zakończenia: `0` — wszystkie instrumenty przeszły próbę struktury;
-`2` — raport gotowy, ale zawiera braki lub odmowę; `1` — błędne wywołanie
-albo brak klucza. Demo w tej próbie daje `2`. `complete: true` dotyczy
+Kod zakończenia skryptu EODHD: `0` — wszystkie instrumenty przeszły próbę
+struktury; `2` — raport gotowy, ale zawiera braki lub odmowę; `1` — błędne
+wywołanie albo brak klucza. Demo w tej próbie daje `2`. `complete: true` dotyczy
 obecności i struktury próbki, nie licencji ani zgodności z giełdą.
+
+Publiczny skrypt GPW zwraca `0`, jeśli dla wszystkich pięciu spółek
+otrzymał identyfikację, historię, odpowiedź dywidendową oraz KPI;
+`2` oznacza brak któregoś z tych elementów. Pole `allRequiredFieldsPresent`
+pozostaje `false`, ponieważ publiczne narzędzia nie obejmują splitów.
 
 Skrypt ma timeout 20 s, odczytuje kolejno, a dla własnego klucza zachowuje
 odstęp 3.1 s. Przy 402/429 zatrzymuje dalsze żądania, bez retry. Nie przechodzi
@@ -216,10 +267,11 @@ korekcie danych lub uprawnień; zachowujemy datę i zakres każdej próby.
 
 | Kryterium #45 | Dowód / pozostały warunek |
 | --- | --- |
-| Porównanie 5+5, waluty, ceny, zdarzenia, fundamenty | Sekcje 1–3 i JSON; dla GPW odmowa dostępu, pokrycie niepotwierdzone. |
-| Próba, luki, plany, limity, koszty, warunki | Sekcje 4–7; wyceny komercyjnej nie zamawiano. |
-| Brak sekretów, obsługa braków, rekomendacja | Raport bez wartości finansowych, syntetyczne testy, rekomendacja warunkowa. |
+| Porównanie 5+5, waluty, ceny, zdarzenia, fundamenty | Sekcje 1–3 i 8 oraz raporty JSON; EODHD GPW odmawia dostępu, publiczne źródło GPW nie podaje splitów i waluty notowania. |
+| Próba, luki, plany, limity, koszty, warunki | Sekcje 4–8; wyceny komercyjnej nie zamawiano. |
+| Brak sekretów, obsługa braków, rekomendacja | Raporty bez wartości finansowych, syntetyczne testy EODHD, rekomendacja warunkowa. |
 
-Pełny odbiór wymaga powtórzenia próby GPW własnym kluczem z właściwymi
-uprawnieniami, sprawdzenia raportów i uzgodnienia warunków odpowiadających
-planowanemu udostępnieniu aplikacji.
+Pełny odbiór wymaga próby GPW u dostawcy z odpowiednim dostępem do cen,
+splitów, dywidend i fundamentów, potwierdzenia waluty oraz warunków
+przechowywania i prezentacji. Dla obecnego kandydata EODHD oznacza to
+powtórzenie próby własnym kluczem z właściwymi uprawnieniami.

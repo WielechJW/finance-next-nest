@@ -1,0 +1,201 @@
+{
+  "provider": "Agent Rynku public MCP",
+  "checkedAt": "2026-11-16T11:53:35.973Z",
+  "purpose": "availability_only",
+  "rawDataStored": false,
+  "maxRequests": 20,
+  "instruments": [
+    {
+      "eodhdSymbol": "CDR.WAR",
+      "searchQuery": "CD PROJEKT",
+      "identity": {
+        "status": "available",
+        "canonicalSymbol": "CDPROJEKT",
+        "hasIsin": true
+      },
+      "prices": {
+        "status": "available",
+        "rows": 10,
+        "currency": null,
+        "hasSource": true,
+        "hasUpdateTime": true,
+        "lastSession": "2026-11-13",
+        "scales": [
+          "adjusted"
+        ],
+        "truncated": true
+      },
+      "dividends": {
+        "status": "empty",
+        "rows": 0,
+        "hasSourceLinks": null,
+        "truncated": false
+      },
+      "fundamentals": {
+        "status": "available",
+        "rows": 2,
+        "hasSourceLinks": true,
+        "reportingCurrencies": [
+          "PLN"
+        ]
+      },
+      "splits": {
+        "status": "no_public_endpoint"
+      }
+    },
+    {
+      "eodhdSymbol": "PKN.WAR",
+      "searchQuery": "PKN",
+      "identity": {
+        "status": "available",
+        "canonicalSymbol": "PKNORLEN",
+        "hasIsin": true
+      },
+      "prices": {
+        "status": "available",
+        "rows": 10,
+        "currency": null,
+        "hasSource": true,
+        "hasUpdateTime": true,
+        "lastSession": "2026-11-13",
+        "scales": [
+          "adjusted"
+        ],
+        "truncated": true
+      },
+      "dividends": {
+        "status": "empty",
+        "rows": 0,
+        "hasSourceLinks": null,
+        "truncated": false
+      },
+      "fundamentals": {
+        "status": "available",
+        "rows": 2,
+        "hasSourceLinks": true,
+        "reportingCurrencies": [
+          "PLN"
+        ]
+      },
+      "splits": {
+        "status": "no_public_endpoint"
+      }
+    },
+    {
+      "eodhdSymbol": "PKO.WAR",
+      "searchQuery": "PKO",
+      "identity": {
+        "status": "available",
+        "canonicalSymbol": "PKOBP",
+        "hasIsin": true
+      },
+      "prices": {
+        "status": "available",
+        "rows": 10,
+        "currency": null,
+        "hasSource": true,
+        "hasUpdateTime": true,
+        "lastSession": "2026-11-13",
+        "scales": [
+          "adjusted"
+        ],
+        "truncated": true
+      },
+      "dividends": {
+        "status": "empty",
+        "rows": 0,
+        "hasSourceLinks": null,
+        "truncated": false
+      },
+      "fundamentals": {
+        "status": "available",
+        "rows": 2,
+        "hasSourceLinks": true,
+        "reportingCurrencies": [
+          "PLN"
+        ]
+      },
+      "splits": {
+        "status": "no_public_endpoint"
+      }
+    },
+    {
+      "eodhdSymbol": "PZU.WAR",
+      "searchQuery": "PZU",
+      "identity": {
+        "status": "available",
+        "canonicalSymbol": "PZU",
+        "hasIsin": true
+      },
+      "prices": {
+        "status": "available",
+        "rows": 10,
+        "currency": null,
+        "hasSource": true,
+        "hasUpdateTime": true,
+        "lastSession": "2026-11-13",
+        "scales": [
+          "adjusted"
+        ],
+        "truncated": true
+      },
+      "dividends": {
+        "status": "available",
+        "rows": 1,
+        "hasSourceLinks": true,
+        "truncated": false
+      },
+      "fundamentals": {
+        "status": "available",
+        "rows": 2,
+        "hasSourceLinks": true,
+        "reportingCurrencies": [
+          "PLN"
+        ]
+      },
+      "splits": {
+        "status": "no_public_endpoint"
+      }
+    },
+    {
+      "eodhdSymbol": "KGH.WAR",
+      "searchQuery": "KGH",
+      "identity": {
+        "status": "available",
+        "canonicalSymbol": "KGHM",
+        "hasIsin": true
+      },
+      "prices": {
+        "status": "available",
+        "rows": 10,
+        "currency": null,
+        "hasSource": true,
+        "hasUpdateTime": true,
+        "lastSession": "2026-11-13",
+        "scales": [
+          "adjusted"
+        ],
+        "truncated": true
+      },
+      "dividends": {
+        "status": "empty",
+        "rows": 0,
+        "hasSourceLinks": null,
+        "truncated": false
+      },
+      "fundamentals": {
+        "status": "available",
+        "rows": 2,
+        "hasSourceLinks": true,
+        "reportingCurrencies": [
+          "PLN"
+        ]
+      },
+      "splits": {
+        "status": "no_public_endpoint"
+      }
+    }
+  ],
+  "requestsMade": 20,
+  "allRequiredFieldsPresent": false
+}
