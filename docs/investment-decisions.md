@@ -60,6 +60,17 @@ swoje wpisy w jednej transakcji bazodanowej.
 | Split | Zmienia ilość i koszt jednostkowy, zachowując łączny koszt partii. Obsługa zdarzeń korporacyjnych powstaje w etapie 5. |
 | Otwarcie istniejącej pozycji | Jawna partia otwarcia zawiera ilość, łączny koszt i datę odniesienia. Nie udaje historycznej transakcji gotówkowej. |
 
+Silnik zapisu etapu 2.1 tworzy wpłaty, wypłaty, zakup, sprzedaż, dywidendy,
+samodzielne opłaty i FX w jednej transakcji. Odtwarza salda z wpisów każdego
+zdarzenia jako sumę w danej walucie lub instrumencie, po czym sprawdza stan
+po całym zdarzeniu. Wstawienie operacji historycznej sprawdza także późniejsze
+stany. Zapis blokuje rachunek przed drugim równoczesnym zapisem i sprawdza
+właściciela. Skrót kanonicznej treści pozwala odróżnić zgodne ponowienie
+od użycia tego samego klucza do innej operacji. Rejestr z niezweryfikowaną
+kolejnością lub korektą wymaga rozstrzygnięcia przed dalszym księgowaniem;
+pełna semantyka korekt powstaje w etapie 2.3. API i formularze pojawią się
+w etapie 3.
+
 Obowiązują następujące ograniczenia:
 
 - Gotówka w każdej walucie i ilość każdego instrumentu są nieujemne po
