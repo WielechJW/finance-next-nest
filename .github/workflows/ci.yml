@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  backend:
+    name: Backend checks and HTTP tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:e2e
+      - run: npm run build
+
+  integration:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL_TEST: postgresql://finance:ci_test_only@127.0.0.1:5432/finance_test?schema=public
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: finance
+          POSTGRES_PASSWORD: ci_test_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U finance -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run test:integration
+
+  browser:
+    name: PostgreSQL Playwright tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL_TEST: postgresql://finance:ci_test_only@127.0.0.1:5432/finance_test?schema=public
+      DATABASE_URL_BROWSER_TEST: postgresql://finance:ci_test_only@127.0.0.1:5432/finance_browser_test?schema=public
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: finance
+          POSTGRES_PASSWORD: ci_test_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U finance -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run prisma:generate
+        working-directory: backend
+      - run: npm run test:browser:typecheck
+        working-directory: backend
+      - run: npx playwright install --with-deps chromium
+        working-directory: backend
+      - run: npm run test:browser
+        working-directory: backend
+
