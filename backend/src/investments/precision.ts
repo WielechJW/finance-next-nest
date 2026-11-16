@@ -47,7 +47,7 @@ export function parseInvestmentDecimal(
   }
   const decimal = new Prisma.Decimal(value);
   if (
-    (rule.sign === 'positive' && !decimal.isPositive()) ||
+    (rule.sign === 'positive' && !decimal.gt(0)) ||
     (rule.sign === 'nonzero' && decimal.isZero())
   ) {
     throw new Error(`${kind} has an invalid sign or zero value.`);
@@ -88,7 +88,7 @@ export function roundSettlementAmount(value: string): string {
 export function calculateFxRatePlnPerUsd(plnSold: string, usdBought: string): string {
   const pln = parseInvestmentDecimal(plnSold, 'cashAmount');
   const usd = parseInvestmentDecimal(usdBought, 'cashAmount');
-  if (!pln.isPositive() || !usd.isPositive()) {
+  if (!pln.gt(0) || !usd.gt(0)) {
     throw new Error('FX legs must be positive absolute amounts.');
   }
   const rate = new InvestmentCalculation(pln.toFixed())
