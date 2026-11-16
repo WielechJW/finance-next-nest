@@ -38,6 +38,7 @@ model InvestmentAccount {
   name        String    @db.VarChar(100)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  events      InvestmentEvent[]
 
   // Ownership is derived through Portfolio.userId, without a second userId.
   @@index([portfolioId])
@@ -55,6 +56,8 @@ model Instrument {
   currency         InvestmentCurrency
   isin             String?                     @db.VarChar(12)
   providerMappings InstrumentProviderMapping[]
+  trades           Trade[]
+  securityEntries  SecurityEntry[]
   createdAt        DateTime                    @default(now())
   updatedAt        DateTime                    @updatedAt
 
@@ -74,6 +77,94 @@ model InstrumentProviderMapping {
 
   @@unique([provider, symbol])
   @@unique([instrumentId, provider])
+}
+
+enum InvestmentEventType {
+  DEPOSIT
+  WITHDRAWAL
+  BUY
+  SELL
+  DIVIDEND
+  FEE
+  FX
+  SPLIT
+  OPENING_POSITION
+  CORRECTION
+}
+
+enum InvestmentEventSource {
+  MANUAL
+  IMPORT
+  BROKER
+  SYSTEM
+}
+
+model InvestmentEvent {
+  id               String                @id @default(uuid()) @db.Uuid
+  accountId        String                @db.Uuid
+  account          InvestmentAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type             InvestmentEventType
+  source           InvestmentEventSource @default(MANUAL)
+  occurredOn       DateTime              @db.Date
+  recordedAt       DateTime              @default(now()) @db.Timestamptz(3)
+  correctionOfId   String?               @db.Uuid
+  correctionOf     InvestmentEvent?      @relation("InvestmentCorrections", fields: [correctionOfId, accountId], references: [id, accountId], onDelete: Cascade)
+  corrections      InvestmentEvent[]     @relation("InvestmentCorrections")
+  correctionReason String?               @db.VarChar(500)
+  trade            Trade?
+  cashEntries      CashEntry[]
+  securityEntries  SecurityEntry[]
+
+  // Timing precision, ordering and idempotency are completed in INV 1.3/1.4.
+  @@unique([id, accountId])
+  @@index([accountId, occurredOn, id])
+  @@index([correctionOfId])
+}
+
+model Trade {
+  id           String          @id @default(uuid()) @db.Uuid
+  eventId      String          @unique @db.Uuid
+  event        InvestmentEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  instrumentId String          @db.Uuid
+  instrument   Instrument      @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  quantity     Decimal         @db.Decimal(28, 10)
+  unitPrice    Decimal         @db.Decimal(28, 10)
+  grossAmount  Decimal         @db.Decimal(28, 8)
+
+  @@index([instrumentId])
+}
+
+enum CashEntryKind {
+  EXTERNAL_TRANSFER
+  TRADE_GROSS
+  COMMISSION
+  DIVIDEND_GROSS
+  WITHHOLDING_TAX
+  FEE
+  FX
+}
+
+model CashEntry {
+  id       String             @id @default(uuid()) @db.Uuid
+  eventId  String             @db.Uuid
+  event    InvestmentEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  kind     CashEntryKind
+  currency InvestmentCurrency
+  amount   Decimal            @db.Decimal(28, 8)
+
+  @@index([eventId])
+}
+
+model SecurityEntry {
+  id           String          @id @default(uuid()) @db.Uuid
+  eventId      String          @db.Uuid
+  event        InvestmentEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  instrumentId String          @db.Uuid
+  instrument   Instrument      @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  quantity     Decimal         @db.Decimal(28, 10)
+
+  @@index([eventId])
+  @@index([instrumentId])
 }
 
 enum Currency {
