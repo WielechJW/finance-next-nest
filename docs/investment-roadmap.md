@@ -23,6 +23,10 @@ Stanowią kontrakt dla implementacji kolejnych etapów.
 próbę EODHD dla pięciu spółek GPW i pięciu USA, koszty i ograniczenia.
 Demo potwierdziło dane USA; pokrycie API GPW wymaga własnego klucza.
 
+[Macierz brokerów INV 0.3](broker-integration-matrix.md) porównuje API,
+rachunki paper, rynki i wykonania oraz zapisuje warunkowy wybór źródła
+danych do MVP i kryteria próby brokerów przed integracją.
+
 ## 1. Punkt wyjścia i zakres
 
 Projekt ma już Next.js, NestJS, PostgreSQL, Prisma, sesje, portfel finansowy,
@@ -125,11 +129,11 @@ Kamienie milowe:
   GPW i USA: identyfikację, walutę, notowania dzienne, splity, dywidendy i
   dostępność fundamentów. Zapisać braki, limity, wymagany plan, koszty i warunki
   przechowywania oraz prezentowania danych. EODHD jest kandydatem do porównania.
-- [ ] **0.3. Przygotować macierz możliwości brokerów.** Zapisać, który kandydat
+- [x] **0.3. Przygotować macierz możliwości brokerów.** Zapisać, który kandydat
   udostępnia API, rachunek testowy, wymagane instrumenty GPW/USA, typy zleceń,
   historię wykonań i autoryzację. Wybrać dostawcę danych do MVP; broker do
   rzeczywistych zleceń zostanie potwierdzony przed etapem 12.
-- [ ] **0.4. Dodać CI.** Lint, typy, testy jednostkowe, HTTP i build obu aplikacji;
+- [x] **0.4. Dodać CI.** Lint, typy, testy jednostkowe, HTTP i build obu aplikacji;
   osobny job PostgreSQL dla testów integracyjnych oraz Playwrighta. Zachować
   istniejące zabezpieczenia osobnych baz testowych. Przy dodaniu Redis rozszerzyć CI.
 
