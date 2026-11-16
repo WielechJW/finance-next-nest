@@ -16,6 +16,64 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   wallet       Wallet?
+  portfolios   Portfolio[]
+}
+
+model Portfolio {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @db.Uuid
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String              @db.VarChar(100)
+  accounts  InvestmentAccount[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([userId])
+}
+
+model InvestmentAccount {
+  id          String    @id @default(uuid()) @db.Uuid
+  portfolioId String    @db.Uuid
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  name        String    @db.VarChar(100)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Ownership is derived through Portfolio.userId, without a second userId.
+  @@index([portfolioId])
+}
+
+enum InvestmentCurrency {
+  PLN
+  USD
+}
+
+model Instrument {
+  id               String                      @id @default(uuid()) @db.Uuid
+  ticker           String                      @db.VarChar(32)
+  mic              String                      @db.VarChar(4)
+  currency         InvestmentCurrency
+  isin             String?                     @db.VarChar(12)
+  providerMappings InstrumentProviderMapping[]
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  // Later investment events will reference this ID, never a mutable ticker.
+  @@unique([mic, ticker])
+  @@index([isin])
+}
+
+model InstrumentProviderMapping {
+  id           String     @id @default(uuid()) @db.Uuid
+  instrumentId String     @db.Uuid
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  provider     String     @db.VarChar(50)
+  symbol       String     @db.VarChar(64)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([provider, symbol])
+  @@unique([instrumentId, provider])
 }
 
 enum Currency {
