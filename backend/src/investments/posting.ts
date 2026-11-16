@@ -141,6 +141,7 @@ export function preparePosting(
       return { ...common, fxRatePlnPerUsd: null, trade: null, securityEntries: [],
         cashEntries: [{ kind: 'FEE', currency: currency(input.currency), amount: negative(positiveCash(input.amount)) }] };
     }
+    if (input.type !== 'FX') throw new BadRequestException('Nieobsługiwany typ operacji.');
     if (input.soldCurrency === input.boughtCurrency) {
       throw new BadRequestException('Wymiana wymaga dwóch różnych walut.');
     }
