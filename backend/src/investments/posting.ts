@@ -7,7 +7,7 @@ import {
   formatInvestmentDecimal,
   parseInvestmentDecimal,
 } from './precision.js';
-import { parseInvestmentTiming, type InvestmentTimingInput } from './timing.js';
+import { parseInvestmentCalendarDate, parseInvestmentTiming, type InvestmentTimingInput } from './timing.js';
 
 type BaseInput = InvestmentTimingInput & {
   accountId: string;
@@ -22,12 +22,14 @@ export type PostInvestmentInput = BaseInput & (
   | { type: 'BUY' | 'SELL'; instrumentId: string; quantity: string; unitPrice: string; commission?: string }
   | { type: 'DIVIDEND'; currency: InvestmentCurrency; grossAmount: string; withholdingTax?: string; fee?: string }
   | { type: 'FEE'; currency: InvestmentCurrency; amount: string }
+  | { type: 'OPENING_POSITION'; instrumentId: string; quantity: string; totalCost: string; acquiredOn: string }
   | { type: 'FX'; soldCurrency: InvestmentCurrency; boughtCurrency: InvestmentCurrency; soldAmount: string; boughtAmount: string; commission?: string }
 );
 
 export type CashEffect = { kind: CashEntryKind; currency: InvestmentCurrency; amount: string };
 export type SecurityEffect = { instrumentId: string; quantity: string };
 export type TradeEffect = { instrumentId: string; quantity: string; unitPrice: string; grossAmount: string };
+export type OpeningLotEffect = { instrumentId: string; quantity: string; totalCost: string; acquiredOn: Date };
 
 export type PreparedPosting = {
   accountId: string;
@@ -40,6 +42,7 @@ export type PreparedPosting = {
   timing: ReturnType<typeof parseInvestmentTiming>;
   fxRatePlnPerUsd: string | null;
   trade: TradeEffect | null;
+  openingLot?: OpeningLotEffect;
   cashEntries: CashEffect[];
   securityEntries: SecurityEffect[];
 };
@@ -140,6 +143,19 @@ export function preparePosting(
     if (input.type === 'FEE') {
       return { ...common, fxRatePlnPerUsd: null, trade: null, securityEntries: [],
         cashEntries: [{ kind: 'FEE', currency: currency(input.currency), amount: negative(positiveCash(input.amount)) }] };
+    }
+    if (input.type === 'OPENING_POSITION') {
+      if (!instrumentCurrency) throw new BadRequestException('Nie znaleziono waluty instrumentu.');
+      const quantity = formatInvestmentDecimal(parseInvestmentDecimal(input.quantity, 'quantity'), 'quantity');
+      const cost = parseInvestmentDecimal(input.totalCost, 'amount8');
+      if (cost.lt(0)) throw new BadRequestException('Koszt partii otwarcia nie może być ujemny.');
+      const acquiredOn = parseInvestmentCalendarDate(input.acquiredOn, 'acquiredOn');
+      if (acquiredOn > timing.occurredOn) {
+        throw new BadRequestException('Data nabycia nie może być późniejsza od daty otwarcia.');
+      }
+      return { ...common, fxRatePlnPerUsd: null, trade: null, cashEntries: [],
+        openingLot: { instrumentId: input.instrumentId, quantity, totalCost: cost.toFixed(8), acquiredOn },
+        securityEntries: [{ instrumentId: input.instrumentId, quantity }] };
     }
     if (input.type !== 'FX') throw new BadRequestException('Nieobsługiwany typ operacji.');
     if (input.soldCurrency === input.boughtCurrency) {
