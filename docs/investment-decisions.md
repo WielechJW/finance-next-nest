@@ -249,6 +249,15 @@ wykonanej operacji jest jawną rewizją wyłączającą ją z aktywnego rejestru
 Nie usuwamy historii fizycznie ani nie księgujemy korekty jako dodatkowej
 niepowiązanej transakcji w dniu jej wprowadzenia.
 
+Każda nowa wersja wskazuje bezpośrednio poprzednią przez `correctionOfId`.
+`revision` rośnie o jeden, a tylko wersja z `activeSlot=1` wpływa na stan
+rachunku. Starsze wersje mają `activeSlot=NULL` i zachowują pełne wpisy do
+audytu. Unikalny aktywny slot daty i kolejności pozwala zamienić wersję
+bez fikcyjnego przesunięcia zdarzenia w czasie. Anulowanie zapisuje aktywną
+wersję `CORRECTION` bez wpisów gotówkowych i ilościowych; można ją później
+zastąpić potwierdzoną wersją. Starsze korekty bez tej semantyki wymagają
+ręcznego wyjaśnienia przed odtworzeniem rachunku.
+
 Zmiana daty lub kolejności, dopisanie operacji historycznej oraz anulowanie
 wymagają ponownego przeliczenia kolejnych zdarzeń od najwcześniejszego
 zmienionego miejsca. Dotyczy to gotówki, partii FIFO, wyników oraz późniejszych

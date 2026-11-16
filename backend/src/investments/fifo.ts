@@ -11,6 +11,8 @@ export type FifoEvent = {
   occurredOn: Date;
   daySequence: number;
   orderingSource: 'EXPLICIT' | 'MIGRATED_UNVERIFIED';
+  revision?: number;
+  correctionOfId?: string | null;
   trade: {
     instrumentId: string;
     quantity: DecimalLike;
@@ -85,7 +87,10 @@ export function replayFifo(events: FifoEvent[]) {
   }[] = [];
   const ordered = [...events].sort((a, b) => a.occurredOn.getTime() - b.occurredOn.getTime() || a.daySequence - b.daySequence);
   for (const event of ordered) {
-    if (event.orderingSource !== 'EXPLICIT' || event.type === 'CORRECTION' || event.type === 'SPLIT') {
+    if (event.orderingSource !== 'EXPLICIT' || event.type === 'SPLIT' || (event.type === 'CORRECTION' &&
+        !(event.revision && event.revision > 0 && event.correctionOfId &&
+          !event.trade && !event.openingLot && event.cashEntries.length === 0 &&
+          event.securityEntries.length === 0))) {
       throw new ConflictException('Historia wymaga rozstrzygnięcia kolejności, korekty lub splitu.');
     }
     if (event.type === 'OPENING_POSITION') {
