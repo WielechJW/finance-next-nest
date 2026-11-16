@@ -1188,7 +1188,7 @@ watchlistę i alerty na telefon, analizę spółek, import historii, strategie,
 testy historyczne, handel symulowany oraz integrację rzeczywistych zleceń.
 Każdy etap zawiera zadania, zależności i kryteria ukończenia.
 
-[Decyzje domenowe — INV 0.1 (#44)](docs/investment-decisions.md) ustalają
+[Decyzje domenowe — INV 0.1](docs/investment-decisions.md) ustalają
 zakres GPW/USA, rozdzielenie domen, FIFO, prowizje, precyzję, daty i korekty.
 Zawierają policzone przykłady kupna, sprzedaży oraz wymiany PLN/USD,
 stanowiące podstawę do implementacji i testów kolejnych etapów.
