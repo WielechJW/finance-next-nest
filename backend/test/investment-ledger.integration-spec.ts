@@ -4,6 +4,7 @@ import { PrismaService } from '../src/prisma/prisma.service.js';
 describe('Investment ledger (PostgreSQL)', () => {
   const emails = new Set<string>();
   const instrumentIds = new Set<string>();
+  const audit = { sourceKey: 'manual', recordedBy: 'test:ledger' };
   let prisma: PrismaService;
 
   beforeAll(async () => {
@@ -54,7 +55,7 @@ describe('Investment ledger (PostgreSQL)', () => {
     const budgetCount = await prisma.transaction.count();
     const event = await prisma.$transaction(async (tx) => {
       const header = await tx.investmentEvent.create({
-        data: { accountId: account.id, type: 'BUY', occurredOn, daySequence: 1 },
+        data: { accountId: account.id, type: 'BUY', occurredOn, daySequence: 1, ...audit },
       });
       await tx.trade.create({
         data: {
@@ -108,6 +109,8 @@ describe('Investment ledger (PostgreSQL)', () => {
         accountId: account.id,
         type: 'DIVIDEND',
         source: 'BROKER',
+        ...audit,
+        sourceKey: 'test-broker',
         occurredOn,
         daySequence: 1,
         cashEntries: {
@@ -128,6 +131,7 @@ describe('Investment ledger (PostgreSQL)', () => {
       data: {
         accountId: account.id,
         type: 'FX',
+        ...audit,
         occurredOn,
         daySequence: 2,
         fxRatePlnPerUsd: '4',
@@ -153,6 +157,7 @@ describe('Investment ledger (PostgreSQL)', () => {
       data: {
         accountId: account.id,
         type: 'SELL',
+        ...audit,
         occurredOn,
         daySequence: 1,
         trade: {
@@ -177,6 +182,7 @@ describe('Investment ledger (PostgreSQL)', () => {
       data: {
         accountId: account.id,
         type: 'SPLIT',
+        ...audit,
         occurredOn,
         daySequence: 2,
         securityEntries: {
@@ -199,6 +205,7 @@ describe('Investment ledger (PostgreSQL)', () => {
       data: {
         accountId: account.id,
         type: 'DEPOSIT',
+        ...audit,
         occurredOn,
         daySequence: 1,
         cashEntries: { create: { kind: 'EXTERNAL_TRANSFER', currency: 'PLN', amount: '100' } },
@@ -208,6 +215,7 @@ describe('Investment ledger (PostgreSQL)', () => {
       data: {
         accountId: account.id,
         type: 'CORRECTION',
+        ...audit,
         occurredOn,
         daySequence: 2,
         correctionOfId: original.id,
@@ -222,6 +230,7 @@ describe('Investment ledger (PostgreSQL)', () => {
         data: {
           accountId: otherAccount.id,
           type: 'CORRECTION',
+          ...audit,
           occurredOn,
           daySequence: 1,
           correctionOfId: original.id,
@@ -231,7 +240,7 @@ describe('Investment ledger (PostgreSQL)', () => {
     ).rejects.toMatchObject({ code: 'P2003' });
     await expect(
       prisma.investmentEvent.create({
-        data: { accountId: account.id, type: 'CORRECTION', occurredOn, daySequence: 3, correctionOfId: original.id },
+        data: { accountId: account.id, type: 'CORRECTION', occurredOn, daySequence: 3, correctionOfId: original.id, ...audit },
       }),
     ).rejects.toThrow();
   });
@@ -242,7 +251,7 @@ describe('Investment ledger (PostgreSQL)', () => {
     await expect(
       prisma.$transaction(async (tx) => {
         await tx.investmentEvent.create({
-          data: { id: eventId, accountId: account.id, type: 'DEPOSIT', occurredOn, daySequence: 1 },
+          data: { id: eventId, accountId: account.id, type: 'DEPOSIT', occurredOn, daySequence: 1, ...audit },
         });
         await tx.cashEntry.create({
           data: { eventId, kind: 'EXTERNAL_TRANSFER', currency: 'PLN', amount: '100' },
@@ -263,6 +272,7 @@ describe('Investment ledger (PostgreSQL)', () => {
       data: {
         accountId: account.id,
         type: 'DEPOSIT',
+        ...audit,
         occurredOn,
         daySequence: 2,
         timePrecision: 'INSTANT',
@@ -275,6 +285,7 @@ describe('Investment ledger (PostgreSQL)', () => {
       data: {
         accountId: account.id,
         type: 'DEPOSIT',
+        ...audit,
         occurredOn,
         daySequence: 1,
         timePrecision: 'INSTANT',
@@ -289,7 +300,7 @@ describe('Investment ledger (PostgreSQL)', () => {
     expect(ordered.map((event) => event.id)).toEqual([first.id, second.id]);
     expect(ordered.every((event) => event.orderingSource === 'EXPLICIT')).toBe(true);
     await expect(prisma.investmentEvent.create({
-      data: { accountId: account.id, type: 'DEPOSIT', occurredOn, daySequence: 1 },
+      data: { accountId: account.id, type: 'DEPOSIT', occurredOn, daySequence: 1, ...audit },
     })).rejects.toMatchObject({ code: 'P2002' });
   });
 
@@ -300,6 +311,7 @@ describe('Investment ledger (PostgreSQL)', () => {
       data: {
         accountId: account.id,
         type: 'DEPOSIT',
+        ...audit,
         occurredOn,
         daySequence: 1,
         timePrecision: 'INSTANT',
@@ -308,11 +320,11 @@ describe('Investment ledger (PostgreSQL)', () => {
       },
     })).rejects.toThrow();
     await expect(prisma.investmentEvent.create({
-      data: { accountId: account.id, type: 'FX', occurredOn, daySequence: 1, fxRatePlnPerUsd: '-1' },
+      data: { accountId: account.id, type: 'FX', occurredOn, daySequence: 1, fxRatePlnPerUsd: '-1', ...audit },
     })).rejects.toThrow();
 
     const event = await prisma.investmentEvent.create({
-      data: { accountId: account.id, type: 'BUY', occurredOn, daySequence: 1 },
+      data: { accountId: account.id, type: 'BUY', occurredOn, daySequence: 1, ...audit },
     });
     await expect(prisma.cashEntry.create({
       data: { eventId: event.id, kind: 'TRADE_GROSS', currency: 'PLN', amount: '-1.001' },
@@ -320,5 +332,155 @@ describe('Investment ledger (PostgreSQL)', () => {
     await expect(prisma.trade.create({
       data: { eventId: event.id, instrumentId: instrument.id, quantity: '1', unitPrice: '1', grossAmount: '1.001' },
     })).rejects.toThrow();
+  });
+
+  it('stores one external operation despite concurrent retries', async () => {
+    const account = await createAccount();
+    const attempts = await Promise.allSettled([1, 2].map((daySequence) =>
+      prisma.investmentEvent.create({
+        data: {
+          accountId: account.id,
+          type: 'DEPOSIT',
+          source: 'BROKER',
+          sourceKey: 'fixture-broker',
+          externalOperationId: 'execution-42',
+          recordedBy: 'broker:fixture-broker',
+          occurredOn,
+          daySequence,
+        },
+      }),
+    ));
+    expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt.status === 'rejected')).toHaveLength(1);
+    expect(await prisma.investmentEvent.count({
+      where: { accountId: account.id, sourceKey: 'fixture-broker', externalOperationId: 'execution-42' },
+    })).toBe(1);
+  });
+
+  it('scopes external IDs to account and concrete source, and request keys to account', async () => {
+    const account = await createAccount();
+    const otherAccount = await createAccount();
+    const external = {
+      type: 'DEPOSIT' as const,
+      source: 'BROKER' as const,
+      externalOperationId: 'same-provider-id',
+      recordedBy: 'broker:fixture',
+      occurredOn,
+    };
+    await prisma.investmentEvent.create({
+      data: { ...external, accountId: account.id, sourceKey: 'broker-one', daySequence: 1 },
+    });
+    await prisma.investmentEvent.create({
+      data: { ...external, accountId: account.id, sourceKey: 'broker-two', daySequence: 2 },
+    });
+    await prisma.investmentEvent.create({
+      data: { ...external, accountId: otherAccount.id, sourceKey: 'broker-one', daySequence: 1 },
+    });
+    const manual = await prisma.investmentEvent.create({
+      data: {
+        accountId: account.id,
+        type: 'DEPOSIT',
+        occurredOn,
+        daySequence: 3,
+        idempotencyKey: 'request-abc',
+        ...audit,
+      },
+    });
+    await expect(prisma.investmentEvent.create({
+      data: {
+        accountId: account.id,
+        type: 'DEPOSIT',
+        occurredOn,
+        daySequence: 4,
+        idempotencyKey: 'request-abc',
+        ...audit,
+      },
+    })).rejects.toMatchObject({ code: 'P2002' });
+    await prisma.investmentEvent.create({
+      data: {
+        accountId: otherAccount.id,
+        type: 'DEPOSIT',
+        occurredOn,
+        daySequence: 2,
+        idempotencyKey: 'request-abc',
+        ...audit,
+      },
+    });
+    expect(await prisma.investmentEvent.count({ where: { id: manual.id } })).toBe(1);
+  });
+
+  it('preserves original details and the correction author in the audit trail', async () => {
+    const account = await createAccount();
+    const original = await prisma.investmentEvent.create({
+      data: {
+        accountId: account.id,
+        type: 'DEPOSIT',
+        occurredOn,
+        daySequence: 1,
+        recordedBy: `user:${randomUUID()}`,
+        sourceKey: 'manual',
+        cashEntries: {
+          create: { kind: 'EXTERNAL_TRANSFER', currency: 'PLN', amount: '100' },
+        },
+      },
+      include: { cashEntries: true },
+    });
+    const author = `user:${randomUUID()}`;
+    const correction = await prisma.investmentEvent.create({
+      data: {
+        accountId: account.id,
+        type: 'CORRECTION',
+        occurredOn,
+        daySequence: 2,
+        sourceKey: 'manual',
+        recordedBy: author,
+        correctionOfId: original.id,
+        correctionReason: 'Corrected amount after reconciliation',
+        cashEntries: {
+          create: { kind: 'EXTERNAL_TRANSFER', currency: 'PLN', amount: '-10' },
+        },
+      },
+      include: { correctionOf: true, cashEntries: true },
+    });
+    expect(correction).toMatchObject({
+      correctionOfId: original.id,
+      correctionReason: 'Corrected amount after reconciliation',
+      recordedBy: author,
+      correctionOf: { id: original.id },
+    });
+    expect(correction.recordedAt).toBeInstanceOf(Date);
+    expect((await prisma.investmentEvent.findUniqueOrThrow({
+      where: { id: original.id }, include: { cashEntries: true },
+    })).cashEntries[0].amount.toString()).toBe('100');
+    expect(correction.cashEntries[0].amount.toString()).toBe('-10');
+  });
+
+  it('keeps quantity and unit price positive at the database boundary', async () => {
+    const account = await createAccount();
+    const instrument = await createInstrument();
+    const event = await prisma.investmentEvent.create({
+      data: { accountId: account.id, type: 'BUY', occurredOn, daySequence: 1, ...audit },
+    });
+    for (const [quantity, unitPrice] of [['0', '1'], ['1', '0'], ['-1', '1'], ['1', '-1']]) {
+      await expect(prisma.trade.create({
+        data: { eventId: event.id, instrumentId: instrument.id, quantity, unitPrice, grossAmount: '1' },
+      })).rejects.toThrow();
+    }
+    expect(await prisma.trade.count({ where: { eventId: event.id } })).toBe(0);
+  });
+
+  it('rejects empty source, request and author identifiers', async () => {
+    const account = await createAccount();
+    const base = { accountId: account.id, type: 'DEPOSIT' as const, occurredOn, daySequence: 1 };
+    for (const data of [
+      { ...base, sourceKey: ' ', recordedBy: 'user:test' },
+      { ...base, sourceKey: 'manual', recordedBy: ' ' },
+      { ...base, sourceKey: 'manual', recordedBy: 'user:test', idempotencyKey: ' ' },
+      { ...base, source: 'BROKER' as const, sourceKey: 'broker-one', recordedBy: 'broker:test', externalOperationId: ' ' },
+      { ...base, sourceKey: 'manual', recordedBy: 'user:test', externalOperationId: 'execution' },
+    ]) {
+      await expect(prisma.investmentEvent.create({ data })).rejects.toThrow();
+    }
+    expect(await prisma.investmentEvent.count({ where: { accountId: account.id } })).toBe(0);
   });
 });
