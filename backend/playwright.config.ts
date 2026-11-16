@@ -31,7 +31,7 @@ export default defineConfig({
       command: 'npm run build:browser && node test/browser/start-backend.mjs',
       cwd: fileURLToPath(new URL('./', import.meta.url)),
       url: 'http://localhost:3101',
-      timeout: 120000,
+      timeout: process.env.CI ? 240000 : 120000,
       reuseExistingServer: false,
       gracefulShutdown: { signal: 'SIGTERM', timeout: 10000 },
     },
@@ -41,7 +41,7 @@ export default defineConfig({
         'npm run build && npm run start -- --hostname localhost --port 3100',
       cwd: fileURLToPath(new URL('../frontend/', import.meta.url)),
       url: 'http://localhost:3100/login',
-      timeout: 120000,
+      timeout: process.env.CI ? 240000 : 120000,
       reuseExistingServer: false,
       gracefulShutdown: { signal: 'SIGTERM', timeout: 10000 },
       env: {
