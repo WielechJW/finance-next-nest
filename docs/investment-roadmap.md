@@ -18,6 +18,10 @@ Punkt startowy: [INV 0.1 — decyzje domenowe i zakres](https://github.com/Wiele
 prowizje, precyzję, daty i korekty oraz zawierają policzone przykłady.
 Stanowią kontrakt dla implementacji kolejnych etapów.
 
+[Weryfikacja dostawcy danych INV 0.2](market-data-verification.md) zawiera
+próbę EODHD dla pięciu spółek GPW i pięciu USA, koszty i ograniczenia.
+Demo potwierdziło dane USA; pokrycie API GPW wymaga własnego klucza.
+
 ## 1. Punkt wyjścia i zakres
 
 Projekt ma już Next.js, NestJS, PostgreSQL, Prisma, sesje, portfel finansowy,

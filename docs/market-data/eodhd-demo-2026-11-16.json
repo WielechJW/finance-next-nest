@@ -1,0 +1,378 @@
+{
+  "provider": "EODHD",
+  "checkedAt": "2026-11-16T10:56:08.210Z",
+  "mode": "demo",
+  "windows": {
+    "eod": {
+      "from": "2026-11-02",
+      "to": "2026-11-13"
+    },
+    "actions": {
+      "from": "2020-01-01",
+      "to": "2026-11-13"
+    }
+  },
+  "maxRequests": 42,
+  "maxCallUnits": 132,
+  "rawDataStored": false,
+  "catalogs": {
+    "WAR": {
+      "status": "access_denied",
+      "httpStatus": 403
+    },
+    "US": {
+      "status": "access_denied",
+      "httpStatus": 403
+    }
+  },
+  "instruments": [
+    {
+      "symbol": "CDR.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "eod": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "splits": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "div": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "fundamentals": {
+        "status": "access_denied",
+        "httpStatus": 403
+      }
+    },
+    {
+      "symbol": "PKN.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "eod": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "splits": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "div": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "fundamentals": {
+        "status": "access_denied",
+        "httpStatus": 403
+      }
+    },
+    {
+      "symbol": "PKO.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "eod": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "splits": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "div": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "fundamentals": {
+        "status": "access_denied",
+        "httpStatus": 403
+      }
+    },
+    {
+      "symbol": "PZU.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "eod": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "splits": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "div": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "fundamentals": {
+        "status": "access_denied",
+        "httpStatus": 403
+      }
+    },
+    {
+      "symbol": "KGH.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "eod": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "splits": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "div": {
+        "status": "access_denied",
+        "httpStatus": 403
+      },
+      "fundamentals": {
+        "status": "access_denied",
+        "httpStatus": 403
+      }
+    },
+    {
+      "symbol": "AAPL.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "source": "fundamentals",
+        "currencyMatches": true,
+        "hasIsin": false
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      },
+      "splits": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 1
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 28,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": true
+      },
+      "fundamentals": {
+        "httpStatus": 200,
+        "status": "available",
+        "currencyMatches": true,
+        "statements": {
+          "Balance_Sheet": {
+            "yearly": 42,
+            "quarterly": 165
+          },
+          "Income_Statement": {
+            "yearly": 42,
+            "quarterly": 165
+          },
+          "Cash_Flow": {
+            "yearly": 38,
+            "quarterly": 148
+          }
+        }
+      }
+    },
+    {
+      "symbol": "MSFT.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "source": "fundamentals",
+        "currencyMatches": true,
+        "hasIsin": false
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      },
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 27,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": true
+      },
+      "fundamentals": {
+        "httpStatus": 200,
+        "status": "available",
+        "currencyMatches": true,
+        "statements": {
+          "Balance_Sheet": {
+            "yearly": 41,
+            "quarterly": 165
+          },
+          "Income_Statement": {
+            "yearly": 41,
+            "quarterly": 165
+          },
+          "Cash_Flow": {
+            "yearly": 38,
+            "quarterly": 149
+          }
+        }
+      }
+    },
+    {
+      "symbol": "TSLA.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "source": "fundamentals",
+        "currencyMatches": true,
+        "hasIsin": false
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      },
+      "splits": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 2
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "fundamentals": {
+        "httpStatus": 200,
+        "status": "available",
+        "currencyMatches": true,
+        "statements": {
+          "Balance_Sheet": {
+            "yearly": 20,
+            "quarterly": 76
+          },
+          "Income_Statement": {
+            "yearly": 20,
+            "quarterly": 76
+          },
+          "Cash_Flow": {
+            "yearly": 20,
+            "quarterly": 76
+          }
+        }
+      }
+    },
+    {
+      "symbol": "AMZN.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "source": "fundamentals",
+        "currencyMatches": true,
+        "hasIsin": false
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      },
+      "splits": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 1
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "fundamentals": {
+        "httpStatus": 200,
+        "status": "available",
+        "currencyMatches": true,
+        "statements": {
+          "Balance_Sheet": {
+            "yearly": 30,
+            "quarterly": 124
+          },
+          "Income_Statement": {
+            "yearly": 30,
+            "quarterly": 124
+          },
+          "Cash_Flow": {
+            "yearly": 30,
+            "quarterly": 120
+          }
+        }
+      }
+    },
+    {
+      "symbol": "MCD.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "source": "fundamentals",
+        "currencyMatches": true,
+        "hasIsin": false
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      },
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 27,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": true
+      },
+      "fundamentals": {
+        "httpStatus": 200,
+        "status": "available",
+        "currencyMatches": true,
+        "statements": {
+          "Balance_Sheet": {
+            "yearly": 41,
+            "quarterly": 165
+          },
+          "Income_Statement": {
+            "yearly": 41,
+            "quarterly": 165
+          },
+          "Cash_Flow": {
+            "yearly": 37,
+            "quarterly": 149
+          }
+        }
+      }
+    }
+  ],
+  "requestsMade": 42,
+  "complete": false
+}

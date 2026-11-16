@@ -1193,6 +1193,12 @@ zakres GPW/USA, rozdzielenie domen, FIFO, prowizje, precyzję, daty i korekty.
 Zawierają policzone przykłady kupna, sprzedaży oraz wymiany PLN/USD,
 stanowiące podstawę do implementacji i testów kolejnych etapów.
 
+[Weryfikacja danych rynkowych — INV 0.2 (#45)](docs/market-data-verification.md)
+zawiera próbę EODHD dla pięciu spółek GPW i pięciu USA, porównanie dostawców,
+plany, koszty i ograniczenia użycia. Dołączony skrypt zapisuje raport bez
+surowych danych i sekretów. Dostęp API do GPW pozostaje do potwierdzenia
+własnym kluczem; publiczny token demo zwraca dla tych spółek 403.
+
 ## Dokumentacja
 
 - [TypeScript — podstawy](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html)
