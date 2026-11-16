@@ -12,7 +12,8 @@ każde zadanie z identyfikatorem można przenieść do osobnego issue.
 
 Realizacja na GitHubie: [główne issue #43](https://github.com/WielechJW/finance-next-nest/issues/43)
 zawiera 60 powiązanych zadań, kolejność prac i podział na wersje A–E.
-Punkt startowy: [INV 0.1 — decyzje domenowe i zakres](https://github.com/WielechJW/finance-next-nest/issues/44).
+Decyzje domenowe INV 0.1 są ukończone. Następny punkt etapu 0:
+[INV 0.2 — weryfikacja dostawcy danych](https://github.com/WielechJW/finance-next-nest/issues/45).
 
 [Decyzje domenowe INV 0.1](investment-decisions.md) precyzują zakres, FIFO,
 prowizje, precyzję, daty i korekty oraz zawierają policzone przykłady.
@@ -116,7 +117,7 @@ Kamienie milowe:
 
 **Cel:** potwierdzić dostępność danych i ustalić reguły, które wpływają na model.
 
-- [ ] **0.1. Opisać decyzje w `docs/investment-decisions.md`.** Przyjąć zakres
+- [x] **0.1. Opisać decyzje w `docs/investment-decisions.md`.** Przyjąć zakres
   powyżej, koszt pozycji metodą FIFO na potrzeby analityki aplikacji, strefy
   `Europe/Warsaw` i `America/New_York` oraz sposób zaokrąglania. Przyjąć,
   że daty wykonanych operacji są historyczne lub bieżące, a plany są osobnymi obiektami.
