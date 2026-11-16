@@ -115,9 +115,12 @@ jobs:
         working-directory: backend
       - run: npm ci
         working-directory: frontend
+      - run: npm run prisma:generate
+        working-directory: backend
       - run: npm run test:browser:typecheck
         working-directory: backend
       - run: npx playwright install --with-deps chromium
         working-directory: backend
       - run: npm run test:browser
         working-directory: backend
+
