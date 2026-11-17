@@ -1186,6 +1186,10 @@ Szczegółowy zakres i zależności zadań opisuje
 
 ## Dalszy rozwój: portfel inwestycyjny GPW i USA
 
+[Weryfikacja portfela i FIFO — INV 2.4](docs/investment-verification.md)
+opisuje wspólny scenariusz odbioru silnika inwestycji, oczekiwane salda,
+koszty i wyniki oraz testy korekt, współbieżności i izolacji kont.
+
 [Plan implementacji platformy inwestycyjnej](docs/investment-roadmap.md)
 opisuje kolejne etapy: model i prowadzenie portfela, notowania i wycenę,
 watchlistę i alerty na telefon, analizę spółek, import historii, strategie,
