@@ -8,6 +8,7 @@ interface Accounts {
   newAccount(): TestAccount;
   register(): Promise<TestAccount>;
   expireSessions(account: TestAccount): Promise<void>;
+  investmentInstrument(): Promise<{ id: string; ticker: string }>;
 }
 
 export const test = base.extend<{ accounts: Accounts }>({
@@ -26,6 +27,7 @@ export const test = base.extend<{ accounts: Accounts }>({
           return account;
         },
         expireSessions: (account) => database.expireSessions(account),
+        investmentInstrument: () => database.investmentInstrument(),
       });
     } finally {
       await database.dispose();
