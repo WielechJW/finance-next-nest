@@ -1186,6 +1186,11 @@ Szczegółowy zakres i zależności zadań opisuje
 
 ## Dalszy rozwój: portfel inwestycyjny GPW i USA
 
+[Panel inwestycji — INV 3.3](docs/investment-dashboard.md) pozwala tworzyć
+portfele i rachunki, zapisywać wpłaty, zakupy i sprzedaż oraz korygować historię.
+Pokazuje gotówkę PLN/USD, ilości, koszt pozostałych akcji i wynik sprzedaży.
+Standardowy seed dodaje początkowy katalog instrumentów bez notowań.
+
 [API inwestycji — INV 3.1–3.2](docs/investment-api.md) udostępnia własne portfele
 i rachunki, archiwizację, zapis operacji, historię z filtrami i audytem korekt
 oraz stan gotówki i pozycji FIFO.

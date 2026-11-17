@@ -1,5 +1,6 @@
 import { seedSystemCategories } from '../dist/categories/system-categories.js';
 import { seedInvestmentTestCatalog } from '../dist/instruments/test-catalog.js';
+import { seedManualInvestmentCatalog } from '../dist/instruments/manual-catalog.js';
 import { PrismaService } from '../dist/prisma/prisma.service.js';
 
 let prisma;
@@ -7,6 +8,7 @@ try {
   prisma = new PrismaService();
   await prisma.$connect();
   await seedSystemCategories(prisma);
+  await seedManualInvestmentCatalog(prisma);
   console.log('Kategorie systemowe zostały zapisane.');
   if (process.env.SEED_INVESTMENT_TEST_CATALOG === '1') {
     await seedInvestmentTestCatalog(prisma);
