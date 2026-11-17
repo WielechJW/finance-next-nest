@@ -8,6 +8,7 @@ import { WalletsModule } from './wallets/wallets.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
+import { InvestmentsModule } from './investments/investments.module.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AnalyticsModule } from './analytics/analytics.module.js';
     CategoriesModule,
     TransactionsModule,
     AnalyticsModule,
+    InvestmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
