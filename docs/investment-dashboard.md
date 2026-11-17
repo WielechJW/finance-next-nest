@@ -1,7 +1,8 @@
-# Ręczny panel inwestycji — INV 3.3 (#58)
+# Ręczny panel inwestycji — INV 3.3–3.4 (#58–59)
 
 Strony chroni istniejąca sesja panelu Finance. Dane inwestycji są odrębne od
 przychodów i wydatków osobistego portfela.
+Zakładka „Inwestycje” pozostaje aktywna także wewnątrz portfela i rachunku.
 
 | Strona | Zawartość |
 | --- | --- |
@@ -53,3 +54,27 @@ npm --prefix frontend test
 npm --prefix backend run test:browser:typecheck
 npm --prefix backend run test:browser -- investments.pw.ts
 ```
+
+## Odbiór wersji A — nawigacja, błędy i dostępność
+
+`backend/test/browser/investment-accessibility.pw.ts` uzupełnia przepływ finansowy:
+
+- Odróżnia ładowanie, błąd odczytu, ponowienie i pustą listę portfeli/rachunków.
+- Na ekranie 375 px tworzy portfel/rachunek i zapisuje formularze Enterem,
+  sprawdza filtrowanie historii i brak poziomego przewijania strony.
+- Błąd wartości wskazuje pole przez `aria-invalid` i odsyła do komunikatu;
+  komunikaty otrzymują fokus. Otwarcie korekty przenosi fokus na jej nagłówek,
+  a anulowanie przywraca go przyciskowi wywołującemu.
+- Odrzucony zapis zachowuje wprowadzone dane i pozwala je poprawić/ponowić.
+  Niepotwierdzony zapis ma odrębny tryb bezpiecznego retry z #58.
+- Wygaśnięcie sesji podczas filtrowania usuwa widok i przekierowuje do logowania.
+  Drugie konto ma pustą listę i nie może odczytać rachunku pierwszego; powrót
+  właściciela zachowuje jego zapisany stan.
+
+```bash
+npm --prefix backend run test:browser -- investment-accessibility.pw.ts investments.pw.ts
+```
+
+Wersja A prowadzi ręczny rejestr i koszt FIFO. Wycena rynkowa, pełny import
+katalogu i alerty należą do kolejnych etapów. Weryfikacja źródła danych GPW
+z #45 pozostaje warunkiem uruchomienia kolejnego etapu #60.

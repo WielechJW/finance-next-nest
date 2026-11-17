@@ -26,6 +26,17 @@ export function DashboardNav() {
       >
         Analityka
       </Link>
+      <Link
+        href="/dashboard/investments"
+        aria-current={
+          pathname === "/dashboard/investments" ||
+          pathname.startsWith("/dashboard/investments/")
+            ? "page"
+            : undefined
+        }
+      >
+        Inwestycje
+      </Link>
     </nav>
   );
 }
