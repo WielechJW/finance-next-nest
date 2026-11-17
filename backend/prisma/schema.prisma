@@ -36,6 +36,7 @@ model InvestmentAccount {
   portfolioId String    @db.Uuid
   portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   name        String    @db.VarChar(100)
+  archivedAt  DateTime?  @db.Timestamptz(3)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   events      InvestmentEvent[]

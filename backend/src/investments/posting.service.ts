@@ -25,8 +25,8 @@ export class InvestmentPostingService {
     }
     return this.prisma.$transaction(async (tx) => {
       // Account lock serializes competing postings, balance checks and retries.
-      const account = await tx.$queryRaw<{ id: string }[]>`
-        SELECT a."id" FROM "InvestmentAccount" AS a
+      const account = await tx.$queryRaw<{ id: string; archivedAt: Date | null }[]>`
+        SELECT a."id", a."archivedAt" FROM "InvestmentAccount" AS a
         JOIN "Portfolio" AS p ON p."id" = a."portfolioId"
         WHERE a."id" = ${input.accountId}::uuid AND p."userId" = ${userId}::uuid
         FOR UPDATE OF a
@@ -65,6 +65,7 @@ export class InvestmentPostingService {
         }
         return { eventId: existing[0].id, duplicate: true };
       }
+      if (account[0].archivedAt) throw new ConflictException('Rachunek jest zarchiwizowany.');
 
       const history = await tx.investmentEvent.findMany({
         where: { accountId: input.accountId, activeSlot: 1 },
@@ -153,8 +154,8 @@ export class InvestmentPostingService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const account = await tx.$queryRaw<{ id: string }[]>`
-        SELECT a."id" FROM "InvestmentAccount" AS a
+      const account = await tx.$queryRaw<{ id: string; archivedAt: Date | null }[]>`
+        SELECT a."id", a."archivedAt" FROM "InvestmentAccount" AS a
         JOIN "Portfolio" AS p ON p."id" = a."portfolioId"
         WHERE a."id" = ${input.accountId}::uuid AND p."userId" = ${userId}::uuid
         FOR UPDATE OF a
@@ -192,6 +193,7 @@ export class InvestmentPostingService {
         }
         return { eventId: existing.id, duplicate: true, revision: existing.revision };
       }
+      if (account[0].archivedAt) throw new ConflictException('Rachunek jest zarchiwizowany.');
 
       const target = await tx.investmentEvent.findFirst({
         where: { id: input.targetEventId, accountId: input.accountId },
