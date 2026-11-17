@@ -45,6 +45,10 @@ export function InvestmentForm({
   onCancel?(): void;
 }) {
   const hintId = useId();
+  const errorId = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const errorMessage = useRef<HTMLParagraphElement>(null);
+  const [invalidField, setInvalidField] = useState("");
   const [type, setType] = useState<ManualInvestmentInput["type"]>(
     (selection?.type as ManualInvestmentInput["type"]) ?? "DEPOSIT",
   );
@@ -80,11 +84,41 @@ export function InvestmentForm({
   } | null>(null);
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    if (selection) heading.current?.focus();
+  }, [selection]);
+  useEffect(() => {
+    if (error) errorMessage.current?.focus();
+  }, [error]);
+
+  function decimal(
+    field: string,
+    label: string,
+    value: string,
+    scale: number,
+    allowZero = false,
+  ) {
+    try {
+      return investmentInput(value, scale, allowZero);
+    } catch (failure) {
+      setInvalidField(field);
+      throw new Error(
+        `${label}: ${failure instanceof Error ? failure.message : "Niepoprawna wartość."}`,
+      );
+    }
+  }
+  function validation(field: string) {
+    return {
+      "aria-invalid": invalidField === field || undefined,
+      "aria-describedby": invalidField === field ? errorId : undefined,
+    };
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (locked.current) return;
     setError("");
+    setInvalidField("");
     try {
       if (!pending.current) {
         if (!isCalendarDate(date) || date > warsawToday())
@@ -121,13 +155,23 @@ export function InvestmentForm({
         };
         const input: ManualInvestmentInput =
           type === "DEPOSIT"
-            ? { ...common, currency, amount: investmentInput(amount, 2) }
+            ? {
+                ...common,
+                currency,
+                amount: decimal("amount", "Kwota", amount, 2),
+              }
             : {
                 ...common,
                 instrumentId,
-                quantity: investmentInput(quantity, 10),
-                unitPrice: investmentInput(price, 10),
-                commission: investmentInput(commission, 2, true),
+                quantity: decimal("quantity", "Ilość akcji", quantity, 10),
+                unitPrice: decimal("price", "Cena za akcję", price, 10),
+                commission: decimal(
+                  "commission",
+                  "Prowizja",
+                  commission,
+                  2,
+                  true,
+                ),
               };
         if (
           type !== "DEPOSIT" &&
@@ -191,7 +235,9 @@ export function InvestmentForm({
       className={styles.card}
       aria-busy={busy}
     >
-      <h2>{selection ? "Korekta operacji" : "Dodaj operację"}</h2>
+      <h2 ref={heading} tabIndex={-1}>
+        {selection ? "Korekta operacji" : "Dodaj operację"}
+      </h2>
       <fieldset disabled={busy || uncertain} className={styles.fields}>
         <legend className={styles.srOnly}>Dane operacji</legend>
         <label>
@@ -245,6 +291,7 @@ export function InvestmentForm({
               Kwota
               <input
                 inputMode="decimal"
+                {...validation("amount")}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
@@ -272,6 +319,7 @@ export function InvestmentForm({
               Ilość akcji
               <input
                 inputMode="decimal"
+                {...validation("quantity")}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 required
@@ -281,6 +329,7 @@ export function InvestmentForm({
               Cena za akcję
               <input
                 inputMode="decimal"
+                {...validation("price")}
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 required
@@ -290,6 +339,7 @@ export function InvestmentForm({
               Prowizja
               <input
                 inputMode="decimal"
+                {...validation("commission")}
                 value={commission}
                 onChange={(e) => setCommission(e.target.value)}
                 required
@@ -318,7 +368,13 @@ export function InvestmentForm({
           Katalog instrumentów jest pusty. Możesz zapisać wpłatę.
         </p>
       )}
-      <p role="alert" className={styles.error}>
+      <p
+        role="alert"
+        id={errorId}
+        ref={errorMessage}
+        tabIndex={-1}
+        className={styles.error}
+      >
         {error}
       </p>
       <div className={styles.actions}>

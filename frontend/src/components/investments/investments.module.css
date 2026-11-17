@@ -71,6 +71,12 @@
   flex-wrap: wrap;
   gap: 12px;
 }
+.actions {
+  margin-top: 16px;
+}
+.panel [aria-invalid="true"] {
+  border-color: #b91c1c;
+}
 .nameForm label {
   flex: 1 1 180px;
 }

@@ -180,11 +180,15 @@ function PortfolioContent({ portfolioId }: { portfolioId: string }) {
   return (
     <section aria-labelledby="portfolio-heading">
       <Link href={root}>Wszystkie portfele</Link>
+      <h1 id="portfolio-heading">
+        {resource.state.status === "ready"
+          ? resource.state.value.portfolio.name
+          : "Portfel inwestycyjny"}
+      </h1>
       {resource.state.status !== "ready" ? (
         <ResourceStatus state={resource.state} retry={resource.refresh} />
       ) : (
         <>
-          <h1 id="portfolio-heading">{resource.state.value.portfolio.name}</h1>
           <h2>Rachunki inwestycyjne</h2>
           {resource.state.value.accounts.length === 0 ? (
             <p>
@@ -226,6 +230,7 @@ function AccountContent({
 }) {
   const [query, setQuery] = useState<InvestmentQuery>({ page: 1 });
   const [selection, setSelection] = useState<InvestmentEvent | null>(null);
+  const correctionTrigger = useRef<HTMLButtonElement | null>(null);
   const [notice, setNotice] = useState("");
   const load = useCallback(
     async (signal: AbortSignal) => {
@@ -256,6 +261,9 @@ function AccountContent({
   return (
     <section aria-labelledby="account-heading">
       <Link href={`${root}/${portfolioId}`}>Rachunki portfela</Link>
+      <h1 id="account-heading">
+        {ready?.account.name ?? "Rachunek inwestycyjny"}
+      </h1>
       <p role="status" className={styles.notice}>
         {notice}
       </p>
@@ -263,7 +271,6 @@ function AccountContent({
         <ResourceStatus state={resource.state} retry={resource.refresh} />
       ) : (
         <>
-          <h1 id="account-heading">{ready.account.name}</h1>
           {ready.account.archivedAt && (
             <p>Rachunek zarchiwizowany. Historia i stan pozostają dostępne.</p>
           )}
@@ -336,7 +343,16 @@ function AccountContent({
               }
               selection={selection ?? undefined}
               onSaved={saved}
-              onCancel={selection ? () => setSelection(null) : undefined}
+              onCancel={
+                selection
+                  ? () => {
+                      setSelection(null);
+                      requestAnimationFrame(() =>
+                        correctionTrigger.current?.focus(),
+                      );
+                    }
+                  : undefined
+              }
             />
           )}
           <section
@@ -390,7 +406,8 @@ function AccountContent({
                       ["DEPOSIT", "BUY", "SELL"].includes(event.type) && (
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={(click) => {
+                            correctionTrigger.current = click.currentTarget;
                             setSelection(event);
                             setNotice("");
                           }}

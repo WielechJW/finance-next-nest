@@ -146,20 +146,20 @@ zawierają wyłącznie dane dopuszczone do takiego wykorzystania.
 
 **Cel:** zapisać historię rachunku w sposób pozwalający odtworzyć jego stan.
 
-- [ ] **1.1. Dodać `Portfolio`, `InvestmentAccount` i `Instrument`.** Portfel należy
+- [x] **1.1. Dodać `Portfolio`, `InvestmentAccount` i `Instrument`.** Portfel należy
   do użytkownika; rachunek do portfela. Instrument ma wewnętrzne ID, ticker,
   rynek lub MIC, walutę i opcjonalny ISIN. `InstrumentProviderMapping` przechowuje
   symbole dostawców; zmiana tickera zachowuje tożsamość instrumentu i historię.
-- [ ] **1.2. Dodać `InvestmentEvent` oraz powiązane `Trade`, `CashEntry`
+- [x] **1.2. Dodać `InvestmentEvent` oraz powiązane `Trade`, `CashEntry`
   i `SecurityEntry`.** Nagłówek opisuje zdarzenie; wpisy gotówkowe i ilościowe
   opisują jego wpływ. Typy: wpłata, wypłata, zakup, sprzedaż, dywidenda,
   opłata, wymiana walut, split oraz korekta. Podatek potrącony od dywidendy
   można zapisać jako składnik rzeczywistej operacji.
-- [ ] **1.3. Ustalić precyzję i ograniczenia.** Proponowane pola:
+- [x] **1.3. Ustalić precyzję i ograniczenia.** Proponowane pola:
   ilość i cena `Decimal(28,10)`, kwoty i kursy `Decimal(28,8)`, z osobną
   regułą zaokrąglania rozliczanej gotówki. Przechować czas wykonania,
   datę rozrachunku, czas zapisu i jednoznaczną kolejność zdarzeń.
-- [ ] **1.4. Dodać indeksy, audyt i klucze idempotencji.** Unikalność operacji
+- [x] **1.4. Dodać indeksy, audyt i klucze idempotencji.** Unikalność operacji
   zewnętrznej w zakresie rachunku i źródła; ograniczenia dodatnich ilości
   i cen w transakcjach; powiązanie korekty z oryginałem. Migracja i seed
   katalogu testowego są powtarzalne.
@@ -172,19 +172,19 @@ zapisów składających się z kilku wpisów. Dane obecnych portfeli zachowują 
 
 **Cel:** otrzymywać poprawny stan rachunku z historii operacji.
 
-- [ ] **2.1. Zaimplementować zapis zdarzeń.** Zakup zmniejsza gotówkę o wartość
+- [x] **2.1. Zaimplementować zapis zdarzeń.** Zakup zmniejsza gotówkę o wartość
   akcji i prowizję oraz zwiększa ilość; sprzedaż wykonuje operację odwrotną.
   Dywidenda i opłata zmieniają gotówkę. Wymiana walut zapisuje obie strony
   atomowo oraz rzeczywisty kurs i opłaty. Zakup instrumentu w USD wymaga gotówki w USD.
-- [ ] **2.2. Wyliczać pozycje i koszt FIFO.** Częściowa sprzedaż konsumuje partie
+- [x] **2.2. Wyliczać pozycje i koszt FIFO.** Częściowa sprzedaż konsumuje partie
   zakupu i proporcjonalne prowizje. Liczyć wynik zrealizowany w walucie instrumentu.
   Stan początkowy istniejącego portfela można wprowadzić jako jawne partie
   otwarcia z kosztem i datą odniesienia.
-- [ ] **2.3. Obsłużyć współbieżność i korekty.** Zapisy blokują właściwy rachunek
+- [x] **2.3. Obsłużyć współbieżność i korekty.** Zapisy blokują właściwy rachunek
   w transakcji bazodanowej. Dwie równoczesne sprzedaże nie mogą zużyć tych samych
   akcji. Wprowadzenie operacji historycznej albo korekty przelicza kolejne stany
   i odrzuca historię powodującą niedozwoloną ujemną pozycję lub gotówkę.
-- [ ] **2.4. Dodać wspólny scenariusz obliczeniowy.** Przykład: wpłata 1000 PLN,
+- [x] **2.4. Dodać wspólny scenariusz obliczeniowy.** Przykład: wpłata 1000 PLN,
   zakup 10 akcji po 50 PLN z prowizją 5 PLN, sprzedaż 4 po 60 PLN z prowizją
   2 PLN. Wynik: gotówka 733 PLN, 6 akcji, pozostały koszt 303 PLN,
   zrealizowany zysk 36 PLN.
@@ -198,16 +198,16 @@ operacji; limit środków dostępnych do zleceń będzie później pochodził od
 
 **Cel:** użytkownik może prowadzić własny portfel bez zewnętrznej integracji.
 
-- [ ] **3.1. Udostępnić API portfeli i rachunków.** Tworzenie, lista, szczegóły,
+- [x] **3.1. Udostępnić API portfeli i rachunków.** Tworzenie, lista, szczegóły,
   zmiana nazwy i archiwizacja; rachunek z historią zachowuje rejestr operacji.
   Sprawdzanie właściciela dotyczy całej ścieżki portfel → rachunek → zdarzenie.
-- [ ] **3.2. Udostępnić API operacji.** Dodawanie zdarzeń, historia z filtrami
+- [x] **3.2. Udostępnić API operacji.** Dodawanie zdarzeń, historia z filtrami
   i paginacją, szczegóły oraz korekta. Walidacja kwot, walut, dat i zgodności
   instrumentu z rachunkiem; idempotencja zapisu również po błędzie sieci.
-- [ ] **3.3. Zbudować strony `/dashboard/investments`.** Lista rachunków, gotówka
+- [x] **3.3. Zbudować strony `/dashboard/investments`.** Lista rachunków, gotówka
   według walut, posiadane akcje z kosztem zakupu, historia i formularze operacji.
   Komponenty inwestycyjne mają własne formatowanie ilości i cen.
-- [ ] **3.4. Dodać obsługę błędów i nawigację.** Stany ładowania, puste portfele,
+- [x] **3.4. Dodać obsługę błędów i nawigację.** Stany ładowania, puste portfele,
   retry odczytu, wygaśnięcie sesji i walidacja pól; układ mobilny i klawiatura.
 
 **Ukończenie:** Playwright przechodzi rejestrację → utworzenie rachunku → wpłatę
