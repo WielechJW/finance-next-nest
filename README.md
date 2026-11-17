@@ -1186,8 +1186,9 @@ Szczegółowy zakres i zależności zadań opisuje
 
 ## Dalszy rozwój: portfel inwestycyjny GPW i USA
 
-[API inwestycji — INV 3.1](docs/investment-api.md) udostępnia własne portfele
-i rachunki, zmianę nazw oraz archiwizację zachowującą całą historię.
+[API inwestycji — INV 3.1–3.2](docs/investment-api.md) udostępnia własne portfele
+i rachunki, archiwizację, zapis operacji, historię z filtrami i audytem korekt
+oraz stan gotówki i pozycji FIFO.
 
 [Weryfikacja portfela i FIFO — INV 2.4](docs/investment-verification.md)
 opisuje wspólny scenariusz odbioru silnika inwestycji, oczekiwane salda,
