@@ -13,6 +13,8 @@ import { useSession } from "../session-provider";
 import { InvestmentForm, investmentLabels } from "./investment-form";
 import { useInvestmentResource } from "./use-investment-resource";
 import styles from "./investments.module.css";
+import { PortfolioValuation } from './portfolio-valuation';
+import { CorporateActions } from './corporate-actions';
 
 const root = "/dashboard/investments";
 export function InvestmentsPanel({
@@ -190,6 +192,7 @@ function PortfolioContent({ portfolioId }: { portfolioId: string }) {
       ) : (
         <>
           <h2>Rachunki inwestycyjne</h2>
+          <PortfolioValuation portfolioId={portfolioId} />
           {resource.state.value.accounts.length === 0 ? (
             <p>
               Ten portfel nie ma jeszcze rachunków. Utwórz rachunek, aby zapisać
@@ -355,6 +358,7 @@ function AccountContent({
               }
             />
           )}
+          {!ready.account.archivedAt && <CorporateActions portfolioId={portfolioId} accountId={accountId} onSaved={saved} />}
           <section
             aria-label="Historia operacji inwestycyjnych"
             className={styles.card}

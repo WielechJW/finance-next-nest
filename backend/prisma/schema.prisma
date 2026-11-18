@@ -25,6 +25,7 @@ model Portfolio {
   user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String              @db.VarChar(100)
   accounts  InvestmentAccount[]
+  valuations PortfolioValuationSnapshot[]
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
 
@@ -63,6 +64,7 @@ model Instrument {
   securityEntries  SecurityEntry[]
   priceBars        PriceBar[]
   corporateActions CorporateAction[]
+  splits           InvestmentSplit[]
   createdAt        DateTime                    @default(now())
   updatedAt        DateTime                    @updatedAt
 
@@ -166,6 +168,7 @@ model CorporateAction {
   contentHash String   @db.Char(64)
   publishedAt DateTime? @db.Timestamptz(3)
   fetchedAt   DateTime @default(now()) @db.Timestamptz(3)
+  events      InvestmentEvent[]
   @@unique([instrumentId, source, kind, exDate, revision])
   @@unique([instrumentId, source, kind, exDate, currentSlot])
 }
@@ -243,6 +246,9 @@ model InvestmentEvent {
   activeSlot       Int?                     @default(1)
   trade            Trade?
   openingLot       OpeningLot?
+  split            InvestmentSplit?
+  corporateActionId String? @db.Uuid
+  corporateAction CorporateAction? @relation(fields: [corporateActionId], references: [id], onDelete: Restrict)
   cashEntries      CashEntry[]
   securityEntries  SecurityEntry[]
 
@@ -254,6 +260,31 @@ model InvestmentEvent {
   @@unique([accountId, idempotencyKey])
   @@index([accountId, recordedAt, id])
   @@index([correctionOfId])
+}
+
+model InvestmentSplit {
+  id           String @id @default(uuid()) @db.Uuid
+  eventId      String @unique @db.Uuid
+  event        InvestmentEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  instrumentId String @db.Uuid
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  numerator    Decimal @db.Decimal(28, 10)
+  denominator  Decimal @db.Decimal(28, 10)
+  @@index([instrumentId])
+}
+
+model PortfolioValuationSnapshot {
+  id           String @id @default(uuid()) @db.Uuid
+  portfolioId  String @db.Uuid
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  asOf         DateTime @db.Date
+  contentHash  String @db.Char(64)
+  ledgerHash   String @db.Char(64)
+  data         Json
+  currentSlot  Int? @default(1)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([portfolioId, asOf, contentHash])
+  @@unique([portfolioId, asOf, currentSlot])
 }
 
 model Trade {

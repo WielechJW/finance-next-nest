@@ -16,6 +16,7 @@ import { isCalendarDate, warsawToday } from "@/lib/transaction-input";
 import styles from "./investments.module.css";
 
 export const investmentLabels: Record<string, string> = {
+  SPLIT: 'Split akcji',
   DEPOSIT: "Wpłata",
   WITHDRAWAL: "Wypłata",
   BUY: "Zakup",
