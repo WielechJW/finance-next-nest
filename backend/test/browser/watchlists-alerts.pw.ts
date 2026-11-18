@@ -7,6 +7,7 @@ test('creates a private watchlist and alert with mobile controls and preserves t
   await accounts.investmentQuote(instrument.id);
   await login(page, await accounts.register());
   await page.getByRole('link', { name: 'Rynek i alerty', exact: true }).click();
+  await expect(page.getByText('Telegram czeka na konfigurację serwera. Alerty zapisują się w historii aplikacji.', { exact: true })).toBeVisible();
   await page.getByLabel('Nazwa watchlisty', { exact: true }).fill('Moje GPW');
   await page.getByRole('button', { name: 'Utwórz watchlistę', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Moje GPW', exact: true })).toBeVisible();
