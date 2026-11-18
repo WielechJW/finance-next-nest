@@ -11,6 +11,7 @@ import { AnalyticsModule } from './analytics/analytics.module.js';
 import { InvestmentsModule } from './investments/investments.module.js';
 import { MarketDataModule } from './market-data/market-data.module.js';
 import { PortfolioAnalyticsModule } from './portfolio-analytics/portfolio-analytics.module.js';
+import { AlertsModule } from './alerts/alerts.module.js';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PortfolioAnalyticsModule } from './portfolio-analytics/portfolio-analyt
     InvestmentsModule,
     MarketDataModule,
     PortfolioAnalyticsModule,
+    AlertsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

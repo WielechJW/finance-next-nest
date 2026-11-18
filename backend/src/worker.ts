@@ -8,6 +8,9 @@ import { MarketWorkerRuntime } from './jobs/runtime.js';
 import { redisConnection } from './jobs/redis.js';
 import { MarketSyncService } from './market-data/sync.service.js';
 import { MarketDataError, object, marketDate } from './market-data/contracts.js';
+import { expectedSession } from './market-data/calendar.js';
+import { PrismaService } from './prisma/prisma.service.js';
+import { PriceAlertsService } from './alerts/alerts.service.js';
 
 async function bootstrap() {
   if (process.env.MARKET_DATA_ENABLED !== '1') { console.log('Worker wyłączony. Ustaw MARKET_DATA_ENABLED=1 po skonfigurowaniu usług.'); return; }
@@ -23,7 +26,13 @@ async function bootstrap() {
     const from = marketDate(payload.from), to = marketDate(payload.to);
     if (job.kind === 'fx') return sync.fx(from, to);
     if (!['prices', 'dividends', 'splits'].includes(job.kind) || typeof payload.instrumentId !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.instrumentId)) throw new MarketDataError('configuration', 'Niepoprawne zadanie synchronizacji.');
-    return sync.instrument(payload.instrumentId, job.kind as 'prices' | 'dividends' | 'splits', from, to);
+    if (job.kind === 'prices' && payload.scheduled === true) {
+      const instrument = await app.get(PrismaService).instrument.findUnique({ where: { id: payload.instrumentId } });
+      if (!instrument || to < expectedSession(instrument.mic)) return { skipped: 'superseded' };
+    }
+    const result = await sync.instrument(payload.instrumentId, job.kind as 'prices' | 'dividends' | 'splits', from, to);
+    if (job.kind === 'prices') await app.get(PriceAlertsService).evaluateInstrument(payload.instrumentId);
+    return result;
   });
   let ticking = false;
   const tick = async () => {

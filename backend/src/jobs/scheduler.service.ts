@@ -15,11 +15,17 @@ export class MarketSchedulerService {
     const accounts = await this.prisma.investmentAccount.findMany({ where: { archivedAt: null }, include: { events: { where: { activeSlot: 1 }, include: { cashEntries: true, securityEntries: true, split: true } } } });
     const held = new Set<string>();
     for (const account of accounts) for (const [id, quantity] of Object.entries(replayBalances(account.events).securities)) if (!/^0(?:\.0+)?$/.test(quantity)) held.add(id);
-    const instruments = await this.prisma.instrument.findMany({ where: { id: { in: [...held] }, providerMappings: { some: { provider: 'EODHD' } } }, orderBy: { id: 'asc' } });
+    const watched = await this.prisma.watchlistItem.findMany({ select: { instrumentId: true } });
+    const alerted = await this.prisma.priceAlert.findMany({ where: { active: true, deletedAt: null }, select: { instrumentId: true } });
+    const selected = new Set([...held, ...watched.map(row => row.instrumentId), ...alerted.map(row => row.instrumentId)]);
+    const latest = await this.prisma.priceBar.findMany({ where: { instrumentId: { in: [...selected] }, currentSlot: 1, source: 'EODHD' }, distinct: ['instrumentId'], orderBy: [{ instrumentId: 'asc' }, { sessionOn: 'desc' }], select: { instrumentId: true, sessionOn: true } });
+    const instruments = await this.prisma.instrument.findMany({ where: { id: { in: [...selected] }, providerMappings: { some: { provider: 'EODHD' } } }, orderBy: { id: 'asc' } });
+    instruments.sort((a, b) => Number(held.has(b.id)) - Number(held.has(a.id)) || (latest.find(row => row.instrumentId === a.id)?.sessionOn.getTime() ?? 0) - (latest.find(row => row.instrumentId === b.id)?.sessionOn.getTime() ?? 0));
+    let rank = 0;
     for (const instrument of instruments) {
       const target = expectedSession(instrument.mic, now);
-      const payload = { instrumentId: instrument.id, from: previousDay(target, 7), to: target };
-      await this.jobs.ensure(`prices_${instrument.id}_${target}`, 'prices', payload, 2);
+      const payload = { instrumentId: instrument.id, from: previousDay(target, 7), to: target, scheduled: true };
+      await this.jobs.ensure(`prices_${instrument.id}_${target}`, 'prices', payload, held.has(instrument.id) ? 2 : 10 + rank++);
       // Price jobs have priority. Corporate actions share the same guarded daily budget.
       const week = Math.floor(Date.parse(target) / (7 * 86400000));
       const actionsFrom = previousDay(target, 90);

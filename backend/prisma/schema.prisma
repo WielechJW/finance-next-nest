@@ -17,6 +17,8 @@ model User {
   updatedAt    DateTime @updatedAt
   wallet       Wallet?
   portfolios   Portfolio[]
+  watchlists   Watchlist[]
+  priceAlerts  PriceAlert[]
 }
 
 model Portfolio {
@@ -65,6 +67,8 @@ model Instrument {
   priceBars        PriceBar[]
   corporateActions CorporateAction[]
   splits           InvestmentSplit[]
+  watchlistItems   WatchlistItem[]
+  priceAlerts      PriceAlert[]
   createdAt        DateTime                    @default(now())
   updatedAt        DateTime                    @updatedAt
 
@@ -123,6 +127,7 @@ model PriceBar {
   contentHash   String   @db.Char(64)
   publishedAt   DateTime? @db.Timestamptz(3)
   fetchedAt     DateTime @default(now()) @db.Timestamptz(3)
+  alertEvents   AlertEvent[]
   @@unique([instrumentId, source, sessionOn, revision])
   @@unique([instrumentId, source, sessionOn, currentSlot])
   @@index([instrumentId, sessionOn])
@@ -392,6 +397,60 @@ model Transaction {
   // SQL migration additionally checks positive finite amounts and ISO date range.
   @@index([walletId, occurredOn, id])
   @@index([categoryId, type])
+}
+
+model Watchlist {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String @db.VarChar(100)
+  items     WatchlistItem[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId])
+}
+model WatchlistItem {
+  id           String @id @default(uuid()) @db.Uuid
+  watchlistId  String @db.Uuid
+  watchlist    Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  instrumentId String @db.Uuid
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([watchlistId, instrumentId])
+}
+model PriceAlert {
+  id            String @id @default(uuid()) @db.Uuid
+  userId        String @db.Uuid
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instrumentId  String @db.Uuid
+  instrument    Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  direction     String @db.VarChar(10)
+  mode          String @db.VarChar(10)
+  threshold     Decimal @db.Decimal(28, 10)
+  active        Boolean @default(true)
+  armed         Boolean @default(false)
+  cooldownMinutes Int @default(1440)
+  lastSessionOn DateTime? @db.Date
+  lastSatisfied Boolean?
+  lastPriceBarId String? @db.Uuid
+  lastTriggeredAt DateTime? @db.Timestamptz(3)
+  deletedAt     DateTime? @db.Timestamptz(3)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  events        AlertEvent[]
+  @@index([userId, deletedAt])
+  @@index([instrumentId, active])
+}
+model AlertEvent {
+  id          String @id @default(uuid()) @db.Uuid
+  alertId     String @db.Uuid
+  alert       PriceAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  priceBarId  String @db.Uuid
+  priceBar    PriceBar @relation(fields: [priceBarId], references: [id], onDelete: Restrict)
+  sessionOn   DateTime @db.Date
+  price       Decimal @db.Decimal(28, 10)
+  threshold   Decimal @db.Decimal(28, 10)
+  direction   String @db.VarChar(10)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([alertId, sessionOn])
 }
 
 model Session {

@@ -1,0 +1,33 @@
+import { login, logout } from './actions.js';
+import { test, expect } from './fixtures.js';
+
+test('creates a private watchlist and alert with mobile controls and preserves them after reload', async ({ page, accounts }) => {
+  await page.setViewportSize({ width: 375, height: 850 });
+  const instrument = await accounts.investmentInstrument();
+  await accounts.investmentQuote(instrument.id);
+  await login(page, await accounts.register());
+  await page.getByRole('link', { name: 'Rynek i alerty', exact: true }).click();
+  await page.getByLabel('Nazwa watchlisty', { exact: true }).fill('Moje GPW');
+  await page.getByRole('button', { name: 'Utwórz watchlistę', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Moje GPW', exact: true })).toBeVisible();
+  await page.getByLabel('Symbol, nazwa lub ISIN', { exact: true }).fill(instrument.ticker);
+  await page.getByRole('button', { name: 'Szukaj', exact: true }).click();
+  await page.getByRole('button', { name: `Obserwuj ${instrument.ticker}`, exact: true }).click();
+  const list = page.getByRole('region', { name: 'Watchlista Moje GPW', exact: true });
+  await expect(list.getByRole('link', { name: instrument.ticker, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: `Ustaw alert ${instrument.ticker}`, exact: true }).click();
+  const form = page.getByRole('form', { name: `Nowy alert ${instrument.ticker}`, exact: true });
+  await form.getByLabel('Próg ceny', { exact: true }).fill('80,00');
+  await form.getByRole('button', { name: 'Zapisz alert', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Wyłącz alert', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Wyłącz alert', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Włącz alert', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(list.getByRole('link', { name: instrument.ticker, exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Włącz alert', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await logout(page); await login(page, await accounts.register()); await page.goto('/dashboard/market');
+  await expect(page.getByText('Utwórz watchlistę, aby dodawać obserwowane spółki.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Moje GPW', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Włącz alert', exact: true })).toHaveCount(0);
+});
