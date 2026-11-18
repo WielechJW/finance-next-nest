@@ -16,6 +16,23 @@
   margin-top: 24px;
   min-width: 0;
 }
+.card form {
+  display: grid;
+  gap: 12px;
+  margin-block: 16px;
+}
+.card label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.card fieldset {
+  min-inline-size: 0;
+}
+.panel input[type="checkbox"] {
+  width: 24px;
+  min-height: 24px;
+}
 .fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

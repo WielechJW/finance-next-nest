@@ -11,8 +11,8 @@ export class MarketJobsService {
   ensure(key: string, kind: string, payload: Prisma.InputJsonObject, priority = 10) {
     return this.prisma.marketJob.upsert({ where: { key }, create: { key, kind, payload, priority }, update: {} });
   }
-  async dispatch(queue: Pick<Queue, 'add'>, now = new Date()) {
-    const rows = await this.prisma.marketJob.findMany({ where: { OR: [
+  async dispatch(queue: Pick<Queue, 'add'>, now = new Date(), kinds = ['prices', 'dividends', 'splits', 'fx', 'valuation']) {
+    const rows = await this.prisma.marketJob.findMany({ where: { kind: { in: kinds }, OR: [
       { status: { in: ['PENDING', 'RETRY'] }, runAfter: { lte: now } }, { status: 'RUNNING', leaseUntil: { lt: now } },
     ] }, orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }], take: 100 });
     for (const row of rows) await queue.add('execute', { id: row.id }, { jobId: row.id, priority: row.priority, removeOnComplete: true, removeOnFail: true });

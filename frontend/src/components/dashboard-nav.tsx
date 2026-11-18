@@ -9,6 +9,7 @@ export function DashboardNav() {
   const active = pathname === "/dashboard/wallet";
   return (
     <nav className={styles.nav} aria-label="Nawigacja panelu">
+      <Link href="/dashboard/market" aria-current={pathname === '/dashboard/market' || pathname.startsWith('/dashboard/market/') ? 'page' : undefined}>Rynek i alerty</Link>
       <Link href="/dashboard/wallet" aria-current={active ? "page" : undefined}>
         Portfel
       </Link>
