@@ -1,0 +1,177 @@
+{
+  "provider": "EODHD",
+  "checkedAt": "2026-11-18T12:30:11.529Z",
+  "mode": "configured_free_key",
+  "rawDataStored": false,
+  "maxCallUnits": 12,
+  "callUnitsReserved": 12,
+  "catalogs": {
+    "WAR": {
+      "status": "available",
+      "httpStatus": 200
+    },
+    "US": {
+      "status": "available",
+      "httpStatus": 200
+    }
+  },
+  "instruments": [
+    {
+      "symbol": "CDR.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      }
+    },
+    {
+      "symbol": "PKN.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      }
+    },
+    {
+      "symbol": "PKO.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      }
+    },
+    {
+      "symbol": "PZU.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      }
+    },
+    {
+      "symbol": "KGH.WAR",
+      "expectedCurrency": "PLN",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 10
+      }
+    },
+    {
+      "symbol": "AAPL.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 11
+      }
+    },
+    {
+      "symbol": "MSFT.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 11
+      }
+    },
+    {
+      "symbol": "TSLA.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 11
+      }
+    },
+    {
+      "symbol": "AMZN.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 11
+      }
+    },
+    {
+      "symbol": "MCD.US",
+      "expectedCurrency": "USD",
+      "identity": {
+        "status": "available",
+        "currencyMatches": true,
+        "hasIsin": true
+      },
+      "eod": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 11
+      }
+    }
+  ],
+  "fundamentals": {
+    "status": "not_requested_free_plan"
+  },
+  "account": {
+    "status": "available",
+    "dailyRateLimit": 20,
+    "apiRequests": 6,
+    "apiRequestsDate": "2026-11-18"
+  },
+  "allowedCallUnits": 12,
+  "window": {
+    "from": "2026-11-03",
+    "to": "2026-11-17"
+  },
+  "pricesAndIdentityComplete": true,
+  "fullProviderVerificationComplete": false,
+  "requestsMade": 13
+}

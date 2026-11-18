@@ -4,7 +4,18 @@ Data: 16 listopada 2026 r. Zadanie: [#45](https://github.com/WielechJW/finance-n
 Zakres: [decyzje domenowe](investment-decisions.md) i etap 0
 [roadmapy](investment-roadmap.md).
 
-**Wynik:** EODHD jest preferowanym kandydatem technicznym dla dziennych
+**Aktualizacja 18 listopada 2026:** własny klucz Free potwierdził oba katalogi,
+tożsamość, walutę i ceny dzienne **5/5 spółek GPW oraz 5/5 USA**. Raport
+[próby Free](market-data/eodhd-free-2026-11-18.json) zawiera tylko statusy i liczniki.
+Osobna [próba operacji](market-data/eodhd-free-actions-2026-11-18.json) potwierdziła
+endpointy dywidend i splitów PKO oraz Apple; pusta lista splitów dotyczy wyłącznie
+sprawdzonego okresu. PKO nie zwróciło daty wypłaty dywidendy.
+Pełny odbiór #45 pozostaje otwarty: zdarzenia wszystkich dziesięciu spółek,
+dłuższa historia i fundamenty nie zostały zweryfikowane własnym kluczem.
+Przyjęty zakres prywatnej wersji B korzysta z cen dziennych i jawnie opisanych braków;
+uruchomienie adaptera nie oznacza potwierdzenia pełnego zakresu #45.
+
+**Wynik pierwotnej próby demo z 16 listopada:** EODHD jest preferowanym kandydatem technicznym dla dziennych
 danych MVP. Demo potwierdziło dane pięciu spółek USA. Pięć spółek GPW
 zwróciło `403`; ich dane API wymagają weryfikacji własnym kluczem.
 Publiczna próba Agent Rynku potwierdziła wybrane dane GPW dla 5/5 spółek,
@@ -12,8 +23,8 @@ ale nie dostarczyła splitów ani waluty notowania i nie nadaje się jako
 automatyczny magazyn danych dla aplikacji. Alternatywą do dalszego
 sprawdzenia pozostaje Twelve Data.
 
-Użytkownik nie ma konta ani klucza EODHD i wybrał sprawdzenie dostępnych
-źródeł. Nie kupowano subskrypcji. Analiza, próba demo i próba publiczna
+W pierwotnej próbie użytkownik nie miał konta ani klucza EODHD i wybrał sprawdzenie dostępnych
+źródeł. Obecnie ma własny klucz Free; nie kupowano subskrypcji. Analiza, próba demo i próba publiczna
 są wykonane; pełne potwierdzenie pokrycia GPW u dostawcy nadającego się
 do MVP pozostaje warunkiem odbioru #45. Nie oznaczamy tego punktu jako
 ukończonego.
@@ -232,6 +243,16 @@ nie oznacza zgody na takie wykorzystanie.
 [Źródło limitów i katalogu](https://agentrynku.pl/en/mcp).
 
 ## 9. Powtórzenie próby i odbiór
+
+Oszczędna próba Free odczytuje limit przez bezpłatne `/api/user`, potem oba
+katalogi i dziesięć serii cen. Rezerwuje najwyżej 12 jednostek, nie przekracza
+pozostałego limitu dziennego, nie zużywa bonusowego salda i pomija fundamenty.
+Nie zastępuje pełnej próby opisanej poniżej. Błędy nie ujawniają tokenu ani URL.
+
+```bash
+node --env-file-if-exists=backend/.env scripts/verify-eodhd-free.mjs --max-calls 12
+node --test scripts/verify-eodhd-free.test.mjs scripts/verify-eodhd.test.mjs
+```
 
 Z katalogu głównego, Node.js 24, bez dodatkowych zależności:
 

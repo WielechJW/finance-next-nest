@@ -1,0 +1,113 @@
+{
+  "provider": "EODHD",
+  "checkedAt": "2026-11-18T12:21:41.751Z",
+  "mode": "configured_key_free_smoke_test",
+  "rawDataStored": false,
+  "maxMarketDataCallUnits": 6,
+  "usageBefore": {
+    "httpStatus": 200,
+    "dailyRateLimit": 20,
+    "apiRequests": 0,
+    "apiRequestsDate": null,
+    "extraLimit": 500
+  },
+  "checks": [
+    {
+      "symbol": "PKO.WAR",
+      "kind": "eod",
+      "window": {
+        "from": "2026-11-02",
+        "to": "2026-11-13",
+        "period": "d",
+        "order": "a"
+      },
+      "httpStatus": 200,
+      "status": "available",
+      "rows": 9,
+      "firstDate": "2026-11-02",
+      "lastDate": "2026-11-13"
+    },
+    {
+      "symbol": "AAPL.US",
+      "kind": "eod",
+      "window": {
+        "from": "2026-11-02",
+        "to": "2026-11-13",
+        "period": "d",
+        "order": "a"
+      },
+      "httpStatus": 200,
+      "status": "available",
+      "rows": 10,
+      "firstDate": "2026-11-02",
+      "lastDate": "2026-11-13"
+    },
+    {
+      "symbol": "PKO.WAR",
+      "kind": "div",
+      "window": {
+        "from": "2025-11-19",
+        "to": "2026-11-17"
+      },
+      "httpStatus": 200,
+      "status": "available",
+      "rows": 1,
+      "hasUnadjustedValue": true,
+      "hasPaymentDate": false,
+      "firstDate": "2026-08-04",
+      "lastDate": "2026-08-04"
+    },
+    {
+      "symbol": "AAPL.US",
+      "kind": "div",
+      "window": {
+        "from": "2025-11-19",
+        "to": "2026-11-17"
+      },
+      "httpStatus": 200,
+      "status": "available",
+      "rows": 4,
+      "hasUnadjustedValue": true,
+      "hasPaymentDate": true,
+      "firstDate": "2026-02-09",
+      "lastDate": "2026-11-12"
+    },
+    {
+      "symbol": "PKO.WAR",
+      "kind": "splits",
+      "window": {
+        "from": "2025-11-19",
+        "to": "2026-11-17"
+      },
+      "httpStatus": 200,
+      "status": "empty",
+      "rows": 0,
+      "firstDate": null,
+      "lastDate": null
+    },
+    {
+      "symbol": "AAPL.US",
+      "kind": "splits",
+      "window": {
+        "from": "2025-11-19",
+        "to": "2026-11-17"
+      },
+      "httpStatus": 200,
+      "status": "empty",
+      "rows": 0,
+      "firstDate": null,
+      "lastDate": null
+    }
+  ],
+  "usageAfter": {
+    "httpStatus": 200,
+    "dailyRateLimit": 20,
+    "apiRequests": 6,
+    "apiRequestsDate": "2026-11-18",
+    "extraLimit": 500
+  },
+  "requestsMade": 8,
+  "observedCallUnitsDelta": 6,
+  "priceAccessVerified": true,
+  "actionEndpointAccessVerified": true
+}
