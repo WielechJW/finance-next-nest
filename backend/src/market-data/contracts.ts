@@ -1,7 +1,7 @@
 import { Prisma } from '../generated/prisma/client.js';
 
 export class MarketDataError extends Error {
-  constructor(readonly code: 'configuration' | 'budget' | 'rate_limit' | 'access' | 'network' | 'invalid_data', message: string) {
+  constructor(readonly code: 'configuration' | 'budget' | 'rate_limit' | 'access' | 'network' | 'invalid_data' | 'not_ready', message: string) {
     super(message);
     this.name = 'MarketDataError';
   }

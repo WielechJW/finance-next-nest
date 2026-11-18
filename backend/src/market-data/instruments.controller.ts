@@ -4,6 +4,7 @@ import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } 
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import { MarketInstrumentsService } from './instruments.service.js';
 import { MarketHistoryService } from './history.service.js';
+import { MarketQualityService } from './quality.service.js';
 
 export class PriceHistoryDto {
   @IsDateString({ strict: true }) from: string;
@@ -19,9 +20,11 @@ export class InstrumentSearchDto {
 @Controller('market-data/instruments')
 @UseGuards(SessionAuthGuard)
 export class MarketInstrumentsController {
-  constructor(private readonly instruments: MarketInstrumentsService, private readonly history: MarketHistoryService) {}
+  constructor(private readonly instruments: MarketInstrumentsService, private readonly history: MarketHistoryService, private readonly quality: MarketQualityService) {}
   @Get() @Header('Cache-Control', 'no-store')
   search(@Query() query: InstrumentSearchDto) { return this.instruments.search(query); }
+  @Get(':instrumentId/quote') @Header('Cache-Control', 'no-store')
+  quote(@Param('instrumentId', ParseUUIDPipe) instrumentId: string) { return this.quality.quote(instrumentId); }
   @Get(':instrumentId/prices') @Header('Cache-Control', 'no-store')
   prices(@Param('instrumentId', ParseUUIDPipe) instrumentId: string, @Query() query: PriceHistoryDto) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(query.from) || !/^\d{4}-\d{2}-\d{2}$/.test(query.to) || query.from > query.to || Date.parse(query.to) - Date.parse(query.from) > 365 * 86400000) throw new BadRequestException('Podaj zakres dat do jednego roku.');
