@@ -1,14 +1,14 @@
 import { BadRequestException, Controller, Get, Header, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import { MarketInstrumentsService } from './instruments.service.js';
 import { MarketHistoryService } from './history.service.js';
 import { MarketQualityService } from './quality.service.js';
 
 export class PriceHistoryDto {
-  @IsDateString({ strict: true }) from: string;
-  @IsDateString({ strict: true }) to: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) from: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) to: string;
 }
 
 export class InstrumentSearchDto {

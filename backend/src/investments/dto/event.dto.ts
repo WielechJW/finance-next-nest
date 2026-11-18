@@ -5,7 +5,7 @@ import {
 import { InvestmentCurrency, InvestmentEventType } from '../../generated/prisma/client.js';
 import { IsCalendarDate } from '../../transactions/transaction-validators.js';
 
-export const manualEventTypes = ['DEPOSIT', 'WITHDRAWAL', 'BUY', 'SELL', 'DIVIDEND', 'FEE', 'FX', 'OPENING_POSITION'] as const;
+export const manualEventTypes = ['DEPOSIT', 'WITHDRAWAL', 'BUY', 'SELL', 'DIVIDEND', 'FEE', 'FX', 'OPENING_POSITION', 'SPLIT'] as const;
 const optional = (_object: unknown, value: unknown) => value !== undefined;
 
 export class CreateInvestmentEventDto {
@@ -33,6 +33,8 @@ export class CreateInvestmentEventDto {
   @ValidateIf(optional) @IsEnum(InvestmentCurrency) boughtCurrency?: InvestmentCurrency;
   @ValidateIf(optional) @IsString() @Length(1, 40) soldAmount?: string;
   @ValidateIf(optional) @IsString() @Length(1, 40) boughtAmount?: string;
+  @ValidateIf(optional) @IsString() @Length(1, 40) numerator?: string;
+  @ValidateIf(optional) @IsString() @Length(1, 40) denominator?: string;
 }
 
 export class CorrectInvestmentEventDto {

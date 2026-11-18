@@ -11,6 +11,7 @@ const fields = {
   DIVIDEND: ['currency', 'grossAmount', 'withholdingTax', 'fee'],
   FEE: ['currency', 'amount'], FX: ['soldCurrency', 'boughtCurrency', 'soldAmount', 'boughtAmount', 'commission'],
   OPENING_POSITION: ['instrumentId', 'quantity', 'totalCost', 'acquiredOn'],
+  SPLIT: ['instrumentId', 'numerator', 'denominator'],
 } satisfies Record<CreateInvestmentEventDto['type'], string[]>;
 const optionalFields = new Set(['commission', 'withholdingTax', 'fee']);
 

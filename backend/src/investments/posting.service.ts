@@ -34,7 +34,7 @@ export class InvestmentPostingService {
       if (account.length !== 1) throw new NotFoundException('Nie znaleziono rachunku inwestycyjnego.');
 
       let instrumentCurrency: InvestmentCurrency | undefined;
-      if (input.type === 'BUY' || input.type === 'SELL' || input.type === 'OPENING_POSITION') {
+      if (input.type === 'BUY' || input.type === 'SELL' || input.type === 'OPENING_POSITION' || input.type === 'SPLIT') {
         const instrument = await tx.instrument.findUnique({
           where: { id: input.instrumentId }, select: { currency: true },
         });
@@ -72,6 +72,7 @@ export class InvestmentPostingService {
         orderBy: [{ occurredOn: 'asc' }, { daySequence: 'asc' }],
         include: {
           cashEntries: true,
+          split: true,
           securityEntries: true,
           trade: { include: { instrument: { select: { currency: true } } } },
           openingLot: { include: { instrument: { select: { currency: true } } } },
@@ -83,6 +84,7 @@ export class InvestmentPostingService {
         executedAt: posting.timing.executedAt,
         orderingSource: 'EXPLICIT',
         type: posting.type,
+        split: posting.split,
         cashEntries: posting.cashEntries,
         securityEntries: posting.securityEntries,
       };
@@ -99,6 +101,7 @@ export class InvestmentPostingService {
       const event = await tx.investmentEvent.create({
         data: {
           accountId: posting.accountId,
+          corporateActionId: posting.corporateActionId,
           type: posting.type,
           source: posting.source,
           sourceKey: posting.sourceKey,
@@ -110,6 +113,7 @@ export class InvestmentPostingService {
           fxRatePlnPerUsd: posting.fxRatePlnPerUsd,
         },
       });
+      if (posting.split) await tx.investmentSplit.create({ data: { eventId: event.id, ...posting.split } });
       if (posting.trade) {
         await tx.trade.create({ data: { eventId: event.id, ...posting.trade } });
       }
@@ -164,7 +168,7 @@ export class InvestmentPostingService {
 
       let instrumentCurrency: InvestmentCurrency | undefined;
       if (input.replacement && (input.replacement.type === 'BUY' ||
-          input.replacement.type === 'SELL' || input.replacement.type === 'OPENING_POSITION')) {
+          input.replacement.type === 'SELL' || input.replacement.type === 'OPENING_POSITION' || input.replacement.type === 'SPLIT')) {
         const instrument = await tx.instrument.findUnique({
           where: { id: input.replacement.instrumentId }, select: { currency: true },
         });
@@ -218,6 +222,7 @@ export class InvestmentPostingService {
         orderBy: [{ occurredOn: 'asc' }, { daySequence: 'asc' }],
         include: {
           cashEntries: true,
+          split: true,
           securityEntries: true,
           trade: { include: { instrument: { select: { currency: true } } } },
           openingLot: { include: { instrument: { select: { currency: true } } } },
@@ -226,6 +231,7 @@ export class InvestmentPostingService {
       const candidate: ReplayEvent = {
         ...timing,
         type: posting?.type ?? 'CORRECTION',
+        split: posting?.split,
         revision,
         correctionOfId: target.id,
         orderingSource: 'EXPLICIT',
@@ -262,6 +268,7 @@ export class InvestmentPostingService {
           activeSlot: 1,
         },
       });
+      if (posting?.split) await tx.investmentSplit.create({ data: { eventId: event.id, ...posting.split } });
       if (posting?.trade) await tx.trade.create({ data: { eventId: event.id, ...posting.trade } });
       if (posting?.openingLot) await tx.openingLot.create({ data: { eventId: event.id, ...posting.openingLot } });
       if (posting?.cashEntries.length) {

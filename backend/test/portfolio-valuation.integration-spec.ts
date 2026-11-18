@@ -1,0 +1,118 @@
+import { randomUUID } from 'node:crypto';
+import { investmentHttpContext } from './support/investment-http.js';
+import { investmentScenario } from './support/investment-scenario.js';
+import { InvestmentPostingService } from '../src/investments/posting.service.js';
+import { PortfolioValuationService } from '../src/portfolio-analytics/valuation.service.js';
+import { CorporateActionsService } from '../src/portfolio-analytics/corporate-actions.service.js';
+import { MarketHistoryService } from '../src/market-data/history.service.js';
+import { parseBars, parseActions } from '../src/market-data/history-contracts.js';
+
+describe('Portfolio valuation, corporate actions and audit (PostgreSQL)', () => {
+  let ctx: Awaited<ReturnType<typeof investmentHttpContext>>;
+  let instrumentId: string;
+  const day = '2026-11-10';
+  beforeAll(async () => { ctx = await investmentHttpContext(); });
+  beforeEach(async () => { instrumentId = (await ctx.prisma.instrument.create({ data: { ticker: `V${randomUUID().slice(0, 8)}`, mic: 'XWAR', currency: 'PLN' } })).id; });
+  afterEach(async () => {
+    await ctx.cleanup();
+    await ctx.prisma.corporateAction.deleteMany({ where: { instrumentId } });
+    await ctx.prisma.priceBar.deleteMany({ where: { instrumentId } });
+    await ctx.prisma.instrument.delete({ where: { id: instrumentId } });
+  });
+  afterAll(async () => { await ctx?.app.close(); });
+  async function scenario() {
+    const user = await ctx.signIn();
+    const portfolio = await ctx.prisma.portfolio.create({ data: { userId: user.userId, name: 'Valuation' } });
+    const account = await ctx.prisma.investmentAccount.create({ data: { portfolioId: portfolio.id, name: 'Account' } });
+    const posting = ctx.app.get(InvestmentPostingService);
+    const inputs = investmentScenario(account.id, instrumentId);
+    const deposit = await posting.postForUser(user.userId, inputs.deposit);
+    const buy = await posting.postForUser(user.userId, inputs.buy);
+    await posting.postForUser(user.userId, inputs.sell);
+    const history = ctx.app.get(MarketHistoryService);
+    const price = (close: string, date = day) => parseBars([{ date, open: close, high: close, low: close, close, adjusted_close: '69', volume: '100' }], date, date);
+    await history.saveBars(instrumentId, price('70'));
+    return { ...user, portfolio, account, posting, inputs, deposit, buy, history, price, valuations: ctx.app.get(PortfolioValuationService) };
+  }
+  it('values the hand-calculated scenario at 1153 PLN and 153 result; a deposit alone creates no gain', async () => {
+    const s = await scenario();
+    const value = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, day), day);
+    expect(value).toMatchObject({ complete: true, valuePln: '1153.00000000', resultPln: '153.00000000', netContributionsPln: '1000.00000000', realized: { PLN: '36.00000000' } });
+    expect(value.positions[0]).toMatchObject({ value: '420.00000000', unrealized: '117.00000000', cost: '303.00000000' });
+    const report = await s.valuations.history(s.userId, s.portfolio.id, day, day);
+    expect(report.twrPercent).toBe('15.300000');
+    await s.history.saveBars(instrumentId, parseBars([{ date: '2026-11-09', open: '50', high: '50', low: '50', close: '50', adjusted_close: '50', volume: '100' }], '2026-11-09', '2026-11-09'));
+    const benchmark = await s.valuations.history(s.userId, s.portfolio.id, day, day, instrumentId);
+    expect(benchmark.items[0].benchmarkPercent).toBe('38.000000');
+    const extra = await ctx.prisma.investmentAccount.create({ data: { portfolioId: s.portfolio.id, name: 'Second account' } });
+    await s.posting.postForUser(s.userId, { ...s.inputs.deposit, accountId: extra.id, amount: '100.00' });
+    expect(s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, day), day)).toMatchObject({ valuePln: '1253.00000000', resultPln: '153.00000000' });
+    const second = await ctx.prisma.portfolio.create({ data: { userId: s.userId, name: 'Cash' } });
+    const account = await ctx.prisma.investmentAccount.create({ data: { portfolioId: second.id, name: 'Cash' } });
+    await s.posting.postForUser(s.userId, { ...s.inputs.deposit, accountId: account.id });
+    expect(s.valuations.calculate(await s.valuations.load(s.userId, second.id, day), day).resultPln).toBe('0.00000000');
+    const stranger = await ctx.signIn();
+    await stranger.agent.get(`/investments/portfolios/${s.portfolio.id}/valuation`).expect(404);
+    await s.agent.get(`/investments/portfolios/${s.portfolio.id}/valuations`).query({ from: day, to: `${day}T12:00:00Z` }).expect(400);
+  });
+  it('keeps missing/stale prices incomplete and versions snapshots after a corrected source price', async () => {
+    const s = await scenario();
+    await s.valuations.record(s.userId, s.portfolio.id, day);
+    await s.valuations.record(s.userId, s.portfolio.id, day);
+    expect(await ctx.prisma.portfolioValuationSnapshot.count({ where: { portfolioId: s.portfolio.id } })).toBe(1);
+    await s.history.saveBars(instrumentId, s.price('71'));
+    await s.valuations.record(s.userId, s.portfolio.id, day);
+    expect(await ctx.prisma.portfolioValuationSnapshot.count({ where: { portfolioId: s.portfolio.id } })).toBe(2);
+    const stale = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, '2026-11-12'), '2026-11-12');
+    expect(stale.complete).toBe(false); expect(stale.valuePln).toBeNull();
+    expect((await s.valuations.history(s.userId, s.portfolio.id, day, '2026-11-12')).twrPercent).toBeNull();
+    await ctx.prisma.priceBar.deleteMany({ where: { instrumentId } });
+    const missing = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, day), day);
+    expect(missing.positions[0].status).toBe('missing'); expect(missing.valuePln).toBeNull();
+  });
+  it('requires confirmation, applies a split once, preserves cost and replays it after an earlier correction', async () => {
+    const s = await scenario();
+    const actionDay = '2026-11-12';
+    await s.history.saveActions(instrumentId, parseActions([{ date: actionDay, split: '2/1' }], 'SPLIT', 'PLN'));
+    const actions = ctx.app.get(CorporateActionsService);
+    const [proposal] = await actions.proposals(s.userId, s.portfolio.id, s.account.id);
+    const input = { expectedRevision: 1, idempotencyKey: 'confirmed-split', occurredOn: actionDay, daySequence: 1, acknowledged: true };
+    await expect(actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, { ...input, acknowledged: false })).rejects.toThrow();
+    const first = await actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, input);
+    expect((await actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, input)).eventId).toBe(first.eventId);
+    let summary = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, actionDay), actionDay);
+    expect(summary.positions[0]).toMatchObject({ quantity: '12.0000000000', cost: '303.00000000' });
+    await s.posting.correctForUser(s.userId, { accountId: s.account.id, targetEventId: s.buy.eventId, expectedRevision: 0, reason: 'Correct quantity', idempotencyKey: 'quantity-correction', replacement: { ...s.inputs.buy, quantity: '12', idempotencyKey: 'quantity-correction' } });
+    summary = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, actionDay), actionDay);
+    expect(summary.positions[0]).toMatchObject({ quantity: '16.0000000000', cost: '403.33333333' });
+  });
+  it('requires historical FX for USD contributions and captures currency movement without a stock-price change', async () => {
+    const s = await scenario();
+    const portfolio = await ctx.prisma.portfolio.create({ data: { userId: s.userId, name: 'USD' } });
+    const account = await ctx.prisma.investmentAccount.create({ data: { portfolioId: portfolio.id, name: 'USD' } });
+    await s.posting.postForUser(s.userId, { ...s.inputs.deposit, accountId: account.id, currency: 'USD', amount: '100.00' });
+    const before = s.valuations.calculate(await s.valuations.load(s.userId, portfolio.id, '2026-11-12'), '2026-11-12');
+    expect(before.valuePln).toBeNull();
+    await s.history.saveFx([{ sessionOn: day, rate: '4.00000000', reference: 'valuation-synthetic' }, { sessionOn: '2026-11-12', rate: '4.20000000', reference: 'valuation-synthetic' }]);
+    const value = s.valuations.calculate(await s.valuations.load(s.userId, portfolio.id, '2026-11-12'), '2026-11-12');
+    expect(value).toMatchObject({ valuePln: '420.00000000', resultPln: '20.00000000' });
+    await ctx.prisma.fxRate.deleteMany({ where: { reference: 'valuation-synthetic' } });
+  });
+  it('does not post a forecast dividend and prevents a second payout after provider revision', async () => {
+    const s = await scenario();
+    const actions = ctx.app.get(CorporateActionsService);
+    const dividend = { date: '2026-11-12', value: '1', currency: 'PLN' };
+    await s.history.saveActions(instrumentId, parseActions([dividend], 'DIVIDEND', 'PLN'));
+    expect(await ctx.prisma.investmentEvent.count({ where: { accountId: s.account.id } })).toBe(3);
+    const [proposal] = await actions.proposals(s.userId, s.portfolio.id, s.account.id);
+    const input = { expectedRevision: 1, idempotencyKey: 'paid-dividend', occurredOn: '2026-11-13', daySequence: 1, acknowledged: true, grossAmount: '10.00', withholdingTax: '1.00' };
+    await actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, input);
+    await actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, input);
+    const summary = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, '2026-11-13'), '2026-11-13');
+    expect(summary.cash.PLN).toBe('742.00'); expect(summary.dividendsGross.PLN).toBe('10.00');
+    await s.history.saveActions(instrumentId, parseActions([{ ...dividend, value: '2' }], 'DIVIDEND', 'PLN'));
+    const [revised] = await actions.proposals(s.userId, s.portfolio.id, s.account.id);
+    expect(revised.recordedRevisionDiffers).toBe(true);
+    await expect(actions.confirm(s.userId, s.portfolio.id, s.account.id, revised.id, { ...input, expectedRevision: 2, idempotencyKey: 'second-dividend' })).rejects.toThrow('Klucz');
+  });
+});

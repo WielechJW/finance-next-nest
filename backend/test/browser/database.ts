@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { expectedSession } from '../../src/market-data/calendar.js';
 import {
   getBrowserDatabaseUrl,
   loadTestEnvironment,
@@ -46,6 +47,12 @@ export class BrowserDatabase {
       throw new Error('Brak sesji konta testowego do wygaszenia.');
   }
 
+  async investmentQuote(instrumentId: string, close = '70') {
+    if (!this.instrumentIds.has(instrumentId)) throw new Error('Instrument nie należy do testu.');
+    await this.pool.query('INSERT INTO "PriceBar" (id, "instrumentId", source, "sessionOn", open, high, low, close, "adjustedClose", volume, revision, "currentSlot", "contentHash", "fetchedAt") VALUES ($1, $2, $3, $4, $5, $5, $5, $5, $5, 100, 1, 1, $6, NOW())',
+      [randomUUID(), instrumentId, 'EODHD', expectedSession('XWAR'), close, '0'.repeat(64)]);
+  }
+
   async dispose(): Promise<void> {
     try {
       const client = await this.pool.connect();
@@ -59,6 +66,7 @@ export class BrowserDatabase {
         await client.query('DELETE FROM "User" WHERE email = ANY($1::text[])', [
           emails,
         ]);
+        await client.query('DELETE FROM "PriceBar" WHERE "instrumentId" = ANY($1::uuid[])', [[...this.instrumentIds]]);
         await client.query('DELETE FROM "Instrument" WHERE id = ANY($1::uuid[])', [[...this.instrumentIds]]);
         await client.query('COMMIT');
       } catch (error) {

@@ -15,6 +15,7 @@ type BaseInput = InvestmentTimingInput & {
   source?: InvestmentEventSource;
   sourceKey?: string;
   externalOperationId?: string;
+  corporateActionId?: string;
 };
 
 export type PostInvestmentInput = BaseInput & (
@@ -23,6 +24,7 @@ export type PostInvestmentInput = BaseInput & (
   | { type: 'DIVIDEND'; currency: InvestmentCurrency; grossAmount: string; withholdingTax?: string; fee?: string }
   | { type: 'FEE'; currency: InvestmentCurrency; amount: string }
   | { type: 'OPENING_POSITION'; instrumentId: string; quantity: string; totalCost: string; acquiredOn: string }
+  | { type: 'SPLIT'; instrumentId: string; numerator: string; denominator: string }
   | { type: 'FX'; soldCurrency: InvestmentCurrency; boughtCurrency: InvestmentCurrency; soldAmount: string; boughtAmount: string; commission?: string }
 );
 
@@ -43,6 +45,8 @@ export type PreparedPosting = {
   fxRatePlnPerUsd: string | null;
   trade: TradeEffect | null;
   openingLot?: OpeningLotEffect;
+  split?: { instrumentId: string; numerator: string; denominator: string };
+  corporateActionId?: string;
   cashEntries: CashEffect[];
   securityEntries: SecurityEffect[];
 };
@@ -109,6 +113,7 @@ export function preparePosting(
       idempotencyKey: input.idempotencyKey,
       recordedBy: `user:${userId}`,
       timing,
+      ...(input.corporateActionId ? { corporateActionId: input.corporateActionId } : {}),
     };
     if (input.type === 'DEPOSIT' || input.type === 'WITHDRAWAL') {
       const amount = positiveCash(input.amount);
@@ -127,6 +132,13 @@ export function preparePosting(
         trade: { instrumentId: input.instrumentId, quantity, unitPrice, grossAmount },
         cashEntries,
         securityEntries: [{ instrumentId: input.instrumentId, quantity: input.type === 'BUY' ? quantity : new InvestmentCalculation(quantity).neg().toFixed(10) }] };
+    }
+    if (input.type === 'SPLIT') {
+      if (!instrumentCurrency) throw new BadRequestException('Nie znaleziono waluty instrumentu.');
+      const numerator = formatInvestmentDecimal(parseInvestmentDecimal(input.numerator, 'quantity'), 'quantity');
+      const denominator = formatInvestmentDecimal(parseInvestmentDecimal(input.denominator, 'quantity'), 'quantity');
+      if (numerator === denominator) throw new BadRequestException('Split musi zmieniać ilość akcji.');
+      return { ...common, fxRatePlnPerUsd: null, trade: null, cashEntries: [], securityEntries: [], split: { instrumentId: input.instrumentId, numerator, denominator } };
     }
     if (input.type === 'DIVIDEND') {
       const gross = positiveCash(input.grossAmount);
@@ -182,6 +194,7 @@ export function preparePosting(
 }
 
 export type ReplayEvent = {
+  split?: { instrumentId: string; numerator: { toString(): string }; denominator: { toString(): string } } | null;
   occurredOn: Date;
   daySequence: number;
   executedAt: Date | null;
@@ -212,6 +225,16 @@ export function replayBalances(events: ReplayEvent[]) {
     if (date !== previousDate) { previousDate = date; previousSequence = 0; previousInstant = null; }
     if (event.daySequence === previousSequence) throw new ConflictException('Zajęta pozycja w dniu.');
     previousSequence = event.daySequence;
+    if (event.type === 'SPLIT') {
+      if (!event.split || event.cashEntries.length || event.securityEntries.length) throw new ConflictException('Niepoprawny zapis splitu.');
+      const split = event.split;
+      const numerator = new InvestmentCalculation(split.numerator.toString()), denominator = new InvestmentCalculation(split.denominator.toString());
+      const before = securities.get(split.instrumentId) ?? new InvestmentCalculation(0);
+      if (!before.gt(0) || !numerator.gt(0) || !denominator.gt(0) || numerator.eq(denominator)) throw new ConflictException('Niepoprawna pozycja lub proporcja splitu.');
+      const after = before.times(numerator).div(denominator);
+      parseInvestmentDecimal(after.toFixed(), 'quantity');
+      securities.set(split.instrumentId, after);
+    }
     if (event.executedAt) {
       if (previousInstant && event.executedAt < previousInstant) throw new ConflictException('Kolejność przeczy czasom wykonania.');
       previousInstant = event.executedAt;

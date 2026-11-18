@@ -9,7 +9,8 @@ import { InvestmentPostingService } from './posting.service.js';
 import { replayBalances } from './posting.js';
 
 const instrumentSelect = { id: true, ticker: true, mic: true, currency: true, isin: true } as const;
-const eventInclude = {
+export const eventInclude = {
+  split: true,
   cashEntries: { orderBy: { id: 'asc' as const } },
   securityEntries: { orderBy: { id: 'asc' as const } },
   trade: { include: { instrument: { select: instrumentSelect } } },

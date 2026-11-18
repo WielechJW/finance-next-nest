@@ -6,6 +6,7 @@ type Amount = InstanceType<typeof InvestmentCalculation>;
 type DecimalLike = { toString(): string };
 
 export type FifoEvent = {
+  split?: { instrumentId: string; numerator: DecimalLike; denominator: DecimalLike } | null;
   id: string;
   type: string;
   occurredOn: Date;
@@ -87,11 +88,26 @@ export function replayFifo(events: FifoEvent[]) {
   }[] = [];
   const ordered = [...events].sort((a, b) => a.occurredOn.getTime() - b.occurredOn.getTime() || a.daySequence - b.daySequence);
   for (const event of ordered) {
-    if (event.orderingSource !== 'EXPLICIT' || event.type === 'SPLIT' || (event.type === 'CORRECTION' &&
+    if (event.type !== 'SPLIT' && event.split) throw new ConflictException('Dane splitu przy innym typie operacji.');
+    if (event.orderingSource !== 'EXPLICIT' || (event.type === 'CORRECTION' &&
         !(event.revision && event.revision > 0 && event.correctionOfId &&
           !event.trade && !event.openingLot && event.cashEntries.length === 0 &&
           event.securityEntries.length === 0))) {
       throw new ConflictException('Historia wymaga rozstrzygnięcia kolejności, korekty lub splitu.');
+    }
+    if (event.type === 'SPLIT') {
+      if (!event.split || event.trade || event.openingLot || event.cashEntries.length || event.securityEntries.length) throw new ConflictException('Niepoprawny zapis splitu.');
+      const split = event.split, position = positions.get(split.instrumentId);
+      const numerator = decimal(split.numerator), denominator = decimal(split.denominator);
+      if (!position || !numerator.gt(0) || !denominator.gt(0) || numerator.eq(denominator)) throw new ConflictException('Brak pozycji lub niepoprawny split.');
+      for (const lot of position.lots) {
+        if (lot.remainingQuantity.isZero()) continue;
+        const quantity = lot.remainingQuantity.times(numerator).div(denominator);
+        parseInvestmentDecimal(quantity.toFixed(), 'quantity');
+        lot.originalCost = lot.originalCost.minus(lot.allocatedCost);
+        lot.originalQuantity = quantity; lot.remainingQuantity = quantity; lot.allocatedCost = new InvestmentCalculation(0);
+      }
+      continue;
     }
     if (event.type === 'OPENING_POSITION') {
       if (!event.openingLot || event.trade || event.cashEntries.length > 0) {
