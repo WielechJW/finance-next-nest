@@ -52,6 +52,7 @@ enum InvestmentCurrency {
 
 model Instrument {
   id               String                      @id @default(uuid()) @db.Uuid
+  name             String?                     @db.VarChar(200)
   ticker           String                      @db.VarChar(32)
   mic              String                      @db.VarChar(4)
   currency         InvestmentCurrency
@@ -66,6 +67,16 @@ model Instrument {
   // Later investment events will reference this ID, never a mutable ticker.
   @@unique([mic, ticker])
   @@index([isin])
+}
+
+model MarketDataBudget {
+  provider      String   @db.VarChar(30)
+  keyHash       String   @db.Char(64)
+  day           DateTime @db.Date
+  spent         Int      @default(0)
+  lastRequestAt DateTime? @db.Timestamptz(3)
+  blockedUntil  DateTime? @db.Timestamptz(3)
+  @@id([provider, keyHash, day])
 }
 
 model InstrumentProviderMapping {
