@@ -1,0 +1,98 @@
+name: finance-production
+x-api-env: &api-env
+  NODE_ENV: production
+  PORT: 3001
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+  SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET}
+  FRONTEND_ORIGIN: https://${APP_DOMAIN:?Set APP_DOMAIN}
+  TRUST_PROXY_HOPS: 1
+  REDIS_URL: redis://redis:6379/0
+  MARKET_DATA_ENABLED: ${MARKET_DATA_ENABLED:-0}
+  EODHD_API_TOKEN: ${EODHD_API_TOKEN:-}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+  TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+  OPERATOR_USER_ID: ${OPERATOR_USER_ID:-}
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+    volumes: [postgres_data:/var/lib/postgresql]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, 'yes', --maxmemory-policy, noeviction]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+  migrate:
+    build: { context: .., dockerfile: backend/Dockerfile, target: migrate }
+    environment: { DATABASE_URL: '${DATABASE_URL:?Set DATABASE_URL}' }
+    depends_on: { db: { condition: service_healthy } }
+    restart: 'no'
+  api:
+    build: { context: .., dockerfile: backend/Dockerfile, target: runtime }
+    restart: unless-stopped
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, 'fetch("http://127.0.0.1:3001/health/live").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  worker:
+    build: { context: .., dockerfile: backend/Dockerfile, target: runtime }
+    profiles: [worker]
+    restart: unless-stopped
+    command: [node, dist/worker.js]
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, dist/operations/worker-health.js]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+      args: { NEXT_PUBLIC_API_URL: 'https://${API_DOMAIN:?Set API_DOMAIN}' }
+    restart: unless-stopped
+    depends_on: { api: { condition: service_healthy } }
+    healthcheck:
+      test: [CMD, node, -e, 'fetch("http://127.0.0.1:3000/login").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL:?Set TLS_EMAIL}
+    volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro, caddy_data:/data, caddy_config:/config]
+    depends_on: { frontend: { condition: service_healthy } }
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

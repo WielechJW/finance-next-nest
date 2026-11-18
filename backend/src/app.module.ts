@@ -1,3 +1,4 @@
+import { OperationsModule } from './operations/operations.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller.js';
@@ -28,6 +29,7 @@ import { AlertsModule } from './alerts/alerts.module.js';
     PortfolioAnalyticsModule,
     AlertsModule,
     NotificationsModule,
+    OperationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
