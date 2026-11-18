@@ -9,6 +9,7 @@ import { CategoriesModule } from './categories/categories.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { InvestmentsModule } from './investments/investments.module.js';
+import { MarketDataModule } from './market-data/market-data.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { InvestmentsModule } from './investments/investments.module.js';
     TransactionsModule,
     AnalyticsModule,
     InvestmentsModule,
+    MarketDataModule,
   ],
   controllers: [AppController],
   providers: [AppService],
