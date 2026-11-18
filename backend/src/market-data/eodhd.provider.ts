@@ -28,9 +28,11 @@ export class EodhdProvider {
   }
   async request(path: string, params: Record<string, string> = {}): Promise<unknown> {
     const { token, limit, keyHash } = this.configuration();
+    const accountWait = await this.budget.reserve(keyHash, 0, limit, new Date(), 0);
+    if (accountWait) await pause(accountWait);
     const now = new Date();
     const account = object(await this.read('user', {}, token));
-    const used = account.apiRequestsDate === now.toISOString().slice(0, 10) ? Number(account.apiRequests) : 0;
+    const used = !account.apiRequestsDate || account.apiRequestsDate === now.toISOString().slice(0, 10) ? Number(account.apiRequests) : 0;
     const remoteLimit = Number(account.dailyRateLimit);
     if (!Number.isSafeInteger(used) || used < 0 || !Number.isSafeInteger(remoteLimit) || remoteLimit < 1) throw new MarketDataError('invalid_data', 'Nie można potwierdzić limitu danych.');
     const wait = await this.budget.reserve(keyHash, used, Math.min(limit, remoteLimit), now);

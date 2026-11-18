@@ -81,6 +81,29 @@ model MarketDataBudget {
   @@id([provider, keyHash, day])
 }
 
+model MarketJob {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.VarChar(200)
+  kind        String   @db.VarChar(30)
+  payload     Json
+  status      String   @default("PENDING") @db.VarChar(20)
+  priority    Int      @default(10)
+  attempts    Int      @default(0)
+  runAfter    DateTime @default(now()) @db.Timestamptz(3)
+  leaseUntil  DateTime? @db.Timestamptz(3)
+  runToken    String?  @db.Uuid
+  errorCode   String?  @db.VarChar(40)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  finishedAt  DateTime? @db.Timestamptz(3)
+  @@index([status, runAfter, priority])
+}
+
+model WorkerHeartbeat {
+  name      String   @id @db.VarChar(80)
+  updatedAt DateTime @db.Timestamptz(3)
+}
+
 model PriceBar {
   id            String   @id @default(uuid()) @db.Uuid
   instrumentId  String   @db.Uuid
