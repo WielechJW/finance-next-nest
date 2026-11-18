@@ -50,3 +50,36 @@ brak chwili publikacji u dostawcy daje `null`, a nie wymyślony czas.
 wymaga sesji, odczytuje wyłącznie bazę i zwraca aktualne rewizje z liczbami
 jako stringami. Zakres jest ograniczony do roku. Pusta seria oznacza brak
 danych; nie tworzy zerowych cen. Rewizje zachowujemy do odtworzenia obliczeń.
+
+## Worker i kolejka
+
+Worker działa osobno od API. Redis przechowuje kolejkę, ale źródłem prawdy
+jest `MarketJob` w PostgreSQL: trwały klucz biznesowy, stan, próby, czas kolejnej
+próby i dzierżawa procesu. Ten sam rekord stanowi outbox. Po utracie Redis
+niezakończone zadania są ponownie publikowane. Token wykonania chroni zapis
+wyniku przed zakończeniem przez stary proces. Zakończony sukcesem klucz nie
+jest wykonywany ponownie. Błędy mają tylko bezpieczne kody.
+
+```bash
+docker compose up -d --wait db redis
+# W backend/.env: REDIS_URL=redis://127.0.0.1:6379/0
+# W backend/.env: MARKET_DATA_ENABLED=1
+npm --prefix backend run build
+npm --prefix backend run start:worker
+```
+
+Domyślnie worker jest wyłączony. Nie uruchamia się w procesie API ani w testach
+HTTP. Harmonogram tworzy zadania cen dla posiadanych instrumentów, kursów NBP
+oraz rzadsze zadania zdarzeń. Ceny mają pierwszeństwo przed zdarzeniami.
+Wyczerpanie budżetu przesuwa próbę po resetowaniu limitu UTC. Inne błędy
+przejściowe mają rosnące opóźnienie; po pięciu próbach pozostają do sprawdzenia.
+Zadania z niepoprawnymi danymi/konfiguracją nie są ponawiane automatycznie.
+Odstęp dotyczy także bezpłatnych odczytów zużycia API.
+
+Testy Redis wymagają oddzielnej usługi na porcie 6380; nie używają domyślnie
+REDIS_URL. Każdy test ma osobną nazwę kolejki, a CI uruchamia osobny Redis.
+
+```bash
+docker compose --profile test up -d --wait redis-test
+REDIS_URL_TEST=redis://127.0.0.1:6380/0 npm --prefix backend run test:integration -- test/market-data-jobs.integration-spec.ts
+```
