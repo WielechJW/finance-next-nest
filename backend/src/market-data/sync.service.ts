@@ -15,7 +15,13 @@ export class MarketSyncService {
     if (!mapping) throw new NotFoundException('Brak mapowania instrumentu do dostawcy.');
     const endpoint = { prices: 'eod', dividends: 'div', splits: 'splits' }[kind];
     const payload = await this.provider.request(`${endpoint}/${encodeURIComponent(mapping.symbol)}`, { from, to, ...(kind === 'prices' ? { period: 'd', order: 'a' } : {}) });
-    return kind === 'prices' ? this.history.saveBars(instrumentId, parseBars(payload, from, to)) : this.history.saveActions(instrumentId, parseActions(payload, kind === 'dividends' ? 'DIVIDEND' : 'SPLIT', mapping.instrument.currency));
+    if (kind === 'prices') {
+      const bars = parseBars(payload, from, to);
+      const result = await this.history.saveBars(instrumentId, bars);
+      if (!bars.some(bar => bar.sessionOn === to)) throw new MarketDataError('not_ready', 'Dostawca nie opublikował jeszcze oczekiwanej sesji.');
+      return result;
+    }
+    return this.history.saveActions(instrumentId, parseActions(payload, kind === 'dividends' ? 'DIVIDEND' : 'SPLIT', mapping.instrument.currency));
   }
   async fx(from: string, to: string) {
     marketDate(from); marketDate(to);

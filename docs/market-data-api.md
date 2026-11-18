@@ -83,3 +83,23 @@ REDIS_URL. Każdy test ma osobną nazwę kolejki, a CI uruchamia osobny Redis.
 docker compose --profile test up -d --wait redis-test
 REDIS_URL_TEST=redis://127.0.0.1:6380/0 npm --prefix backend run test:integration -- test/market-data-jobs.integration-spec.ts
 ```
+
+## Kalendarze, świeżość i korekty
+
+Harmonogram uwzględnia strefę giełdy, weekendy, święta i krótkie sesje USA.
+Oczekiwany dzień ceny zmienia się 90 minut po zamknięciu — to ostrożna polityka
+aplikacji, a nie gwarancja publikacji dostawcy. Brak oczekiwanej ceny powoduje
+ponowienie zadania, zamiast uznania pustej serii za sukces. Każde pobranie obejmuje
+poprzednie siedem dni, aby wykrywać korekty; starsze korekty wymagają jawnego
+zadania operatora. Rewizje nie są automatycznie usuwane.
+
+`GET /market-data/instruments/:id/quote` zwraca oczekiwaną sesję, stan
+`fresh/stale/missing/unexpected`, ostatnią cenę i brakujące sesje ostatniego
+tygodnia. Weekend lub zamknięcie rynku nie starzeje samodzielnie piątkowej ceny.
+
+Kalendarz GPW został sprawdzony dla 2026 według
+[uchwały 753/2025](https://www.gpw.pl/pub/GPW/uchwaly/2025/753_2025.pdf),
+a kalendarz USA dla 2026–2028 według [NYSE](https://www.nyse.com/trade/hours-calendars).
+Przed rozpoczęciem nieobjętego roku operator musi zaktualizować kalendarz z
+oficjalnego źródła. Nieznany rok daje błąd konfiguracji, a nie zgadywane sesje.
+Nadzwyczajne zamknięcia wymagają aktualizacji zestawu i przejścia testów.
