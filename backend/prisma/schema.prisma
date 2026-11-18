@@ -61,6 +61,8 @@ model Instrument {
   trades           Trade[]
   openingLots      OpeningLot[]
   securityEntries  SecurityEntry[]
+  priceBars        PriceBar[]
+  corporateActions CorporateAction[]
   createdAt        DateTime                    @default(now())
   updatedAt        DateTime                    @updatedAt
 
@@ -77,6 +79,72 @@ model MarketDataBudget {
   lastRequestAt DateTime? @db.Timestamptz(3)
   blockedUntil  DateTime? @db.Timestamptz(3)
   @@id([provider, keyHash, day])
+}
+
+model PriceBar {
+  id            String   @id @default(uuid()) @db.Uuid
+  instrumentId  String   @db.Uuid
+  instrument    Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  source        String   @db.VarChar(30)
+  sessionOn     DateTime @db.Date
+  open          Decimal  @db.Decimal(28, 10)
+  high          Decimal  @db.Decimal(28, 10)
+  low           Decimal  @db.Decimal(28, 10)
+  close         Decimal  @db.Decimal(28, 10)
+  adjustedClose Decimal  @db.Decimal(28, 10)
+  volume        Decimal  @db.Decimal(28, 0)
+  revision      Int      @default(1)
+  currentSlot   Int?     @default(1)
+  contentHash   String   @db.Char(64)
+  publishedAt   DateTime? @db.Timestamptz(3)
+  fetchedAt     DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([instrumentId, source, sessionOn, revision])
+  @@unique([instrumentId, source, sessionOn, currentSlot])
+  @@index([instrumentId, sessionOn])
+}
+
+model FxRate {
+  id          String   @id @default(uuid()) @db.Uuid
+  source      String   @db.VarChar(30)
+  base        InvestmentCurrency @default(USD)
+  quote       InvestmentCurrency @default(PLN)
+  sessionOn   DateTime @db.Date
+  rate        Decimal  @db.Decimal(28, 8)
+  reference   String   @db.VarChar(80)
+  revision    Int      @default(1)
+  currentSlot Int?     @default(1)
+  contentHash String   @db.Char(64)
+  publishedAt DateTime? @db.Timestamptz(3)
+  fetchedAt   DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([source, base, quote, sessionOn, revision])
+  @@unique([source, base, quote, sessionOn, currentSlot])
+}
+
+enum CorporateActionKind {
+  SPLIT
+  DIVIDEND
+}
+
+model CorporateAction {
+  id          String   @id @default(uuid()) @db.Uuid
+  instrumentId String @db.Uuid
+  instrument  Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  source      String   @db.VarChar(30)
+  kind        CorporateActionKind
+  exDate      DateTime @db.Date
+  paymentOn   DateTime? @db.Date
+  currency    InvestmentCurrency?
+  amount      Decimal? @db.Decimal(28, 8)
+  amountBasis String?  @db.VarChar(30)
+  numerator   Decimal? @db.Decimal(28, 10)
+  denominator Decimal? @db.Decimal(28, 10)
+  revision    Int      @default(1)
+  currentSlot Int?     @default(1)
+  contentHash String   @db.Char(64)
+  publishedAt DateTime? @db.Timestamptz(3)
+  fetchedAt   DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([instrumentId, source, kind, exDate, revision])
+  @@unique([instrumentId, source, kind, exDate, currentSlot])
 }
 
 model InstrumentProviderMapping {

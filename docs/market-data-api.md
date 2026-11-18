@@ -31,3 +31,22 @@ Synchronizacja katalogów kosztuje dwie jednostki. Nie jest wykonywana przy
 starcie API ani przy otwarciu panelu. Testy używają wymyślonych danych.
 JSON dostawcy parsujemy z zachowaniem oryginalnych cyfr liczb (Node 24),
 a liczby rynkowe przechodzą walidację Decimal przed zapisem.
+
+## Notowania, FX i zdarzenia
+
+`PriceBar` przechowuje surowe OHLCV oraz osobne `adjustedClose`; do wyceny
+pozycji używamy surowego close. `FxRate` zapisuje tabelę A NBP jako referencyjny
+kurs PLN za USD. Nie zastępuje kursu rzeczywiście wykonanej wymiany walut.
+`CorporateAction` przechowuje split lub dywidendę, jej podstawę kwotową i
+opcjonalną datę wypłaty. Sam import zdarzenia rynkowego nie zmienia rejestru rachunku.
+
+Identyczne ponowienie aktualizuje tylko czas ostatniego pobrania. Zmiana treści
+tworzy kolejną rewizję; poprzednia pozostaje w bazie, a unikalny aktywny slot
+wskazuje obecną wersję. Blokada instrumentu serializuje równoległe zapisy.
+Źródło, data sesji, pobranie i ewentualna data publikacji pozostają rozdzielone;
+brak chwili publikacji u dostawcy daje `null`, a nie wymyślony czas.
+
+`GET /market-data/instruments/:id/prices?from=2026-11-01&to=2026-11-18`
+wymaga sesji, odczytuje wyłącznie bazę i zwraca aktualne rewizje z liczbami
+jako stringami. Zakres jest ograniczony do roku. Pusta seria oznacza brak
+danych; nie tworzy zerowych cen. Rewizje zachowujemy do odtworzenia obliczeń.
