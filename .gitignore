@@ -28,3 +28,4 @@ Thumbs.db
 .agents/
 .codex/
 .aws/
+deploy/backups/

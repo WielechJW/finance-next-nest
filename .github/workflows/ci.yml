@@ -133,3 +133,16 @@ jobs:
       - run: npm run test:browser
         working-directory: backend
 
+
+  deployment:
+    name: Deployment configuration and backup restore
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash -n deploy/*.sh
+      - run: docker compose --env-file deploy/.env.production.example -f deploy/compose.production.yaml config --quiet
+      - run: deploy/test-backup-restore.sh
+      - run: docker build -f backend/Dockerfile --target migrate -t finance-version-b-migrate:check .
+      - run: docker build -f backend/Dockerfile --target runtime -t finance-version-b-api:check .
+      - run: docker build -f frontend/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.finance.example.com -t finance-version-b-frontend:check .
+      - run: deploy/test-containers.sh
