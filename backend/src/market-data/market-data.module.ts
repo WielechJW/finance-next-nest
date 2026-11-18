@@ -6,8 +6,10 @@ import { MarketDataBudgetService } from './budget.service.js';
 import { EodhdProvider } from './eodhd.provider.js';
 import { MarketInstrumentsController } from './instruments.controller.js';
 import { MarketInstrumentsService } from './instruments.service.js';
+import { MarketHistoryService } from './history.service.js';
+import { MarketSyncService } from './sync.service.js';
 
 @Module({ imports: [PrismaModule, UsersModule], controllers: [MarketInstrumentsController],
-  providers: [MarketDataBudgetService, EodhdProvider, MarketInstrumentsService, SessionAuthGuard],
-  exports: [MarketDataBudgetService, EodhdProvider, MarketInstrumentsService] })
+  providers: [MarketDataBudgetService, EodhdProvider, MarketInstrumentsService, MarketHistoryService, MarketSyncService, SessionAuthGuard],
+  exports: [MarketDataBudgetService, EodhdProvider, MarketInstrumentsService, MarketHistoryService, MarketSyncService] })
 export class MarketDataModule {}
