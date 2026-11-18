@@ -7,6 +7,7 @@ import { warsawToday } from '@/lib/transaction-input';
 import { useSession } from '../session-provider';
 import { useInvestmentResource } from './use-investment-resource';
 import styles from './investments.module.css';
+import { TelegramSettings } from './telegram-settings';
 
 export function MarketCenter() {
   const { state } = useSession();
@@ -77,6 +78,7 @@ function MarketContent() {
       {resource.state.status === 'ready' && <ul className={styles.list}>{resource.state.value.events.items.map(event => <li key={event.id}>{event.ticker} · {event.sessionOn} · {formatInvestment(event.price, 2)} {event.currency} · próg {formatInvestment(event.threshold, 2)}</li>)}</ul>}
       <div className={styles.actions}><button type="button" disabled={eventPage <= 1} onClick={() => setEventPage(eventPage - 1)}>Poprzednie alerty</button><span>Strona alertów {eventPage}</span><button type="button" disabled={resource.state.status !== 'ready' || eventPage * 25 >= resource.state.value.events.total} onClick={() => setEventPage(eventPage + 1)}>Następne alerty</button></div>
     </section>
+    <TelegramSettings />
     <button type="button" onClick={resource.refresh}>Odśwież rynek i alerty</button>
   </section>;
 }
