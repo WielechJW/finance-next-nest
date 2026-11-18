@@ -23,6 +23,12 @@ Stanowią kontrakt dla implementacji kolejnych etapów.
 próbę EODHD dla pięciu spółek GPW i pięciu USA, koszty i ograniczenia.
 Demo potwierdziło dane USA; pokrycie API GPW wymaga własnego klucza.
 
+Aktualizacja 18 listopada: własny klucz Free potwierdził katalogi oraz ceny i
+waluty pięciu spółek z każdego rynku. Pełne #45 nadal ma jawne luki w zdarzeniach,
+fundamentach i dłuższej historii. Prywatną wersję B implementujemy z limitem
+20 jednostek/dzień, wspólnym magazynem cen i obsługą niepełnych danych;
+nie oznacza to pełnego odbioru dostawcy ani uprawnień do publicznej dystrybucji.
+
 [Macierz brokerów INV 0.3](broker-integration-matrix.md) porównuje API,
 rachunki paper, rynki i wykonania oraz zapisuje warunkowy wybór źródła
 danych do MVP i kryteria próby brokerów przed integracją.
