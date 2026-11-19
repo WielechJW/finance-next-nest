@@ -179,6 +179,7 @@ function WalletContent({ onRetry }: { onRetry: () => void }) {
         </div>
         <Link
           className={styles.add}
+          scroll={false}
           href="/dashboard/transactions#transaction-form-heading"
         >
           <UiIcon name="plus" /> Dodaj transakcję

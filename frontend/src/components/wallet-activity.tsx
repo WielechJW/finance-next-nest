@@ -90,6 +90,7 @@ export function WalletActivity() {
         ))}
       <Link
         className={styles.inlineLink}
+        scroll={false}
         href="/dashboard/transactions#history-heading"
       >
         Pełna historia <UiIcon name="arrow-right" />

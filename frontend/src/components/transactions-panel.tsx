@@ -41,6 +41,27 @@ function TransactionsContent() {
   const walletRequest = useRef<AbortController | null>(null);
   const [selection, setSelection] = useState<TransactionSelection | null>(null);
   const [notice, setNotice] = useState("");
+  const entryTarget = useRef("");
+
+  useEffect(() => {
+    entryTarget.current = window.location.hash;
+  }, []);
+
+  useEffect(() => {
+    if (wallet.status === "loading" || categories.state.status === "loading")
+      return;
+    const hash = entryTarget.current;
+    if (hash !== "#history-heading" && hash !== "#transaction-form-heading")
+      return;
+    const frame = requestAnimationFrame(() => {
+      entryTarget.current = "";
+      if (window.location.hash !== hash) return;
+      const heading = document.getElementById(hash.slice(1));
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [wallet.status, categories.state.status]);
 
   useEffect(() => {
     const controller = new AbortController();
