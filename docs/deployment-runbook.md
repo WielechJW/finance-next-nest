@@ -23,7 +23,8 @@ Redis, API, worker i frontend oraz niezależne miejsce na zaszyfrowane kopie.
    Frontend utrwala `NEXT_PUBLIC_API_URL` podczas budowania. Zmiana API_DOMAIN
    wymaga przebudowania frontendu. Użyj wybranego, przetestowanego commita.
 5. `deploy/compose.sh up -d --wait` uruchamia bazę/Redis, wykonuje migracje
-   w osobnym kontenerze, a dopiero po ich sukcesie startuje API i frontend.
+   w osobnym kontenerze, po czym inicjalizuje sześć kategorii i katalog ręczny.
+   Krok można powtórzyć z zachowaniem identyfikatorów. Po jego sukcesie startuje API i frontend.
    Caddy zapewnia HTTPS dla dwóch domen i utrwala certyfikaty. Pierwsze wydanie
    wymaga dostępu do ACME i publicznie poprawnego DNS. Obrazy używają Node 24;
    przed wydaniem produkcyjnym przypnij sprawdzone digesty obrazów bazowych.

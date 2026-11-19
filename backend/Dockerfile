@@ -10,7 +10,7 @@ RUN npm run build
 
 FROM build AS migrate
 USER node
-CMD ["npm", "run", "prisma:deploy"]
+CMD ["sh", "-ec", "npm run prisma:deploy && node prisma/seed.mjs"]
 
 FROM build AS production-deps
 RUN npm prune --omit=dev

@@ -102,6 +102,8 @@ function TransactionFormContent(
   const [saving, setSaving] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const pending = useRef(false);
+  const creationKey = useRef<string | null>(null);
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const saveController = useRef<AbortController | null>(null);
 
   useEffect(
@@ -194,6 +196,7 @@ function TransactionFormContent(
         title,
         occurredOn: values.occurredOn,
       };
+      if (!editing) creationKey.current ??= crypto.randomUUID();
       created = editing
         ? await transactionsApi.update(
             props.transaction.id,
@@ -201,11 +204,13 @@ function TransactionFormContent(
             controller.signal,
           )
         : await transactionsApi.create(
-            { ...input, ...(values.note ? { note: values.note } : {}) },
+            { ...input, idempotencyKey: creationKey.current!, ...(values.note ? { note: values.note } : {}) },
             controller.signal,
           );
       if (controller.signal.aborted) return;
       if (!editing) {
+        creationKey.current = null;
+        setUnconfirmed(false);
         setValues((previous) => ({
           ...previous,
           amount: "",
@@ -225,6 +230,11 @@ function TransactionFormContent(
         (error instanceof ApiError && error.status === 401)
       )
         return;
+      if (!editing) {
+        const uncertain = !(error instanceof ApiError) || error.status === 0 || error.status >= 500;
+        setUnconfirmed(uncertain);
+        if (!uncertain) creationKey.current = null;
+      }
       if (editing && error instanceof ApiError && error.status === 404) {
         setUnavailable(true);
         setFormError(
@@ -281,7 +291,8 @@ function TransactionFormContent(
         aria-busy={saving}
         aria-labelledby={`${prefix}-form-heading`}
       >
-        <div className={styles.fields}>
+        {unconfirmed && <p role="status">Potwierdzenie zapisu nie dotarło. Ponów ten sam zapis, aby sprawdzić wynik.</p>}
+        <fieldset className={styles.fields} disabled={unconfirmed}>
           <div className={styles.field}>
             <label htmlFor={`${prefix}-type`}>Typ operacji</label>
             <select
@@ -395,7 +406,7 @@ function TransactionFormContent(
             </p>
             <FieldError prefix={prefix} name="note" message={errors.note} />
           </div>
-        </div>
+        </fieldset>
         <div role="alert" aria-atomic="true">
           {Object.values(errors).some(Boolean) && (
             <p className={styles.error}>Popraw zaznaczone pola.</p>

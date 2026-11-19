@@ -110,8 +110,10 @@ test('preserves all fields after a network error and saves exactly one transacti
   await page.route(API_URL + '/transactions', async (route) => {
     if (route.request().method() !== 'POST') return route.continue();
     posts += 1;
-    if (posts === 1) await route.abort('failed');
-    else await route.continue();
+    if (posts === 1) {
+      expect((await route.fetch()).status()).toBe(201);
+      await route.abort('failed');
+    } else await route.continue();
   });
   await fillTransaction(page);
   await page

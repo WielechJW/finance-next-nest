@@ -14,6 +14,10 @@ import {
 } from '../transaction-validators.js';
 
 export class CreateTransactionDto {
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsUUID()
+  idempotencyKey?: string;
+
   @IsEnum(TransactionType, { message: 'Typ musi być INCOME albo EXPENSE.' })
   type!: TransactionType;
 

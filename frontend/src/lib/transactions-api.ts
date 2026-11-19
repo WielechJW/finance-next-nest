@@ -239,6 +239,7 @@ export const transactionsApi = {
         method: "POST",
         signal,
         body: JSON.stringify({
+          idempotencyKey: input.idempotencyKey,
           type: input.type,
           amount: input.amount,
           categoryId: input.categoryId,
