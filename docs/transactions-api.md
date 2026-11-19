@@ -492,3 +492,7 @@ i kategorii. Obejmują dokładne saldo po zmianie i usunięciu, autoryzację
 dwóch kont, sesje, CSRF i preflight DELETE. Scenariusze równoległe sprawdzają
 niezależne pola PATCH, walidację po rzeczywistym oczekiwaniu na blokadę
 PostgreSQL, jednoczesne usunięcia i wyścig edycji z usuwaniem.
+Opcjonalne pole `idempotencyKey` w `POST /transactions` przyjmuje UUID.
+Formularz nadaje nowy klucz każdej operacji. Przy utracie odpowiedzi wysyła ten sam
+klucz i dane. Ponowienie zwraca istniejącą transakcję tego portfela. Zmiana treści
+pod tym samym kluczem lub wcześniejsze usunięcie transakcji daje HTTP 409.

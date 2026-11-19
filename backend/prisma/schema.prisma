@@ -366,6 +366,7 @@ model Wallet {
   currency       Currency      @default(PLN)
   openingBalance Decimal       @default(0) @db.Decimal(14, 2)
   transactions   Transaction[]
+  creationRequests TransactionCreation[]
 }
 
 enum TransactionType {
@@ -396,10 +397,22 @@ model Transaction {
   occurredOn DateTime        @db.Date
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
+  creation   TransactionCreation?
 
   // SQL migration additionally checks positive finite amounts and ISO date range.
   @@index([walletId, occurredOn, id])
   @@index([categoryId, type])
+}
+
+model TransactionCreation {
+  walletId      String       @db.Uuid
+  key           String       @db.Uuid
+  payloadHash   String       @db.Char(64)
+  transactionId String?      @unique @db.Uuid
+  wallet        Wallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@id([walletId, key])
 }
 
 model Watchlist {

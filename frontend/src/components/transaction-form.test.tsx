@@ -76,6 +76,7 @@ describe("Transaction form", () => {
       expect(mocks.create).toHaveBeenCalledWith(
         {
           type,
+          idempotencyKey: expect.any(String),
           amount: "12.50",
           categoryId: categories[type === "INCOME" ? 1 : 0]!.id,
           title: "Zakupy",
@@ -147,6 +148,7 @@ describe("Transaction form", () => {
     fireEvent.submit(form());
     await screen.findByText("Wydatek zapisany.");
     expect(mocks.create).toHaveBeenCalledTimes(2);
+    expect(mocks.create.mock.calls[1]?.[0]).toEqual(mocks.create.mock.calls[0]?.[0]);
   });
   it("allows retrying a failed category request while retaining typed data", async () => {
     mocks.categories.mockRejectedValueOnce(

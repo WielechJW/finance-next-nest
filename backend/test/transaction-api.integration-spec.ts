@@ -96,6 +96,21 @@ describe('Transaction and category API (PostgreSQL)', () => {
     return { agent, user, wallet, cookie, sid };
   }
 
+  it('serializes creation retries per wallet and respects later deletion', async () => {
+    const { agent } = await createAccount();
+    const input = { ...validInput, idempotencyKey: randomUUID() };
+    const post = (body: typeof input) => agent.post('/transactions').set('Origin', origin).send(body);
+    const [first, replay] = await Promise.all([post(input).expect(201), post(input).expect(201)]);
+    expect(first.body).toEqual(replay.body);
+    await post({ ...input, amount: '99.00' }).expect(409);
+    await post({ ...input, idempotencyKey: randomUUID() }).expect(201);
+    const stranger = await createAccount();
+    await stranger.agent.post('/transactions').set('Origin', origin).send(input).expect(201);
+    await agent.delete('/transactions/' + (first.body as TransactionResponse).id).set('Origin', origin).expect(204);
+    await post(input).expect(409);
+    expect((await agent.get('/transactions').expect(200)).body).toMatchObject({ total: 1 });
+  });
+
   it('requires a session for categories and transaction creation', async () => {
     await request(app.getHttpServer()).get('/categories').expect(401);
     await request(app.getHttpServer())

@@ -7,6 +7,7 @@ export interface CategoryDto {
 }
 
 export interface CreateTransactionInput {
+  idempotencyKey?: string;
   type: TransactionType;
   amount: string;
   categoryId: string;
@@ -16,10 +17,10 @@ export interface CreateTransactionInput {
 }
 
 export type UpdateTransactionInput = Partial<
-  Omit<CreateTransactionInput, "note">
+  Omit<CreateTransactionInput, "note" | "idempotencyKey">
 > & { note?: string | null };
 
-export interface TransactionDto extends Omit<CreateTransactionInput, "note"> {
+export interface TransactionDto extends Omit<CreateTransactionInput, "note" | "idempotencyKey"> {
   id: string;
   walletId: string;
   note: string | null;

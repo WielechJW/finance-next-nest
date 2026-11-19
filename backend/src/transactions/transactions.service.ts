@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { Prisma, type TransactionType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { formatMoney } from '../wallets/money.js';
@@ -130,25 +132,40 @@ export class TransactionsService {
       });
       if (!wallet) throw new NotFoundException('Nie znaleziono portfela.');
 
-      await this.assertCategory(this.prisma, input.type, input.categoryId);
-
-      const transaction = await this.prisma.transaction.create({
-        data: {
-          walletId: wallet.id,
-          type: input.type,
-          amount: new Prisma.Decimal(input.amount),
-          categoryId: input.categoryId,
-          title: input.title,
-          note: input.note ?? null,
-          occurredOn: new Date(input.occurredOn + 'T00:00:00.000Z'),
-        },
-        select: transactionSelect,
+      const write = async (db: Prisma.TransactionClient) => {
+        await this.assertCategory(db, input.type, input.categoryId);
+        return db.transaction.create({
+          data: {
+            walletId: wallet.id, type: input.type, amount: new Prisma.Decimal(input.amount),
+            categoryId: input.categoryId, title: input.title, note: input.note ?? null,
+            occurredOn: new Date(input.occurredOn + 'T00:00:00.000Z'),
+          },
+          select: transactionSelect,
+        });
+      };
+      const key = input.idempotencyKey;
+      if (!key) return this.toResponse(await write(this.prisma));
+      const payloadHash = createHash('sha256').update(JSON.stringify([
+        input.type, input.amount, input.categoryId.toLowerCase(), input.title, input.note ?? null, input.occurredOn,
+      ])).digest('hex');
+      return await this.prisma.$transaction(async db => {
+        await db.$queryRaw`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id}::uuid FOR UPDATE`;
+        const receipt = await db.transactionCreation.findUnique({
+          where: { walletId_key: { walletId: wallet.id, key } },
+          include: { transaction: { select: transactionSelect } },
+        });
+        if (receipt) {
+          if (receipt.payloadHash !== payloadHash) throw new ConflictException('Ten zapis ma już inną treść.');
+          if (!receipt.transaction) throw new ConflictException('Zapisana wcześniej transakcja została usunięta.');
+          return this.toResponse(receipt.transaction);
+        }
+        const transaction = await write(db);
+        await db.transactionCreation.create({ data: { walletId: wallet.id, key, payloadHash, transactionId: transaction.id } });
+        return this.toResponse(transaction);
       });
-
-      return this.toResponse(transaction);
     } catch (error: unknown) {
       if (
-        error instanceof BadRequestException ||
+        error instanceof ConflictException || error instanceof BadRequestException ||
         error instanceof NotFoundException
       ) {
         throw error;
