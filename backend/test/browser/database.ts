@@ -36,6 +36,14 @@ export class BrowserDatabase {
     return { id, ticker };
   }
 
+  async populateCatalog() {
+    const rows = await this.pool.query<{ id: string }>(
+      `INSERT INTO "Instrument" (id, ticker, mic, currency, "createdAt", "updatedAt")
+       SELECT gen_random_uuid(), $1 || n::text, 'XNAS', 'USD', NOW(), NOW()
+       FROM generate_series(1, 1001) n RETURNING id`, ['A' + randomUUID().slice(0, 8)]);
+    for (const row of rows.rows) this.instrumentIds.add(row.id);
+  }
+
   async expireSessions(account: TestAccount): Promise<void> {
     if (!this.emails.has(account.email))
       throw new Error('Konto nie należy do tego testu.');

@@ -154,6 +154,7 @@ test('supports mobile keyboard entry, field validation, rejected writes and corr
   await form(page)
     .getByRole('combobox', { name: 'Typ operacji', exact: true })
     .selectOption('BUY');
+  await form(page).getByLabel('Szukaj instrumentu').fill(instrument.ticker);
   await form(page)
     .getByRole('combobox', { name: 'Instrument', exact: true })
     .selectOption(instrument.id);

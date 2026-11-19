@@ -12,9 +12,12 @@ export function marketArray<T>(value: unknown, parse: (item: unknown) => T): T[]
 export function marketInteger(value: unknown): number { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new ApiError(502, 'Nieprawidłowy licznik.'); return value; }
 export function marketBoolean(value: unknown): boolean { if (typeof value !== 'boolean') throw new ApiError(502, 'Nieprawidłowy stan danych.'); return value; }
 const money = (value: unknown) => { const row = marketObject(value); return { PLN: marketDecimal(row.PLN), USD: marketDecimal(row.USD) }; };
+function pendingSplits(value: unknown) {
+  return marketArray(value ?? [], item => { const split = marketObject(item); return { ticker: marketText(split.ticker), exDate: marketText(split.exDate) }; });
+}
 function valuation(value: unknown) {
   const row = marketObject(value);
-  return { asOf: marketText(row.asOf), complete: marketBoolean(row.complete), valuePln: marketNullableDecimal(row.valuePln), resultPln: marketNullableDecimal(row.resultPln),
+  return { asOf: marketText(row.asOf), pendingSplits: pendingSplits(row.pendingSplits), complete: marketBoolean(row.complete), valuePln: marketNullableDecimal(row.valuePln), resultPln: marketNullableDecimal(row.resultPln),
     netContributionsPln: marketNullableDecimal(row.netContributionsPln), cash: money(row.cash), realized: money(row.realized), dividendsGross: money(row.dividendsGross), feesAndTaxes: money(row.feesAndTaxes),
     allocation: (() => { const a = marketObject(row.allocation); const parse = (value: unknown) => { const r = marketObject(value); return { label: marketText(r.label), percent: marketNullableDecimal(r.percent) }; }; return { markets: marketArray(a.markets, parse), currencies: marketArray(a.currencies, parse) }; })(),
     positions: marketArray(row.positions, value => { const p = marketObject(value), i = marketObject(p.instrument), q = p.quote === null ? null : marketObject(p.quote);
@@ -35,7 +38,7 @@ export const investmentMarketApi = {
   valuation: async (portfolioId: string, signal?: AbortSignal) => valuation(await apiRequest<unknown>(`/investments/portfolios/${encodeURIComponent(portfolioId)}/valuation`, { signal })),
   history: async (portfolioId: string, from: string, to: string, signal?: AbortSignal) => {
     const data = marketObject(await apiRequest<unknown>(`/investments/portfolios/${encodeURIComponent(portfolioId)}/valuations?${new URLSearchParams({ from, to })}`, { signal }));
-    return { twrPercent: marketNullableDecimal(data.twrPercent), items: marketArray(data.items, value => { const row = marketObject(value); return { asOf: marketText(row.asOf), valuePln: marketNullableDecimal(row.valuePln), resultPln: marketNullableDecimal(row.resultPln) }; }) };
+    return { twrPercent: marketNullableDecimal(data.twrPercent), items: marketArray(data.items, value => { const row = marketObject(value); return { asOf: marketText(row.asOf), pendingSplits: pendingSplits(row.pendingSplits), valuePln: marketNullableDecimal(row.valuePln), resultPln: marketNullableDecimal(row.resultPln) }; }) };
   },
   actions: async (p: string, a: string, signal?: AbortSignal) => marketArray(await apiRequest<unknown>(`${investmentAccountPath(p, a)}/corporate-actions`, { signal }), action),
   confirmAction: (p: string, a: string, actionId: string, data: unknown) => apiRequest(`${investmentAccountPath(p, a)}/corporate-actions/${encodeURIComponent(actionId)}/confirm`, { method: 'POST', body: JSON.stringify(data) }),

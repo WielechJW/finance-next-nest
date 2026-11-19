@@ -237,15 +237,14 @@ function AccountContent({
   const [notice, setNotice] = useState("");
   const load = useCallback(
     async (signal: AbortSignal) => {
-      const [account, summary, history, instruments, latest] =
+      const [account, summary, history, latest] =
         await Promise.all([
           investmentsApi.account(portfolioId, accountId, signal),
           investmentsApi.summary(portfolioId, accountId, signal),
           investmentsApi.history(portfolioId, accountId, query, signal),
-          investmentsApi.instruments(signal),
           investmentsApi.history(portfolioId, accountId, { page: 1 }, signal),
         ]);
-      return { account, summary, history, instruments, latest };
+      return { account, summary, history, latest };
     },
     [portfolioId, accountId, query],
   );
@@ -335,7 +334,6 @@ function AccountContent({
               key={selection?.id ?? "new"}
               portfolioId={portfolioId}
               accountId={accountId}
-              instruments={ready.instruments}
               sequence={
                 Math.max(
                   0,
@@ -374,6 +372,7 @@ function AccountContent({
                     <h3>
                       {investmentLabels[event.type] ?? event.type}
                       {event.trade && ` · ${event.trade.instrument.ticker}`}
+                      {event.split && ` · ${event.split.instrument.ticker} · ${formatInvestment(event.split.numerator)}:${formatInvestment(event.split.denominator)}`}
                     </h3>
                     <p>
                       <time dateTime={event.occurredOn}>

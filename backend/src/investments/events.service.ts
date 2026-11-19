@@ -10,7 +10,7 @@ import { replayBalances } from './posting.js';
 
 const instrumentSelect = { id: true, ticker: true, mic: true, currency: true, isin: true } as const;
 export const eventInclude = {
-  split: true,
+  split: { include: { instrument: { select: instrumentSelect } } },
   cashEntries: { orderBy: { id: 'asc' as const } },
   securityEntries: { orderBy: { id: 'asc' as const } },
   trade: { include: { instrument: { select: instrumentSelect } } },
@@ -31,6 +31,7 @@ function response(event: EventRecord) {
     fxRatePlnPerUsd: event.fxRatePlnPerUsd?.toFixed(8) ?? null,
     cashEntries: event.cashEntries.map((entry) => ({ kind: entry.kind, currency: entry.currency, amount: entry.amount.toFixed(2) })),
     securityEntries: event.securityEntries.map((entry) => ({ instrumentId: entry.instrumentId, quantity: entry.quantity.toFixed(10) })),
+    split: event.split ? { instrument: event.split.instrument, instrumentId: event.split.instrumentId, numerator: event.split.numerator.toFixed(10), denominator: event.split.denominator.toFixed(10) } : null,
     trade: event.trade ? { instrument: event.trade.instrument, quantity: event.trade.quantity.toFixed(10),
       unitPrice: event.trade.unitPrice.toFixed(10), grossAmount: event.trade.grossAmount.toFixed(2) } : null,
     openingLot: event.openingLot ? { instrument: event.openingLot.instrument, quantity: event.openingLot.quantity.toFixed(10),
@@ -84,7 +85,7 @@ export class InvestmentEventsService {
       accountId, account: { portfolioId, portfolio: { userId } },
       ...(input.view === 'effective' ? { activeSlot: 1 } : {}),
       ...(input.type ? { type: input.type } : {}),
-      ...(input.instrumentId ? { securityEntries: { some: { instrumentId: input.instrumentId } } } : {}),
+      ...(input.instrumentId ? { OR: [{ securityEntries: { some: { instrumentId: input.instrumentId } } }, { split: { instrumentId: input.instrumentId } }] } : {}),
       ...(input.from || input.to ? { occurredOn: {
         ...(input.from ? { gte: new Date(`${input.from}T00:00:00.000Z`) } : {}),
         ...(input.to ? { lte: new Date(`${input.to}T00:00:00.000Z`) } : {}),

@@ -14,7 +14,7 @@ export function PortfolioValuation({ portfolioId }: { portfolioId: string }) {
   return <section className={styles.card} aria-label="Wycena rynkowa portfela">
     <h2>Wycena rynkowa</h2>
     {resource.state.status === 'loading' ? <p role="status">Ładowanie wyceny…</p> : resource.state.status === 'error' ? <p role="alert">{resource.state.message}</p> : <>
-      {!resource.state.value.complete && <p role="status">Wycena jest niepełna: brakuje aktualnej ceny lub kursu walut.</p>}
+      {!resource.state.value.complete && <p role="status">Wycena jest niepełna. {resource.state.value.pendingSplits.length ? `Uzgodnij split na rachunku: ${resource.state.value.pendingSplits.map(s => s.ticker + ' (' + s.exDate + ')').join(', ')}.` : 'Brakuje aktualnej ceny lub kursu walut.'}</p>}
       <dl className={styles.balances}>
         <div><dt>Wartość portfela</dt><dd>{display(resource.state.value.valuePln)}</dd></div>
         <div><dt>Wynik po uwzględnieniu wkładów</dt><dd>{display(resource.state.value.resultPln)}</dd></div>
@@ -49,7 +49,7 @@ function ValuationHistory({ portfolioId }: { portfolioId: string }) {
     </form>
     {resource.state.status === 'loading' ? <p role="status">Ładowanie historii…</p> : resource.state.status === 'error' ? <p role="alert">{resource.state.message}</p> : <>
       <p>TWR: {display(resource.state.value.twrPercent, '%')}. Przepływy przyjmujemy na początek dnia; brak danych pozostaje luką.</p>
-      <ul className={styles.list}>{resource.state.value.items.map(row => <li key={row.asOf}><time dateTime={row.asOf}>{row.asOf}</time> · Wartość: {display(row.valuePln)} · Wynik: {display(row.resultPln)}</li>)}</ul>
+      <ul className={styles.list}>{resource.state.value.items.map(row => <li key={row.asOf}><time dateTime={row.asOf}>{row.asOf}</time> · Wartość: {display(row.valuePln)} · Wynik: {display(row.resultPln)}{row.pendingSplits.length > 0 && ` · Split do uzgodnienia: ${row.pendingSplits.map(split => split.ticker).join(', ')}`}</li>)}</ul>
     </>}
   </section>;
 }

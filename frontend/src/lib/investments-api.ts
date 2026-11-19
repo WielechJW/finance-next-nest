@@ -26,6 +26,7 @@ export type InvestmentEvent = {
   marketSessionOn: string | null;
   settledOn: string | null;
   cashEntries: { kind: string; currency: string; amount: string }[];
+  split?: { instrument: InvestmentInstrument; numerator: string; denominator: string } | null;
   trade: {
     instrument: InvestmentInstrument;
     quantity: string;
@@ -147,6 +148,7 @@ function event(value: unknown): InvestmentEvent {
     !["DATE", "INSTANT"].includes(String(v.timePrecision))
   )
     invalid();
+  const split = v.split == null ? null : object(v.split);
   const t = v.trade === null ? null : object(v.trade);
   return {
     id: id(v.id),
@@ -172,6 +174,7 @@ function event(value: unknown): InvestmentEvent {
         amount: decimal(e.amount),
       };
     }),
+    split: split ? { instrument: instrument(split.instrument), numerator: decimal(split.numerator), denominator: decimal(split.denominator) } : null,
     trade: t
       ? {
           instrument: instrument(t.instrument),
@@ -262,11 +265,11 @@ export const investmentsApi = {
     a: string,
     input: { name?: string; archived?: boolean },
   ) => account(await write(investmentAccountPath(p, a), input, "PATCH")),
-  instruments: async (signal?: AbortSignal) =>
-    array(
-      await apiRequest<unknown>("/investments/instruments", { signal }),
-      instrument,
-    ),
+  searchInstruments: async (q: string, page: number, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ q, page: String(page), pageSize: "25" });
+    const result = object(await apiRequest<unknown>(`/market-data/instruments?${params}`, { signal }));
+    return { items: array(result.items, instrument), total: integer(result.total), pageSize: integer(result.pageSize, 1) };
+  },
   summary: async (p: string, a: string, signal?: AbortSignal) =>
     summary(
       await apiRequest<unknown>(`${investmentAccountPath(p, a)}/summary`, {

@@ -25,7 +25,18 @@ export class PortfolioValuationService {
       const instruments = await tx.instrument.findMany({ where: { id: { in: [...ids] } }, orderBy: { id: 'asc' } });
       const prices = await tx.priceBar.findMany({ where: { instrumentId: { in: [...ids] }, source: 'EODHD', currentSlot: 1, sessionOn: { lte: new Date(`${asOf}T00:00:00Z`) } }, orderBy: { sessionOn: 'desc' } });
       const fx = await tx.fxRate.findMany({ where: { source: 'NBP', base: 'USD', quote: 'PLN', currentSlot: 1, sessionOn: { lte: new Date(`${asOf}T00:00:00Z`) } }, orderBy: { sessionOn: 'desc' } });
-      return { portfolio, accounts, instruments, prices, fx };
+      const splits = await tx.corporateAction.findMany({ where: { instrumentId: { in: [...ids] }, kind: 'SPLIT', currentSlot: 1, exDate: { lte: new Date(asOf) } }, orderBy: [{ exDate: 'asc' }, { id: 'asc' }] });
+      const unresolved = accounts.flatMap(account => splits.flatMap(action => {
+        const { instrumentId, exDate, numerator, denominator } = action;
+        const confirmed = account.events.some(event => event.split?.instrumentId === instrumentId &&
+          event.occurredOn.getTime() === exDate.getTime() && numerator && denominator &&
+          new D(event.split.numerator.toString()).times(denominator.toString()).eq(new D(event.split.denominator.toString()).times(numerator.toString())));
+        if (confirmed) return [];
+        const prior = replayBalances(account.events.filter(event => event.occurredOn < exDate));
+        if (!new D(prior.securities[instrumentId] ?? 0).gt(0)) return [];
+        return [{ accountId: account.id, instrumentId, ticker: instruments.find(row => row.id === instrumentId)!.ticker, exDate: dayOf(exDate), actionId: action.id }];
+      })).sort((a, b) => a.actionId.localeCompare(b.actionId) || a.accountId.localeCompare(b.accountId));
+      return { portfolio, accounts, instruments, prices, fx, unresolved };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
   calculate(data: Awaited<ReturnType<PortfolioValuationService['load']>>, asOf: string, now = new Date(`${asOf}T22:59:59Z`)) {
@@ -50,7 +61,9 @@ export class PortfolioValuationService {
         prior.quantity = prior.quantity.plus(position.quantity); prior.cost = prior.cost.plus(position.cost); held.set(position.instrumentId, prior);
       }
     }
-    let complete = true;
+    const pendingSplits = data.unresolved.filter(split => split.exDate <= asOf);
+    const affected = new Set(pendingSplits.map(split => split.instrumentId));
+    let complete = pendingSplits.length === 0;
     let known = cash.PLN;
     const usdCash = convert(cash.USD.toFixed(), 'USD');
     if (usdCash === null) complete = false; else known = known.plus(usdCash);
@@ -59,7 +72,7 @@ export class PortfolioValuationService {
       const expected = expectedSession(instrument.mic, now);
       const price = data.prices.find(row => row.instrumentId === instrumentId && dayOf(row.sessionOn) <= expected);
       const status = !price ? 'missing' : dayOf(price.sessionOn) < expected ? 'stale' : 'fresh';
-      const value = price ? position.quantity.times(price.close.toString()) : null;
+      const value = price && !affected.has(instrumentId) ? position.quantity.times(price.close.toString()) : null;
       const pln = value ? convert(value.toFixed(), position.currency) : null;
       if (status !== 'fresh' || pln === null) complete = false;
       if (pln) known = known.plus(pln);
@@ -95,7 +108,7 @@ export class PortfolioValuationService {
     const allocation = (label: string, value: InstanceType<typeof D>) => ({ label, valuePln: value.toFixed(8), percent: complete && known.gt(0) ? value.div(known).times(100).toFixed(4) : null });
     const ledgerHash = sha(events.map(event => [event.id, event.revision]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
     const fx = data.fx.find(row => row.id === [...fxIds].at(0));
-    const result = { portfolio: data.portfolio, asOf, complete, valuePln: complete ? known.toFixed(8) : null, knownValuePln: known.toFixed(8),
+    const result = { portfolio: data.portfolio, asOf, complete, pendingSplits, valuePln: complete ? known.toFixed(8) : null, knownValuePln: known.toFixed(8),
       cash: { PLN: cash.PLN.toFixed(2), USD: cash.USD.toFixed(2) }, positions,
       allocation: { markets: [...marketValues].map(([label, value]) => allocation(label, value)), currencies: (['PLN', 'USD'] as const).map(label => allocation(label, currencyValues[label])) },
       netContributionsPln: flowsComplete ? flows.toFixed(8) : null, externalFlowTodayPln: todayFlowComplete ? todayFlow.toFixed(8) : null,
@@ -104,7 +117,7 @@ export class PortfolioValuationService {
       feesAndTaxes: { PLN: fees.PLN.toFixed(2), USD: fees.USD.toFixed(2) },
       fx: fx ? { id: fx.id, source: fx.source, sessionOn: dayOf(fx.sessionOn), rate: fx.rate.toFixed(8), reference: fx.reference } : null,
       openingPositionToday: events.some(event => !!event.openingLot && dayOf(event.occurredOn) === asOf), ledgerHash };
-    return { ...result, contentHash: sha({ ledgerHash, asOf, complete, prices: positions.map(row => [row.quote?.id, row.expectedSessionOn]), fx: [...fxIds].sort(), method: 'portfolio-v1' }) };
+    return { ...result, contentHash: sha({ ledgerHash, asOf, complete, pendingSplits, prices: positions.map(row => [row.quote?.id, row.expectedSessionOn]), fx: [...fxIds].sort(), method: 'portfolio-v2' }) };
   }
   async current(userId: string, portfolioId: string, now = new Date()) {
     const day = zonedClock(now, 'Europe/Warsaw').day;
@@ -142,7 +155,7 @@ export class PortfolioValuationService {
       const dailyFactor = valid ? denominator!.isZero() ? new D(1) : new D(row.valuePln!).div(denominator!) : null;
       if (!dailyFactor) twrComplete = false; else factor = factor.times(dailyFactor);
       const benchmarkEnd = benchmarkValue(day);
-      items.push({ asOf: day, valuePln: row.valuePln, resultPln: row.resultPln, complete: row.complete, externalFlowPln: row.externalFlowTodayPln,
+      items.push({ asOf: day, valuePln: row.valuePln, resultPln: row.resultPln, complete: row.complete, pendingSplits: row.pendingSplits, externalFlowPln: row.externalFlowTodayPln,
         dailyReturnPercent: dailyFactor?.minus(1).times(100).toFixed(6) ?? null,
         twrPercent: twrComplete ? factor.minus(1).times(100).toFixed(6) : null,
         benchmarkPercent: benchmarkStart && benchmarkEnd ? benchmarkEnd.div(benchmarkStart).minus(1).times(100).toFixed(6) : null });
