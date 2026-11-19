@@ -225,20 +225,20 @@ wycena rynkowa pojawia się w etapie 5.
 
 **Cel:** zbudować wspólne źródło danych dla wyceny, analiz i alertów.
 
-- [ ] **4.1. Dodać adapter dostawcy i katalog instrumentów.** Import katalogu
+- [x] **4.1. Dodać adapter dostawcy i katalog instrumentów.** Import katalogu
   GPW/USA, wyszukiwarka, mapowanie symboli oraz walidacja odpowiedzi.
   Klucze i limity dostawcy obsługuje backend. Na początek synchronizować
   instrumenty posiadane i obserwowane, aby kontrolować zużycie API.
-- [ ] **4.2. Dodać `PriceBar`, `FxRate` i `CorporateAction`.** Zapisywać surowe
+- [x] **4.2. Dodać `PriceBar`, `FxRate` i `CorporateAction`.** Zapisywać surowe
   OHLCV, osobno wartości skorygowane i ich znaczenie, źródło, wersję oraz
   daty publikacji/pobrania. NBP jest kandydatem do dziennych kursów referencyjnych;
   faktyczna wymiana walut korzysta z kursu zapisanej operacji.
-- [ ] **4.3. Uruchomić worker NestJS i BullMQ z Redis.** Osobny entrypoint
+- [x] **4.3. Uruchomić worker NestJS i BullMQ z Redis.** Osobny entrypoint
   workera, harmonogramy, retry z opóźnieniem, limity, timeouty, trwały rejestr
   uruchomień i blokada równoległej synchronizacji tego samego zakresu.
   Zadania biznesowe mają trwałe identyfikatory w PostgreSQL; outbox pozwala
   ponownie zasilić kolejkę po awarii. Dodać Redis do Compose i odpowiednich testów CI.
-- [ ] **4.4. Obsłużyć sesje i jakość danych.** Kalendarze obu giełd, święta,
+- [x] **4.4. Obsłużyć sesje i jakość danych.** Kalendarze obu giełd, święta,
   skrócone sesje i niezależne zmiany czasu. Przeprowadzać synchronizację
   po oczekiwanym udostępnieniu danych; później sprawdzać korekty i luki.
   Opisać retencję wersji danych oraz warunki oznaczania ceny jako nieaktualnej.
@@ -252,17 +252,17 @@ Zamknięta sesja sama w sobie nie oznacza awarii danych.
 
 **Cel:** pokazać wartość portfela i wynik z rozdzieleniem wpłat oraz wypłat.
 
-- [ ] **5.1. Wyliczać wycenę.** Liczba akcji × surowa cena rynkowa, gotówka
+- [x] **5.1. Wyliczać wycenę.** Liczba akcji × surowa cena rynkowa, gotówka
   w każdej walucie, suma w PLN według określonego kursu referencyjnego.
   Każdy wynik wskazuje datę ceny i waluty; suma ma status kompletności.
-- [ ] **5.2. Obsłużyć zdarzenia korporacyjne.** Split zmienia ilość i cenę
+- [x] **5.2. Obsłużyć zdarzenia korporacyjne.** Split zmienia ilość i cenę
   jednostkową kosztu, zachowując łączny koszt; dywidenda ma osobno zdarzenie
   rynkowe i rzeczywistą wypłatę na rachunek. Propozycja wypłaty wymaga
   potwierdzenia albo uzgodnienia z brokerem/importem. Rewizja zdarzenia zachowuje audyt.
-- [ ] **5.3. Dodać wynik i alokację.** Zysk zrealizowany, niezrealizowany,
+- [x] **5.3. Dodać wynik i alokację.** Zysk zrealizowany, niezrealizowany,
   dywidendy, opłaty, udział spółek, rynków i walut. Określić metodę wyceny
   przepływów w PLN; wzrost salda po wpłacie jest przepływem zewnętrznym.
-- [ ] **5.4. Dodać historyczne snapshoty i stopy zwrotu.** Najpierw kwotowy
+- [x] **5.4. Dodać historyczne snapshoty i stopy zwrotu.** Najpierw kwotowy
   wynik po uwzględnieniu wpłat i wypłat. Następnie TWR z wyceną na granicach
   przepływów i jawną konwencją dla danych dziennych. Przy brakujących wycenach
   prezentować lukę. Porównanie z benchmarkiem używa zgodnej waluty i zasad dywidend.
@@ -277,18 +277,18 @@ Testować też ruch USD/PLN przy niezmienionej cenie akcji, brak FX i korektę h
 
 **Cel:** użytkownik definiuje warunki obserwacji wybranych instrumentów.
 
-- [ ] **6.1. Dodać watchlisty.** Dodawanie/usuwanie instrumentów GPW i USA,
+- [x] **6.1. Dodać watchlisty.** Dodawanie/usuwanie instrumentów GPW i USA,
   ostatnia cena, waluta, data aktualizacji i przejście do szczegółów spółki.
-- [ ] **6.2. Dodać `AlertRule` i `AlertEvent`.** Pierwszy typ: przekroczenie
+- [x] **6.2. Dodać `AlertRule` i `AlertEvent`.** Pierwszy typ: przekroczenie
   ceny w górę lub w dół. Reguła ma próg, walutę, częstotliwość, stan aktywności
   i tryb jednorazowy albo ponowne uzbrojenie po powrocie ceny na drugą stronę.
-- [ ] **6.3. Zaimplementować ewaluację po aktualizacji danych.** Porównywać
+- [x] **6.3. Zaimplementować ewaluację po aktualizacji danych.** Porównywać
   kolejne prawidłowe obserwacje; zdefiniować zachowanie pierwszego pomiaru,
   cooldown i reakcję na korektę notowania. Odrzucać dane niespełniające
   wymagań świeżości. Zapis zdarzenia i outbox jest jedną transakcją.
-- [ ] **6.4. Dodać panel i historię alertów.** Formularz progu, włączenie,
+- [x] **6.4. Dodać panel i historię alertów.** Formularz progu, włączenie,
   wyłączenie, usunięcie reguły oraz podgląd, kiedy i na jakich danych zadziałała.
-  Po podstawowej regule dodać zmianę procentową między zamknięciami sesji.
+- [ ] Rozszerzyć alerty o zmianę procentową między zamknięciami sesji.
 
 **Ukończenie:** jedno przekroczenie tworzy jedno logiczne zdarzenie również
 przy równoczesnych workerach i ponowieniu zadania. Testy obejmują dotknięcie
@@ -299,11 +299,11 @@ Alerty dzienne są opisane jako sprawdzane po aktualizacji ceny zamknięcia.
 
 **Cel:** otrzymywać powiadomienia również po zamknięciu przeglądarki.
 
-- [ ] **7.1. Połączyć konto z Telegramem.** Użytkownik inicjuje połączenie,
+- [x] **7.1. Połączyć konto z Telegramem.** Użytkownik inicjuje połączenie,
   otrzymuje krótko ważny jednorazowy kod i potwierdza go w prywatnej rozmowie
   z botem. Backend wiąże zweryfikowane `chat_id` z kontem. Obsłużyć odłączenie
   oraz uwierzytelnienie webhooka. Token bota jest sekretem serwera.
-- [ ] **7.2. Zaimplementować `Notification` i dostarczanie.** Wiadomość zawiera
+- [x] **7.2. Zaimplementować `Notification` i dostarczanie.** Wiadomość zawiera
   instrument, cenę, próg, czas i link do aplikacji. Zapisywać próby, odpowiedzi,
   retry oraz stany `pending/sent/failed/unknown`; zapewnić limity i ciszę nocną
   z jawną regułą dla opóźnionych alertów. Dodać opcjonalne podsumowanie sesji.
@@ -311,7 +311,8 @@ Alerty dzienne są opisane jako sprawdzane po aktualizacji ceny zamknięcia.
   HTTPS, sesje i CORS dla rzeczywistych domen, migracje przed startem,
   restart procesów, health/readiness, backup i przetestowane odtworzenie.
   Utrwalać Redis oraz zapewnić możliwość odbudowy zadań z rejestru w PostgreSQL.
-- [ ] **7.4. Dodać obserwowalność.** Opóźnienie aktualizacji cen, kolejka,
+  Odbiór docelowych domen i rzeczywistej dostawy na telefon jest otwarty. [Zadanie #74](https://github.com/WielechJW/finance-next-nest/issues/74)
+- [x] **7.4. Dodać obserwowalność.** Opóźnienie aktualizacji cen, kolejka,
   błędy dostawcy, ostatnie poprawne wykonanie workera i skuteczność wysyłki.
   Udostępnić kontrolowane ponowienie błędnego zadania i instrukcję obsługi awarii.
 

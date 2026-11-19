@@ -179,7 +179,7 @@ describe('Investment concurrency and revisions (PostgreSQL)', () => {
       posting.postForUser(owner.userId, input), posting.postForUser(owner.userId, input),
     ]);
     expect(first.eventId).toBe(retry.eventId);
-    expect([first.duplicate, retry.duplicate].sort()).toEqual([false, true]);
+    expect(first.duplicate).toBe(!retry.duplicate);
     expect(await prisma.investmentEvent.count({ where: { accountId: owner.accountId } })).toBe(1);
     await expect(posting.correctForUser(stranger.userId, {
       accountId: owner.accountId, targetEventId: first.eventId, expectedRevision: 0,

@@ -20,6 +20,12 @@ describe('Reviewed exchange calendars and freshness', () => {
     expect(quoteFreshness('XNYS', null, new Date('2026-11-27T19:31:00Z')).status).toBe('missing');
     expect(missingSessions('XWAR', '2026-11-10', '2026-11-12', new Set(['2026-11-10']))).toEqual(['2026-11-12']);
   });
+  it('uses the 2027 GPW resolution, including the first session and year-end closures', () => {
+    for (const day of ['01-01', '01-06', '03-26', '03-29', '05-03', '05-27', '11-01', '11-11', '12-24', '12-31'])
+      expect(session('XWAR', '2027-' + day).trading).toBe(false);
+    expect(expectedSession('XWAR', new Date('2027-01-03T22:00:00Z'))).toBe('2026-12-30');
+    expect(expectedSession('XWAR', new Date('2027-01-04T22:00:00Z'))).toBe('2027-01-04');
+  });
   it('refuses to invent holidays for an unreviewed year', () => {
     expect(() => session('XWAR', '2030-01-02')).toThrow('Kalendarz');
   });

@@ -57,9 +57,7 @@ MarketJob w celu odzyskiwania kolejki. Rejestry, rewizje cen i snapshoty są
 zachowywane; etap B nie kasuje historycznych wersji automatycznie. Monitoruj
 rozmiar i zaplanuj archiwizację przed wprowadzeniem retencji.
 
-Kalendarz GPW obejmuje zatwierdzony rok 2026, USA lata 2026–2028. Nieznany rok
-zatrzymuje planowanie zamiast zgadywać sesje. Przed 2027 trzeba zaktualizować
-GPW na podstawie oficjalnego kalendarza i uruchomić testy świąt/DST.
+Kalendarz GPW obejmuje zatwierdzone lata 2026–2027, USA lata 2026–2028. Przy braku kalendarza worker pomija dany rynek, zapisuje komunikat i nadal przekazuje oczekujące zadania. Przed 2028 r. należy uzupełnić sesje GPW. [Uchwała GPW na 2027 r.](https://www.gpw.pl/pub/GPW/uchwaly/2025/754_2025.pdf)
 Weryfikacja dostawcy #45 pozostaje częściowa: potwierdzono katalogi i ceny
 próbki GPW/USA; pełny zakres zdarzeń, fundamentów i długiej historii jest otwarty.
 
