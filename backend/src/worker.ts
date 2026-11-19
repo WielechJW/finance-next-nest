@@ -6,6 +6,7 @@ import { WorkerModule } from './worker.module.js';
 import { PortfolioValuationService } from './portfolio-analytics/valuation.service.js';
 import { MarketJobsService } from './jobs/jobs.service.js';
 import { MarketSchedulerService } from './jobs/scheduler.service.js';
+import { runWorkerCycle } from './jobs/worker-cycle.js';
 import { MarketWorkerRuntime } from './jobs/runtime.js';
 import { redisConnection } from './jobs/redis.js';
 import { MarketSyncService } from './market-data/sync.service.js';
@@ -112,13 +113,12 @@ async function bootstrap() {
     if (ticking) return;
     ticking = true;
     try {
-      await scheduler.schedule();
-      await notifications.scheduleSummaries();
-      await runtime.dispatch();
-    } catch {
-      console.error(
-        'Nie udało się zaplanować synchronizacji; ponowienie przy następnym przebiegu.',
-      );
+      await runWorkerCycle({
+        market: () => scheduler.schedule(),
+        summaries: () => notifications.scheduleSummaries(),
+        dispatch: () => runtime.dispatch(),
+        heartbeat: () => scheduler.heartbeat(),
+      });
     } finally {
       ticking = false;
     }

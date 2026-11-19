@@ -4,6 +4,8 @@ import { investmentScenario } from './support/investment-scenario.js';
 import { InvestmentPostingService } from '../src/investments/posting.service.js';
 import { PortfolioValuationService } from '../src/portfolio-analytics/valuation.service.js';
 import { CorporateActionsService } from '../src/portfolio-analytics/corporate-actions.service.js';
+import { MarketSchedulerService } from '../src/jobs/scheduler.service.js';
+import { MarketJobsService } from '../src/jobs/jobs.service.js';
 import { NotificationsService } from '../src/notifications/notifications.service.js';
 import { MarketHistoryService } from '../src/market-data/history.service.js';
 import { parseBars, parseActions } from '../src/market-data/history-contracts.js';
@@ -108,6 +110,31 @@ describe('Portfolio valuation, corporate actions and audit (PostgreSQL)', () => 
     await s.posting.correctForUser(s.userId, { accountId: s.account.id, targetEventId: s.buy.eventId, expectedRevision: 0, reason: 'Correct quantity', idempotencyKey: 'quantity-correction', replacement: { ...s.inputs.buy, quantity: '12', idempotencyKey: 'quantity-correction' } });
     summary = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, actionDay), actionDay);
     expect(summary.positions[0]).toMatchObject({ quantity: '16.0000000000', cost: '403.33333333' });
+  });
+  it('schedules active holdings of an archived account despite an invalid ledger and a missing calendar elsewhere', async () => {
+    const s = await scenario();
+    const other = await ctx.signIn();
+    const broken = await ctx.prisma.portfolio.create({ data: { name: 'Migrated', userId: other.userId } });
+    const account = await ctx.prisma.investmentAccount.create({ data: { name: 'Migrated', portfolioId: broken.id } });
+    const deposit = await s.posting.postForUser(other.userId, { ...s.inputs.deposit, accountId: account.id });
+    await ctx.prisma.investmentEvent.update({ where: { id: deposit.eventId }, data: { orderingSource: 'MIGRATED_UNVERIFIED' } });
+    await ctx.prisma.investmentAccount.update({ where: { id: s.account.id }, data: { archivedAt: new Date() } });
+    const instrument = await ctx.prisma.instrument.update({ where: { id: instrumentId }, data: { mic: 'XNAS' } });
+    await ctx.prisma.instrumentProviderMapping.create({ data: { instrumentId, provider: 'EODHD', symbol: instrument.ticker + '.US' } });
+    const jobs = new MarketJobsService(ctx.prisma);
+    const ensure = vi.spyOn(jobs, 'ensure');
+    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const scheduler = new MarketSchedulerService(ctx.prisma, jobs);
+      await scheduler.schedule(new Date('2028-01-10T23:00:00Z'));
+      expect(ensure.mock.calls.some(([key]) => key === 'prices_' + instrumentId + '_2028-01-10')).toBe(true);
+      expect(ensure.mock.calls.some(([key]) => key.startsWith('valuation_' + s.portfolio.id))).toBe(true);
+      expect(ensure.mock.calls.some(([key]) => key.startsWith('valuation_' + broken.id))).toBe(false);
+    } finally {
+      warnings.mockRestore();
+      await ctx.prisma.marketJob.deleteMany({ where: { key: { in: ensure.mock.calls.map(([key]) => key) } } });
+      await ctx.prisma.instrumentProviderMapping.deleteMany({ where: { instrumentId } });
+    }
   });
   it('requires historical FX for USD contributions and captures currency movement without a stock-price change', async () => {
     const s = await scenario();

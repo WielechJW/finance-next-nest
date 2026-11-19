@@ -54,6 +54,21 @@ describe('Private watchlists and atomic alerts (PostgreSQL)', () => {
     expect((await owner.agent.get('/price-alerts/events').expect(200)).body.total).toBe(2);
     expect((await stranger.agent.get('/price-alerts/events').expect(200)).body.total).toBe(0);
   });
+  it('arms a resumed alert from the fresh quote and preserves the first crossing under retries', async () => {
+    const { userId } = await ctx.signIn();
+    const alerts = ctx.app.get(PriceAlertsService);
+    await price('2026-11-10', '90');
+    const rule = await alerts.create(userId, { instrumentId, threshold: '100', direction: 'ABOVE', mode: 'ONCE', cooldownMinutes: 5 });
+    await alerts.update(userId, rule.id, false);
+    const baselineTime = new Date('2026-11-10T22:00:00Z');
+    expect((await alerts.update(userId, rule.id, true, baselineTime)).armed).toBe(true);
+    await price('2026-11-12', '110');
+    const next = new Date('2026-11-12T22:00:00Z');
+    await alerts.update(userId, rule.id, true, next);
+    const attempts = await Promise.all([alerts.evaluateInstrument(instrumentId, next), alerts.evaluateInstrument(instrumentId, next)]);
+    expect(attempts.reduce((sum, row) => sum + row.fired, 0)).toBe(1);
+    expect(await ctx.prisma.alertEvent.count({ where: { alertId: rule.id } })).toBe(1);
+  });
   it('does not evaluate a stale quote', async () => {
     const owner = await ctx.signIn(); await price('2026-11-10', '49');
     const engine = ctx.app.get(PriceAlertsService);

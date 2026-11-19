@@ -2,9 +2,11 @@ import { marketDate, MarketDataError } from './contracts.js';
 
 // Reviewed official calendars. Unsupported years fail closed, never become guessed sessions.
 // GPW: https://www.gpw.pl/pub/GPW/uchwaly/2025/753_2025.pdf
+// GPW 2027: https://www.gpw.pl/pub/GPW/uchwaly/2025/754_2025.pdf
 // US: https://www.nyse.com/trade/hours-calendars
 const holidays: Record<string, string[]> = {
   'XWAR-2026': ['01-01', '01-06', '04-03', '04-06', '05-01', '06-04', '11-11', '12-24', '12-25', '12-31'],
+  'XWAR-2027': ['01-01', '01-06', '03-26', '03-29', '05-03', '05-27', '11-01', '11-11', '12-24', '12-31'],
   'US-2026': ['01-01', '01-19', '02-16', '04-03', '05-25', '06-19', '07-03', '09-07', '11-26', '12-25'],
   'US-2027': ['01-01', '01-18', '02-15', '03-26', '05-31', '06-18', '07-05', '09-06', '11-25', '12-24'],
   'US-2028': ['01-17', '02-21', '04-14', '05-29', '06-19', '07-04', '09-04', '11-23', '12-25'],
