@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { reconcileSplit } from '../investments/split-reconciliation.js';
 import { replayBalances } from '../investments/posting.js';
 import { replayFifo } from '../investments/fifo.js';
 import { eventInclude } from '../investments/events.service.js';
@@ -27,11 +28,8 @@ export class PortfolioValuationService {
       const fx = await tx.fxRate.findMany({ where: { source: 'NBP', base: 'USD', quote: 'PLN', currentSlot: 1, sessionOn: { lte: new Date(`${asOf}T00:00:00Z`) } }, orderBy: { sessionOn: 'desc' } });
       const splits = await tx.corporateAction.findMany({ where: { instrumentId: { in: [...ids] }, kind: 'SPLIT', currentSlot: 1, exDate: { lte: new Date(asOf) } }, orderBy: [{ exDate: 'asc' }, { id: 'asc' }] });
       const unresolved = accounts.flatMap(account => splits.flatMap(action => {
-        const { instrumentId, exDate, numerator, denominator } = action;
-        const confirmed = account.events.some(event => event.split?.instrumentId === instrumentId &&
-          event.occurredOn.getTime() === exDate.getTime() && numerator && denominator &&
-          new D(event.split.numerator.toString()).times(denominator.toString()).eq(new D(event.split.denominator.toString()).times(numerator.toString())));
-        if (confirmed) return [];
+        const { instrumentId, exDate } = action;
+        if (reconcileSplit(account.events, action).matches) return [];
         const prior = replayBalances(account.events.filter(event => event.occurredOn < exDate));
         if (!new D(prior.securities[instrumentId] ?? 0).gt(0)) return [];
         return [{ accountId: account.id, instrumentId, ticker: instruments.find(row => row.id === instrumentId)!.ticker, exDate: dayOf(exDate), actionId: action.id }];

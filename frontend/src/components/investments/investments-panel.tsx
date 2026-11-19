@@ -6,6 +6,7 @@ import { formatInvestment } from "@/lib/investment-format";
 import {
   investmentsApi,
   type InvestmentEvent,
+  type InvestmentInstrument,
   type InvestmentQuery,
 } from "@/lib/investments-api";
 import { warsawToday } from "@/lib/transaction-input";
@@ -362,7 +363,7 @@ function AccountContent({
             className={styles.card}
           >
             <h2>Historia operacji</h2>
-            <HistoryFilters query={query} apply={navigate} />
+            <HistoryFilters query={query} instruments={ready.summary.instruments} apply={navigate} />
             {ready.history.items.length === 0 ? (
               <p>Brak operacji spełniających wybrane filtry.</p>
             ) : (
@@ -453,9 +454,11 @@ function AccountContent({
 
 function HistoryFilters({
   query,
+  instruments,
   apply,
 }: {
   query: InvestmentQuery;
+  instruments: InvestmentInstrument[];
   apply(query: InvestmentQuery): void;
 }) {
   return (
@@ -466,6 +469,7 @@ function HistoryFilters({
         const data = new FormData(event.currentTarget);
         apply({
           page: 1,
+          instrumentId: String(data.get("instrumentId") ?? "") || undefined,
           type: String(data.get("type") ?? "") || undefined,
           from: String(data.get("from") ?? "") || undefined,
           to: String(data.get("to") ?? "") || undefined,
@@ -473,6 +477,13 @@ function HistoryFilters({
       }}
     >
       <div className={styles.fields}>
+        <label>
+          Instrument w historii
+          <select name="instrumentId" defaultValue={query.instrumentId ?? ""}>
+            <option value="">Wszystkie instrumenty</option>
+            {instruments.map(item => <option key={item.id} value={item.id}>{item.ticker} · {item.mic}</option>)}
+          </select>
+        </label>
         <label>
           Filtr typu
           <select name="type" defaultValue={query.type ?? ""}>
