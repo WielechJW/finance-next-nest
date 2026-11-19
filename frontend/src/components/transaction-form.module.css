@@ -1,16 +1,16 @@
 .balance {
   margin: 24px 0 32px;
   padding: 20px 24px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #c5dbca;
   border-radius: 12px;
-  background: #eff6ff;
+  background: var(--mint);
 }
 
 .balance dl {
   margin: 0;
 }
 .balance dt {
-  color: #475569;
+  color: var(--muted);
   font-size: 14px;
 }
 .balance dd {
@@ -54,23 +54,23 @@
   min-width: 0;
   min-height: 48px;
   padding: 10px 12px;
-  border: 1px solid #64748b;
+  border: 1px solid var(--field-line);
   border-radius: 8px;
   background: #fff;
-  color: #0f172a;
+  color: var(--ink);
   font: inherit;
 }
 .field textarea {
   resize: vertical;
 }
 .field [aria-invalid="true"] {
-  border-color: #b91c1c;
+  border-color: var(--negative);
 }
 .field :is(input, select, textarea):disabled {
-  background: #f1f5f9;
+  background: #eff3ec;
 }
 .field :is(input, select, textarea):focus-visible {
-  outline: 3px solid #1d4ed8;
+  outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
 .panel .hint {
@@ -79,7 +79,7 @@
 }
 .panel .error {
   margin: 0;
-  color: #b91c1c;
+  color: var(--negative);
   font-size: 14px;
 }
 .formSection form > [role="alert"]:not(:empty) {
@@ -93,15 +93,15 @@
   flex-wrap: wrap;
 }
 .formSection .secondary {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--line);
+  color: var(--ink);
 }
 .formSection .secondary:hover {
-  background: #cbd5e1;
+  background: var(--line);
 }
 .panel .success {
   margin: 0;
-  color: #166534;
+  color: var(--positive);
   font-weight: 600;
 }
 .loadError {
@@ -119,5 +119,68 @@
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
+  }
+}
+.panel > p:first-of-type {
+  margin: 0;
+  color: var(--muted);
+}
+.jumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+}
+.jumps a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 7px 15px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: white;
+  color: var(--forest);
+  font-size: 0.87rem;
+  font-weight: 620;
+  text-decoration: none;
+}
+.jumps a:hover {
+  background: var(--mint);
+}
+.balance {
+  color: #f3f9f2;
+  border: 0;
+  border-radius: var(--radius);
+  margin: 17px 0;
+  background: linear-gradient(115deg, #153e30, #285b40);
+}
+.balance dt,
+.balance p {
+  color: #dae8dc;
+}
+.balance dd {
+  font-size: clamp(1.8rem, 3vw, 2.65rem);
+}
+.columns {
+  display: grid;
+  gap: 17px;
+  align-items: start;
+}
+.columns > div {
+  min-width: 0;
+}
+.columns > div > .formSection {
+  padding: clamp(17px, 2.2vw, 28px);
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.field label {
+  font-size: 0.9rem;
+}
+@media (min-width: 1350px) {
+  .columns {
+    grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
   }
 }

@@ -23,7 +23,7 @@ export function TelegramSettings() {
     try { await action(); refresh(); } catch (error) { setError(error instanceof Error ? error.message : 'Nie udało się zapisać ustawień.'); }
     finally { lock.current = false; setBusy(false); }
   }
-  return <section className={styles.card} aria-label="Powiadomienia Telegram"><h2>Powiadomienia Telegram</h2><p role="alert">{error}</p>
+  return <section className={styles.card} aria-label="Powiadomienia Telegram"><h2 id="telegram">Powiadomienia Telegram</h2><p role="alert">{error}</p>
     {resource.state.status === 'loading' ? <p role="status">Ładowanie powiadomień…</p> : resource.state.status === 'error' ? <p role="alert">{resource.state.message}</p> : <>
       {!resource.state.value.status.configured ? <p>Telegram czeka na konfigurację serwera. Alerty zapisują się w historii aplikacji.</p> : !connected ? <>
         <p>Połącz prywatną rozmowę z botem, aby otrzymywać alerty po zamknięciu strony.</p>

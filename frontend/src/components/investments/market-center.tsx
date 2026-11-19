@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { marketCenterApi } from '@/lib/market-center-api';
 import { formatInvestment } from '@/lib/investment-format';
 import { warsawToday } from '@/lib/transaction-input';
@@ -16,6 +16,8 @@ export function MarketCenter() {
 function MarketContent() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<{ id: string; ticker: string; currency: string } | null>(null);
+  const alertHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { if (selected) alertHeading.current?.focus(); }, [selected]);
   const [listId, setListId] = useState('');
   const [eventPage, setEventPage] = useState(1);
   const [error, setError] = useState(''), [busy, setBusy] = useState(false);
@@ -33,9 +35,10 @@ function MarketContent() {
   const targetList = lists.find(list => list.id === listId)?.id ?? lists[0]?.id;
   return <section className={styles.panel} aria-labelledby="market-heading"><h1 id="market-heading">Rynek i alerty</h1>
     <p>Ceny dzienne po sesji. Status przy cenie wskazuje jej aktualność.</p>
+    <nav className={styles.jumps} aria-label="Sekcje rynku"><a href="#instruments">Instrumenty</a><a href="#watchlists">Watchlisty</a><a href="#alerts">Alerty</a><a href="#telegram">Telegram</a></nav>
     <p role="alert">{error}</p>
     {resource.state.status === 'error' && <p role="alert">{resource.state.message}</p>}
-    <section className={styles.card} aria-label="Wyszukiwarka instrumentów"><h2>Wyszukaj spółkę</h2>
+    <section className={styles.card} aria-label="Wyszukiwarka instrumentów"><h2 id="instruments">Wyszukaj spółkę</h2>
       <form onSubmit={event => { event.preventDefault(); setQuery(String(new FormData(event.currentTarget).get('query') ?? '')); }}>
         <label>Symbol, nazwa lub ISIN<input name="query" maxLength={80} /></label><button type="submit">Szukaj</button>
       </form>
@@ -43,10 +46,10 @@ function MarketContent() {
       {results.state.status === 'loading' ? <p role="status">Wyszukiwanie…</p> : results.state.status === 'error' ? <p role="alert">{results.state.message}</p> : <ul className={styles.list}>{results.state.value.map(instrument => <li key={instrument.id}>
         <Link href={`/dashboard/market/${instrument.id}`}>{instrument.ticker} · {instrument.mic}</Link>{instrument.name && <p>{instrument.name}</p>}
         <button type="button" disabled={busy || !targetList} onClick={() => { void perform(() => marketCenterApi.addItem(targetList!, instrument.id)); }}>Obserwuj {instrument.ticker}</button>{' '}
-        <button type="button" onClick={() => setSelected(instrument)}>Ustaw alert {instrument.ticker}</button>
+        <button type="button" onClick={() => { setSelected(instrument); if (selected?.id === instrument.id) alertHeading.current?.focus(); }}>Ustaw alert {instrument.ticker}</button>
       </li>)}</ul>}
     </section>
-    <section className={styles.card} aria-label="Watchlisty"><h2>Watchlisty</h2>
+    <section className={styles.card} aria-label="Watchlisty"><h2 id="watchlists">Watchlisty</h2>
       <form onSubmit={event => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get('name') ?? ''); void perform(() => marketCenterApi.createList(name)); }}>
         <label>Nazwa watchlisty<input name="name" required maxLength={100} /></label><button type="submit" disabled={busy}>Utwórz watchlistę</button>
       </form>
@@ -59,10 +62,10 @@ function MarketContent() {
         <button type="button" disabled={busy} onClick={() => { void perform(() => marketCenterApi.removeList(list.id)); }}>Usuń watchlistę {list.name}</button>
       </section>)}
     </section>
-    <section className={styles.card} aria-label="Reguły alertów"><h2>Alerty cenowe</h2>
+    <section className={styles.card} aria-label="Reguły alertów"><h2 id="alerts">Alerty cenowe</h2>
       <p>Alert reaguje na przejście przez próg. Pierwsza obserwacja ustala punkt odniesienia.</p>
       {selected && <form key={selected.id} aria-label={`Nowy alert ${selected.ticker}`} onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); void perform(() => marketCenterApi.createAlert({ instrumentId: selected.id, threshold: String(form.get('threshold')).replace(',', '.'), direction: String(form.get('direction')), mode: String(form.get('mode')), cooldownMinutes: Number(form.get('cooldown')) })); }}>
-        <h3>Nowy alert: {selected.ticker} ({selected.currency})</h3>
+        <h3 ref={alertHeading} tabIndex={-1}>Nowy alert: {selected.ticker} ({selected.currency})</h3>
         <label>Próg ceny<input name="threshold" inputMode="decimal" required /></label>
         <label>Kierunek<select name="direction"><option value="ABOVE">W górę do progu lub wyżej</option><option value="BELOW">W dół do progu lub niżej</option></select></label>
         <label>Tryb<select name="mode"><option value="ONCE">Jednorazowy</option><option value="REARM">Ponownie po powrocie na drugą stronę</option></select></label>
