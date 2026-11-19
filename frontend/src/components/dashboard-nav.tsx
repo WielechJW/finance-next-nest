@@ -2,42 +2,54 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UiIcon } from "./ui-icon";
 import styles from "./dashboard-nav.module.css";
+
+const sections = [
+  { href: "/dashboard/wallet", label: "Portfel", icon: "wallet" },
+  {
+    href: "/dashboard/transactions",
+    label: "Transakcje",
+    icon: "arrows-left-right",
+  },
+  { href: "/dashboard/analytics", label: "Analityka", icon: "chart-donut" },
+  {
+    href: "/dashboard/investments",
+    label: "Inwestycje",
+    icon: "chart-line-up",
+  },
+  { href: "/dashboard/market", label: "Rynek i alerty", icon: "bell-ringing" },
+];
 
 export function DashboardNav() {
   const pathname = usePathname();
-  const active = pathname === "/dashboard/wallet";
   return (
     <nav className={styles.nav} aria-label="Nawigacja panelu">
-      <Link href="/dashboard/market" aria-current={pathname === '/dashboard/market' || pathname.startsWith('/dashboard/market/') ? 'page' : undefined}>Rynek i alerty</Link>
-      <Link href="/dashboard/wallet" aria-current={active ? "page" : undefined}>
-        Portfel
-      </Link>
-      <Link
-        href="/dashboard/transactions"
-        aria-current={
-          pathname === "/dashboard/transactions" ? "page" : undefined
-        }
-      >
-        Transakcje
-      </Link>
-      <Link
-        href="/dashboard/analytics"
-        aria-current={pathname === "/dashboard/analytics" ? "page" : undefined}
-      >
-        Analityka
-      </Link>
-      <Link
-        href="/dashboard/investments"
-        aria-current={
-          pathname === "/dashboard/investments" ||
-          pathname.startsWith("/dashboard/investments/")
-            ? "page"
-            : undefined
-        }
-      >
-        Inwestycje
-      </Link>
+      {sections.map(({ href, label, icon }) => (
+        <Link
+          key={href}
+          href={href}
+          aria-current={
+            pathname === href || pathname.startsWith(href + "/")
+              ? "page"
+              : undefined
+          }
+        >
+          <UiIcon name={icon} />
+          <span>{label}</span>
+        </Link>
+      ))}
     </nav>
+  );
+}
+
+export function DashboardLocation() {
+  const pathname = usePathname();
+  return (
+    <span>
+      {sections.find(
+        ({ href }) => pathname === href || pathname.startsWith(href + "/"),
+      )?.label ?? "Panel"}
+    </span>
   );
 }

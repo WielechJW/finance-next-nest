@@ -1,134 +1,116 @@
 .page {
-  min-height: 100svh;
   display: grid;
-  place-items: center;
-  padding: 32px 16px;
-  background: #f1f5f9;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100svh;
+  padding: clamp(18px, 3.5vw, 54px);
+  gap: clamp(24px, 7vw, 110px);
+  align-items: center;
+  max-width: 1600px;
+  margin: auto;
 }
-
+.visual {
+  align-self: stretch;
+  order: 2;
+  border-radius: 26px;
+  background: var(--forest) url("/finance-still-life.webp") center / cover;
+}
 .card {
-  width: 100%;
-  max-width: 440px;
-  padding: 36px;
-  border: 1px solid #cbd5e1;
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 16px 48px rgb(15 23 42 / 6%);
+  width: min(100%, 415px);
+  margin: auto;
+  padding: 18px 0;
 }
-
 .brand {
-  margin: 0 0 24px;
-  color: #1d4ed8;
-  font-size: 18px;
-  font-weight: 700;
+  display: inline-flex;
+  color: var(--ink);
+  text-decoration: none;
+  margin-bottom: clamp(28px, 5vh, 64px);
 }
-
 .card h1 {
-  margin: 0;
-  font-size: 30px;
-  line-height: 1.2;
-  letter-spacing: -0.03em;
+  font-size: clamp(2.5rem, 4vw, 3.7rem);
+  font-weight: 620;
+  margin: 0 0 10px;
+  letter-spacing: -0.06em;
 }
-
+.intro,
+.footer,
+.hint {
+  color: var(--muted);
+}
 .intro {
-  margin: 12px 0 28px;
-  color: #475569;
+  margin: 0 0 24px;
 }
-
-.form > [role="alert"] p {
-  margin-bottom: 20px;
+.form {
+  display: grid;
+  gap: 15px;
 }
-
+.form > div:empty {
+  display: none;
+}
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
+  display: grid;
+  gap: 6px;
 }
-
 .field label {
-  font-weight: 600;
+  font-weight: 650;
+  font-size: 0.91rem;
 }
-
 .field input {
   width: 100%;
-  min-width: 0;
   min-height: 48px;
-  padding: 10px 12px;
-  border: 1px solid #64748b;
-  border-radius: 8px;
-  color: #0f172a;
-  background: #fff;
-  font: inherit;
+  border: 1px solid var(--field-line);
+  border-radius: 10px;
+  background: white;
+  color: var(--ink);
+  padding: 11px 13px;
 }
-
 .field input[aria-invalid="true"] {
-  border-color: #b91c1c;
+  border-color: var(--negative);
 }
-
+.field p,
+.form p {
+  margin: 0;
+  font-size: 0.875rem;
+}
 .form button {
-  width: 100%;
-  min-height: 48px;
-  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 49px;
+  background: var(--forest);
+  color: white;
   border: 0;
-  border-radius: 8px;
-  background: #1d4ed8;
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
+  border-radius: 11px;
+  font-weight: 650;
 }
-
 .form button:hover {
-  background: #1e40af;
+  background: var(--accent);
 }
-
-.form button:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
-
-.hint {
-  margin: 0;
-  color: #475569;
-  font-size: 14px;
-}
-
-.card :is(input, button, a):focus-visible {
-  outline: 3px solid #1d4ed8;
-  outline-offset: 3px;
-}
-
-.error {
-  margin: 0;
-  color: #b91c1c;
-  font-size: 14px;
-}
-
-.success {
-  margin: 20px 0 0;
-  padding: 12px;
-  border: 1px solid #86b89b;
-  border-radius: 8px;
-  background: #f0fdf4;
-  color: #166534;
-}
-
 .footer {
-  margin: 28px 0 0;
-  color: #475569;
-  text-align: center;
+  margin: 22px 0 0;
 }
-
 .footer a {
-  color: #1d4ed8;
-  font-weight: 600;
-  text-underline-offset: 3px;
+  font-weight: 650;
 }
-
-@media (max-width: 480px) {
+.error {
+  color: var(--negative);
+}
+.success {
+  color: var(--positive);
+}
+@media (max-width: 700px) {
+  .page {
+    display: block;
+    min-height: 100svh;
+    padding: 33px 22px;
+  }
+  .visual {
+    display: none;
+  }
   .card {
-    padding: 28px 20px;
-    border-radius: 16px;
+    padding: 0;
+  }
+  .brand {
+    margin-bottom: 44px;
   }
 }

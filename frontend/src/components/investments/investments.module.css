@@ -2,7 +2,7 @@
   min-width: 0;
 }
 .panel a {
-  color: #1d4ed8;
+  color: var(--accent);
   overflow-wrap: anywhere;
 }
 .panel h2 {
@@ -10,7 +10,7 @@
   font-size: 1.2rem;
 }
 .card {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 24px;
   margin-top: 24px;
@@ -56,26 +56,26 @@
   min-width: 0;
   min-height: 48px;
   padding: 10px 12px;
-  border: 1px solid #64748b;
+  border: 1px solid var(--field-line);
   border-radius: 8px;
   font: inherit;
   background: #fff;
-  color: #0f172a;
+  color: var(--ink);
 }
 .panel input:focus-visible,
 .panel select:focus-visible {
-  outline: 3px solid #1d4ed8;
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 .full {
   grid-column: 1 / -1;
 }
 .panel .error {
-  color: #b91c1c;
+  color: var(--negative);
   overflow-wrap: anywhere;
 }
 .panel .notice {
-  color: #166534;
+  color: var(--positive);
   font-weight: 600;
 }
 .panel .hint {
@@ -92,7 +92,7 @@
   margin-top: 16px;
 }
 .panel [aria-invalid="true"] {
-  border-color: #b91c1c;
+  border-color: var(--negative);
 }
 .nameForm label {
   flex: 1 1 180px;
@@ -104,9 +104,9 @@
   margin: 24px 0;
 }
 .balances div {
-  background: #eff6ff;
+  background: var(--mint);
   padding: 20px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #c5dbca;
   border-radius: 12px;
   min-width: 0;
 }
@@ -123,7 +123,7 @@
   margin: 16px 0;
 }
 .list li {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--line);
   padding: 16px 0;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -168,4 +168,74 @@
   .nameForm label {
     flex-basis: auto;
   }
+}
+.panel > p,
+.panel > section > h1 + p,
+.hint {
+  color: var(--muted);
+}
+.panel h1 {
+  margin-top: 10px;
+}
+.card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: clamp(18px, 2.4vw, 31px);
+  margin: 18px 0;
+}
+.panel .card h2 {
+  font-size: clamp(1.17rem, 1.8vw, 1.45rem);
+}
+.card form button {
+  justify-self: start;
+}
+.card form > label {
+  max-width: 42rem;
+}
+.card form > label,
+.fields label,
+.nameForm label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.card [role="alert"]:empty,
+.card [role="status"]:empty {
+  margin: 0;
+}
+.list li > a:first-child {
+  font-size: 1.02rem;
+  font-weight: 660;
+}
+.list li button {
+  margin-block: 3px;
+}
+.panel .list li > button {
+  background: var(--mint);
+  color: var(--forest);
+}
+.panel .list li > button:hover {
+  background: #cfe4d5;
+}
+.jumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block: 14px;
+}
+.jumps a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 7px 14px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  color: var(--forest);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.jumps a:hover {
+  background: var(--mint);
 }

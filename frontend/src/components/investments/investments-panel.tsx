@@ -139,7 +139,7 @@ function PortfolioList() {
       {resource.state.status !== "ready" ? (
         <ResourceStatus state={resource.state} retry={resource.refresh} />
       ) : (
-        <>
+        <section className={styles.card} aria-label="Twoje portfele"><h2>Twoje portfele</h2>
           {resource.state.value.length === 0 ? (
             <p>
               Nie masz jeszcze portfela inwestycyjnego. Utwórz pierwszy portfel.
@@ -161,7 +161,7 @@ function PortfolioList() {
               resource.refresh();
             }}
           />
-        </>
+        </section>
       )}
     </section>
   );
@@ -191,8 +191,7 @@ function PortfolioContent({ portfolioId }: { portfolioId: string }) {
         <ResourceStatus state={resource.state} retry={resource.refresh} />
       ) : (
         <>
-          <h2>Rachunki inwestycyjne</h2>
-          <PortfolioValuation portfolioId={portfolioId} />
+          <section className={styles.card} aria-label="Rachunki inwestycyjne"><h2>Rachunki inwestycyjne</h2>
           {resource.state.value.accounts.length === 0 ? (
             <p>
               Ten portfel nie ma jeszcze rachunków. Utwórz rachunek, aby zapisać
@@ -218,6 +217,8 @@ function PortfolioContent({ portfolioId }: { portfolioId: string }) {
               resource.refresh();
             }}
           />
+          </section>
+          <PortfolioValuation portfolioId={portfolioId} />
         </>
       )}
     </section>
@@ -276,7 +277,7 @@ function AccountContent({
           {ready.account.archivedAt && (
             <p>Rachunek zarchiwizowany. Historia i stan pozostają dostępne.</p>
           )}
-          <section aria-label="Gotówka inwestycyjna">
+          <section className={styles.card} aria-label="Gotówka inwestycyjna">
             <h2>Gotówka</h2>
             <dl className={styles.balances}>
               {(["PLN", "USD"] as const).map((currency) => (
@@ -290,7 +291,7 @@ function AccountContent({
               ))}
             </dl>
           </section>
-          <section aria-label="Posiadane akcje">
+          <section className={styles.card} aria-label="Posiadane akcje">
             <h2>Posiadane akcje</h2>
             {ready.summary.positions.length === 0 ? (
               <p>Nie masz otwartych pozycji na tym rachunku.</p>
@@ -325,8 +326,7 @@ function AccountContent({
               </ul>
             )}
             <p className={styles.hint}>
-              Koszt obejmuje prowizje zakupu. Wycena rynkowa pojawi się po
-              podłączeniu notowań.
+              Koszt obejmuje prowizje zakupu. Bieżącą wycenę znajdziesz w podsumowaniu portfela.
             </p>
           </section>
           {!ready.account.archivedAt && (

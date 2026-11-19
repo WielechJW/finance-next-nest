@@ -54,7 +54,7 @@ export function CategoryChart({ items }: { items: AnalyticsCategory[] }) {
             }
           />
           <Tooltip
-            cursor={{ fill: "#eff6ff" }}
+            cursor={{ fill: "#e5f2e8" }}
             content={({ active, payload }) => {
               const item = payload?.[0]?.payload as
                 AnalyticsCategory | undefined;
@@ -70,7 +70,7 @@ export function CategoryChart({ items }: { items: AnalyticsCategory[] }) {
           <Bar
             dataKey="value"
             name="Wydatki"
-            fill="#2563eb"
+            fill="#287654"
             radius={[0, 4, 4, 0]}
             maxBarSize={28}
             isAnimationActive={false}
@@ -119,7 +119,7 @@ export function TrendChart({ items }: { items: AnalyticsTrendPoint[] }) {
           margin={{ top: 16, right: 12, left: 12, bottom: 8 }}
           accessibilityLayer
         >
-          <CartesianGrid vertical={false} stroke="#e2e8f0" />
+          <CartesianGrid vertical={false} stroke="#d6e0d8" />
           <XAxis
             dataKey="period"
             tickFormatter={(value: string) => analyticsDateLabel(value)}
@@ -145,7 +145,7 @@ export function TrendChart({ items }: { items: AnalyticsTrendPoint[] }) {
           <Line
             dataKey="incomeValue"
             name="Przychody"
-            stroke="#15803d"
+            stroke="#197454"
             strokeWidth={2.5}
             dot={items.length <= 31}
             activeDot={{ r: 5 }}
@@ -154,7 +154,7 @@ export function TrendChart({ items }: { items: AnalyticsTrendPoint[] }) {
           <Line
             dataKey="expenseValue"
             name="Wydatki"
-            stroke="#b45309"
+            stroke="#a85627"
             strokeWidth={2.5}
             strokeDasharray="6 3"
             dot={items.length <= 31}

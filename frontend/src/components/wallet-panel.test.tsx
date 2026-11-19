@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   session: {} as SessionState,
 }));
+vi.mock("@/lib/transactions-api", () => ({ transactionsApi: { list: vi.fn().mockResolvedValue({ items: [] }) } }));
 vi.mock("@/lib/wallet-api", () => ({
   walletApi: { get: mocks.get, update: mocks.update },
 }));

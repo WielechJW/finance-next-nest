@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Brand } from "./brand";
+import { UiIcon } from "./ui-icon";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -135,8 +137,11 @@ export default function AuthForm({
 
   return (
     <main className={styles.page}>
+      <div className={styles.visual} aria-hidden="true" />
       <section className={styles.card} aria-labelledby="auth-heading">
-        <p className={styles.brand}>Finance</p>
+        <Link href="/" aria-label="Finance" className={styles.brand}>
+          <Brand />
+        </Link>
         <h1 id="auth-heading">{isRegister ? "Rejestracja" : "Logowanie"}</h1>
         <p className={styles.intro}>
           {isRegister
@@ -242,7 +247,8 @@ export default function AuthForm({
                 : "Logowanie…"
               : isRegister
                 ? "Zarejestruj się"
-                : "Zaloguj się"}
+                : "Zaloguj się"}{" "}
+            <UiIcon name="arrow-right" />
           </button>
 
           <div role="status" aria-atomic="true">

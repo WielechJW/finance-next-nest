@@ -41,6 +41,27 @@ function TransactionsContent() {
   const walletRequest = useRef<AbortController | null>(null);
   const [selection, setSelection] = useState<TransactionSelection | null>(null);
   const [notice, setNotice] = useState("");
+  const entryTarget = useRef("");
+
+  useEffect(() => {
+    entryTarget.current = window.location.hash;
+  }, []);
+
+  useEffect(() => {
+    if (wallet.status === "loading" || categories.state.status === "loading")
+      return;
+    const hash = entryTarget.current;
+    if (hash !== "#history-heading" && hash !== "#transaction-form-heading")
+      return;
+    const frame = requestAnimationFrame(() => {
+      entryTarget.current = "";
+      if (window.location.hash !== hash) return;
+      const heading = document.getElementById(hash.slice(1));
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [wallet.status, categories.state.status]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -105,6 +126,10 @@ function TransactionsContent() {
     <section aria-labelledby="transactions-heading" className={styles.panel}>
       <h1 id="transactions-heading">Transakcje</h1>
       <p>Dodawaj, przeglądaj i poprawiaj operacje swojego portfela.</p>
+      <nav aria-label="Sekcje transakcji" className={styles.jumps}>
+        <a href="#transaction-form-heading">Dodaj operację</a>
+        <a href="#history-heading">Przejdź do historii</a>
+      </nav>
       <section aria-label="Saldo portfela" className={styles.balance}>
         {wallet.status === "loading" && <p role="status">Odświeżanie salda…</p>}
         {wallet.status === "ready" && (
@@ -127,23 +152,27 @@ function TransactionsContent() {
           </>
         )}
       </section>
-      <TransactionForm onCreated={created} categories={categories} />
-      <p role="status" aria-atomic="true" className={styles.success}>
-        {notice}
-      </p>
-      <TransactionHistory
-        categories={categories}
-        query={historyQuery}
-        setQuery={setHistoryQuery}
-        onEdit={(transaction, trigger) => {
-          setNotice("");
-          setSelection({ kind: "edit", transaction, trigger });
-        }}
-        onDelete={(transaction, trigger) => {
-          setNotice("");
-          setSelection({ kind: "delete", transaction, trigger });
-        }}
-      />
+      <div className={styles.columns}>
+        <div>
+          <TransactionForm onCreated={created} categories={categories} />
+          <p role="status" aria-atomic="true" className={styles.success}>
+            {notice}
+          </p>
+        </div>
+        <TransactionHistory
+          categories={categories}
+          query={historyQuery}
+          setQuery={setHistoryQuery}
+          onEdit={(transaction, trigger) => {
+            setNotice("");
+            setSelection({ kind: "edit", transaction, trigger });
+          }}
+          onDelete={(transaction, trigger) => {
+            setNotice("");
+            setSelection({ kind: "delete", transaction, trigger });
+          }}
+        />
+      </div>
       {selection && (
         <TransactionMutationDialog
           selection={selection}

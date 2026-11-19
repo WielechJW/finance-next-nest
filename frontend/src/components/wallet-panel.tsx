@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { UiIcon } from "./ui-icon";
+import { WalletActivity } from "./wallet-activity";
 import { ApiError, isAbortError } from "@/lib/api-client";
 import { formatPLN, normalizeMoneyInput } from "@/lib/money";
 import { walletApi } from "@/lib/wallet-api";
@@ -169,125 +172,136 @@ function WalletContent({ onRetry }: { onRetry: () => void }) {
     <section className={styles.panel} aria-labelledby="wallet-heading">
       <header className={styles.heading}>
         <div>
-          <p className={styles.eyebrow}>Twój portfel</p>
           <h1 id="wallet-heading">{wallet.name}</h1>
+          <p className={styles.subtitle}>
+            Saldo i ostatnie operacje na Twoim koncie.
+          </p>
         </div>
-        <span className={styles.currency} aria-label="Waluta: PLN">
-          PLN
-        </span>
+        <Link
+          className={styles.add}
+          scroll={false}
+          href="/dashboard/transactions#transaction-form-heading"
+        >
+          <UiIcon name="plus" /> Dodaj transakcję
+        </Link>
       </header>
 
-      <section aria-label="Podsumowanie portfela">
+      <section className={styles.hero} aria-label="Podsumowanie portfela">
         <dl className={styles.balances}>
           <div className={styles.currentBalance}>
-            <dt>Bieżące saldo</dt>
+            <dt>
+              <UiIcon name="wallet" /> Bieżące saldo
+            </dt>
             <dd aria-describedby="wallet-balance-description">
               {formatPLN(wallet.balance)}
             </dd>
           </div>
-          <div>
+          <div className={styles.opening}>
             <dt>Saldo początkowe</dt>
             <dd>{formatPLN(wallet.openingBalance)}</dd>
           </div>
         </dl>
-        <p
-          id="wallet-balance-description"
-          className={styles.balanceDescription}
-        >
-          Bieżące saldo to saldo początkowe + przychody − wydatki z całej
-          historii, także z zapisanych operacji z przyszłą datą.
-        </p>
-        {wallet.openingBalance === "0.00" && (
-          <p className={styles.welcome}>
-            Możesz ustawić saldo początkowe swojego portfela.
-          </p>
-        )}
       </section>
+      <p id="wallet-balance-description" className={styles.balanceDescription}>
+        <UiIcon name="info" /> Bieżące saldo to saldo początkowe + przychody −
+        wydatki z całej historii, także z zapisanych operacji z przyszłą datą.
+      </p>
 
-      <section
-        className={styles.settings}
-        aria-labelledby="wallet-settings-heading"
-      >
-        <h2 id="wallet-settings-heading">Ustawienia portfela</h2>
-        <p>
-          Saldo początkowe to kwota, od której zaczynasz prowadzenie portfela.
-          Może być również ujemne.
-        </p>
-        <form
-          className={styles.form}
-          onSubmit={submit}
-          noValidate
-          aria-busy={saving}
+      <div className={styles.lower}>
+        <WalletActivity />
+        <section
+          className={styles.settings}
           aria-labelledby="wallet-settings-heading"
         >
-          <div className={styles.fields}>
-            <div className={styles.field}>
-              <label htmlFor="wallet-name">Nazwa portfela</label>
-              <input
-                ref={nameInput}
-                id="wallet-name"
-                name="name"
-                type="text"
-                required
-                value={name}
-                disabled={saving}
-                aria-invalid={Boolean(errors.name)}
-                aria-describedby={errors.name ? "wallet-name-error" : undefined}
-                onChange={(event) => {
-                  setName(event.target.value);
-                  clearFeedback("name");
-                }}
-              />
-              {errors.name && (
-                <p id="wallet-name-error" className={styles.error}>
-                  {errors.name}
+          <div className={styles.sectionHeading}>
+            <span className={styles.sectionIcon}>
+              <UiIcon name="sliders-horizontal" />
+            </span>
+            <h2 id="wallet-settings-heading">Ustawienia portfela</h2>
+          </div>
+          <p>
+            {wallet.openingBalance === "0.00"
+              ? "Możesz ustawić saldo początkowe swojego portfela."
+              : "Zmień nazwę portfela lub kwotę, od której zaczynasz."}
+          </p>
+          <form
+            className={styles.form}
+            onSubmit={submit}
+            noValidate
+            aria-busy={saving}
+            aria-labelledby="wallet-settings-heading"
+          >
+            <div className={styles.fields}>
+              <div className={styles.field}>
+                <label htmlFor="wallet-name">Nazwa portfela</label>
+                <input
+                  ref={nameInput}
+                  id="wallet-name"
+                  name="name"
+                  type="text"
+                  required
+                  value={name}
+                  disabled={saving}
+                  aria-invalid={Boolean(errors.name)}
+                  aria-describedby={
+                    errors.name ? "wallet-name-error" : undefined
+                  }
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    clearFeedback("name");
+                  }}
+                />
+                {errors.name && (
+                  <p id="wallet-name-error" className={styles.error}>
+                    {errors.name}
+                  </p>
+                )}
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="wallet-opening-balance">Saldo początkowe</label>
+                <input
+                  ref={balanceInput}
+                  id="wallet-opening-balance"
+                  name="openingBalance"
+                  type="text"
+                  inputMode="decimal"
+                  required
+                  value={openingBalance}
+                  disabled={saving}
+                  aria-invalid={Boolean(errors.openingBalance)}
+                  aria-describedby={`wallet-balance-help${errors.openingBalance ? " wallet-balance-error" : ""}`}
+                  onChange={(event) => {
+                    setOpeningBalance(event.target.value);
+                    clearFeedback("openingBalance");
+                  }}
+                />
+                <p id="wallet-balance-help" className={styles.hint}>
+                  Kwota w PLN. Możesz użyć przecinka, np. -250,50.
                 </p>
+                {errors.openingBalance && (
+                  <p id="wallet-balance-error" className={styles.error}>
+                    {errors.openingBalance}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div role="alert" aria-atomic="true">
+              {(errors.name || errors.openingBalance) && (
+                <p className={styles.error}>Popraw zaznaczone pola.</p>
               )}
+              {saveError && <p className={styles.error}>{saveError}</p>}
             </div>
-            <div className={styles.field}>
-              <label htmlFor="wallet-opening-balance">Saldo początkowe</label>
-              <input
-                ref={balanceInput}
-                id="wallet-opening-balance"
-                name="openingBalance"
-                type="text"
-                inputMode="decimal"
-                required
-                value={openingBalance}
-                disabled={saving}
-                aria-invalid={Boolean(errors.openingBalance)}
-                aria-describedby={`wallet-balance-help${errors.openingBalance ? " wallet-balance-error" : ""}`}
-                onChange={(event) => {
-                  setOpeningBalance(event.target.value);
-                  clearFeedback("openingBalance");
-                }}
-              />
-              <p id="wallet-balance-help" className={styles.hint}>
-                Kwota w PLN. Możesz użyć przecinka, np. -250,50.
-              </p>
-              {errors.openingBalance && (
-                <p id="wallet-balance-error" className={styles.error}>
-                  {errors.openingBalance}
-                </p>
-              )}
+            <div className={styles.actions}>
+              <button type="submit" disabled={saving || !changed}>
+                {saving ? "Zapisywanie…" : "Zapisz zmiany"}
+              </button>
+              <div role="status" aria-atomic="true">
+                {notice && <p className={styles.success}>{notice}</p>}
+              </div>
             </div>
-          </div>
-          <div role="alert" aria-atomic="true">
-            {(errors.name || errors.openingBalance) && (
-              <p className={styles.error}>Popraw zaznaczone pola.</p>
-            )}
-            {saveError && <p className={styles.error}>{saveError}</p>}
-          </div>
-          <div className={styles.actions}>
-            <button type="submit" disabled={saving || !changed}>
-              {saving ? "Zapisywanie…" : "Zapisz zmiany"}
-            </button>
-            <div role="status" aria-atomic="true">
-              {notice && <p className={styles.success}>{notice}</p>}
-            </div>
-          </div>
-        </form>
-      </section>
+          </form>
+        </section>
+      </div>
     </section>
   );
 }
