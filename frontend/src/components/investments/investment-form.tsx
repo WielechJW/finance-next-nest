@@ -13,6 +13,7 @@ import {
   type ManualInvestmentInput,
 } from "@/lib/investments-api";
 import { isCalendarDate, warsawToday } from "@/lib/transaction-input";
+import { InstrumentPicker } from "./instrument-picker";
 import styles from "./investments.module.css";
 
 export const investmentLabels: Record<string, string> = {
@@ -31,7 +32,6 @@ export const investmentLabels: Record<string, string> = {
 export function InvestmentForm({
   portfolioId,
   accountId,
-  instruments,
   sequence,
   selection,
   onSaved,
@@ -39,7 +39,6 @@ export function InvestmentForm({
 }: {
   portfolioId: string;
   accountId: string;
-  instruments: InvestmentInstrument[];
   sequence: number;
   selection?: InvestmentEvent;
   onSaved(): void;
@@ -64,9 +63,7 @@ export function InvestmentForm({
     selection?.cashEntries.find((e) => e.kind === "EXTERNAL_TRANSFER")
       ?.amount ?? "",
   );
-  const [instrumentId, setInstrumentId] = useState(
-    selection?.trade?.instrument.id ?? instruments[0]?.id ?? "",
-  );
+  const [instrument, setInstrument] = useState<InvestmentInstrument | null>(selection?.trade?.instrument ?? null);
   const [quantity, setQuantity] = useState(selection?.trade?.quantity ?? "");
   const [price, setPrice] = useState(selection?.trade?.unitPrice ?? "");
   const [commission, setCommission] = useState(
@@ -163,7 +160,7 @@ export function InvestmentForm({
               }
             : {
                 ...common,
-                instrumentId,
+                instrumentId: instrument?.id,
                 quantity: decimal("quantity", "Ilość akcji", quantity, 10),
                 unitPrice: decimal("price", "Cena za akcję", price, 10),
                 commission: decimal(
@@ -176,7 +173,7 @@ export function InvestmentForm({
               };
         if (
           type !== "DEPOSIT" &&
-          !instruments.some((item) => item.id === instrumentId)
+          !instrument
         )
           throw new Error("Wybierz instrument z katalogu.");
         pending.current = { input, reason: reason.trim() };
@@ -301,21 +298,7 @@ export function InvestmentForm({
           </>
         ) : (
           <>
-            <label>
-              Instrument
-              <select
-                value={instrumentId}
-                onChange={(e) => setInstrumentId(e.target.value)}
-                required
-              >
-                <option value="">Wybierz instrument</option>
-                {instruments.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.ticker} · {item.mic} · {item.currency}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <InstrumentPicker selected={instrument} onChange={setInstrument} />
             <label>
               Ilość akcji
               <input
@@ -364,11 +347,6 @@ export function InvestmentForm({
         Kolejność określa porządek operacji tego samego dnia. Cena i prowizja są
         w walucie instrumentu.
       </p>
-      {type !== "DEPOSIT" && instruments.length === 0 && (
-        <p role="status">
-          Katalog instrumentów jest pusty. Możesz zapisać wpłatę.
-        </p>
-      )}
       <p
         role="alert"
         id={errorId}

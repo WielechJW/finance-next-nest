@@ -34,9 +34,10 @@ export class MarketSchedulerService {
     const portfolios = await this.prisma.portfolio.findMany({ select: { id: true, userId: true, accounts: { select: { events: { where: { activeSlot: 1 }, select: { id: true, revision: true }, orderBy: { id: 'asc' } } } } } });
     const prices = await this.prisma.priceBar.findMany({ where: { currentSlot: 1 }, select: { id: true }, orderBy: { id: 'asc' } });
     const fx = await this.prisma.fxRate.findMany({ where: { currentSlot: 1 }, select: { id: true }, orderBy: { id: 'asc' } });
+    const splits = await this.prisma.corporateAction.findMany({ where: { kind: 'SPLIT', currentSlot: 1 }, select: { id: true }, orderBy: { id: 'asc' } });
     const asOf = zonedClock(now, 'Europe/Warsaw').day;
     for (const portfolio of portfolios) {
-      const signature = createHash('sha256').update(JSON.stringify([portfolio.accounts, prices, fx])).digest('hex').slice(0, 20);
+      const signature = createHash('sha256').update(JSON.stringify([portfolio.accounts, prices, fx, splits])).digest('hex').slice(0, 20);
       await this.jobs.ensure(`valuation_${portfolio.id}_${asOf}_${signature}`, 'valuation', { portfolioId: portfolio.id, userId: portfolio.userId, asOf }, 30);
     }
     await this.prisma.workerHeartbeat.upsert({ where: { name: 'market-data' }, create: { name: 'market-data', updatedAt: now }, update: { updatedAt: now } });

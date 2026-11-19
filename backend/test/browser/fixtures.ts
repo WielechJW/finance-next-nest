@@ -9,6 +9,7 @@ interface Accounts {
   register(): Promise<TestAccount>;
   expireSessions(account: TestAccount): Promise<void>;
   investmentInstrument(): Promise<{ id: string; ticker: string }>;
+  populateCatalog(): Promise<void>;
   investmentQuote(instrumentId: string, close?: string): Promise<void>;
 }
 
@@ -29,6 +30,7 @@ export const test = base.extend<{ accounts: Accounts }>({
         },
         expireSessions: (account) => database.expireSessions(account),
         investmentInstrument: () => database.investmentInstrument(),
+        populateCatalog: () => database.populateCatalog(),
         investmentQuote: (id, close) => database.investmentQuote(id, close),
       });
     } finally {

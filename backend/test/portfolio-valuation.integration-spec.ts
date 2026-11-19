@@ -4,6 +4,7 @@ import { investmentScenario } from './support/investment-scenario.js';
 import { InvestmentPostingService } from '../src/investments/posting.service.js';
 import { PortfolioValuationService } from '../src/portfolio-analytics/valuation.service.js';
 import { CorporateActionsService } from '../src/portfolio-analytics/corporate-actions.service.js';
+import { NotificationsService } from '../src/notifications/notifications.service.js';
 import { MarketHistoryService } from '../src/market-data/history.service.js';
 import { parseBars, parseActions } from '../src/market-data/history-contracts.js';
 
@@ -78,7 +79,29 @@ describe('Portfolio valuation, corporate actions and audit (PostgreSQL)', () => 
     const [proposal] = await actions.proposals(s.userId, s.portfolio.id, s.account.id);
     const input = { expectedRevision: 1, idempotencyKey: 'confirmed-split', occurredOn: actionDay, daySequence: 1, acknowledged: true };
     await expect(actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, { ...input, acknowledged: false })).rejects.toThrow();
+    await s.history.saveBars(instrumentId, s.price('35', actionDay));
+    const now = new Date(actionDay + 'T22:00:00Z');
+    const pending = await s.valuations.current(s.userId, s.portfolio.id, now);
+    expect(pending).toMatchObject({ complete: false, valuePln: null, resultPln: null, knownValuePln: '733.00000000',
+      pendingSplits: [{ accountId: s.account.id, instrumentId, actionId: proposal.id }], positions: [{ value: null, unrealized: null }] });
+    const history = await s.valuations.history(s.userId, s.portfolio.id, '2026-11-11', actionDay);
+    expect(history.items[0]).toMatchObject({ complete: true, pendingSplits: [] });
+    expect(history.items[1]).toMatchObject({ dailyReturnPercent: null, twrPercent: null, pendingSplits: pending.pendingSplits });
+    const snapshot = await s.valuations.record(s.userId, s.portfolio.id, actionDay);
+    expect(snapshot.data).toMatchObject({ complete: false, pendingSplits: pending.pendingSplits });
+    await ctx.prisma.telegramConnection.create({ data: { userId: s.userId, chatId: '123456789', dailySummaryEnabled: true } });
+    const notifications = ctx.app.get(NotificationsService);
+    const delivery = vi.spyOn(notifications, 'deliver').mockResolvedValue();
+    try { await notifications.summary(s.userId, actionDay, now); } finally { delivery.mockRestore(); }
+    expect((await ctx.prisma.notification.findFirstOrThrow({ where: { userId: s.userId } })).body).toContain('uzgodnij split');
     const first = await actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, input);
+    const events = `/investments/portfolios/${s.portfolio.id}/accounts/${s.account.id}/events`;
+    const filtered = await s.agent.get(events).query({ instrumentId, type: 'SPLIT' }).expect(200);
+    expect(filtered.body).toMatchObject({ total: 1, items: [{ id: first.eventId, split: { instrumentId, numerator: '2.0000000000', denominator: '1.0000000000' } }] });
+    const reconciled = await s.valuations.record(s.userId, s.portfolio.id, actionDay);
+    expect(reconciled.id).not.toBe(snapshot.id);
+    expect(reconciled.data).toMatchObject({ complete: true, pendingSplits: [], valuePln: '1153.00000000' });
+    expect((await s.valuations.history(s.userId, s.portfolio.id, actionDay, actionDay)).twrPercent).toBe('0.000000');
     expect((await actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, input)).eventId).toBe(first.eventId);
     let summary = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, actionDay), actionDay);
     expect(summary.positions[0]).toMatchObject({ quantity: '12.0000000000', cost: '303.00000000' });

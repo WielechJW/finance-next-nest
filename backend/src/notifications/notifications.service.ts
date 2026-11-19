@@ -125,7 +125,7 @@ export class NotificationsService {
         now,
       );
       lines.push(
-        `${portfolio.name}: ${value.complete ? `${value.valuePln} PLN; wynik ${value.resultPln ?? 'brak pełnych danych'} PLN` : 'wycena niepełna — sprawdź ceny/FX w aplikacji'}`,
+        `${portfolio.name}: ${value.complete ? `${value.valuePln} PLN; wynik ${value.resultPln ?? 'brak pełnych danych'} PLN` : value.pendingSplits.length ? `wycena niepełna — uzgodnij split: ${[...new Set(value.pendingSplits.map(split => split.ticker))].join(', ')}` : 'wycena niepełna — sprawdź ceny/FX w aplikacji'}`,
       );
     }
     if (!portfolios.length) lines.push('Brak portfeli inwestycyjnych.');

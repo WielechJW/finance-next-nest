@@ -37,6 +37,7 @@ test('runs deposit, purchase, partial sale, reload and historical correction aga
   accounts,
 }, testInfo) => {
   const user = await accounts.register();
+  await accounts.populateCatalog();
   const instrument = await accounts.investmentInstrument();
   await login(page, user);
   await createPortfolioAndAccount(page);
@@ -50,6 +51,7 @@ test('runs deposit, purchase, partial sale, reload and historical correction aga
   await operation(page)
     .getByRole('combobox', { name: 'Typ operacji', exact: true })
     .selectOption('BUY');
+  await operation(page).getByLabel('Szukaj instrumentu').fill(instrument.ticker);
   await operation(page)
     .getByRole('combobox', { name: 'Instrument', exact: true })
     .selectOption(instrument.id);
@@ -65,6 +67,7 @@ test('runs deposit, purchase, partial sale, reload and historical correction aga
   await operation(page)
     .getByRole('combobox', { name: 'Typ operacji', exact: true })
     .selectOption('SELL');
+  await operation(page).getByLabel('Szukaj instrumentu').fill(instrument.ticker);
   await operation(page)
     .getByRole('combobox', { name: 'Instrument', exact: true })
     .selectOption(instrument.id);

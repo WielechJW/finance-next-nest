@@ -289,7 +289,7 @@ export class InvestmentPostingService {
     const events = await this.prisma.investmentEvent.findMany({
       where: { accountId, activeSlot: 1 },
       orderBy: [{ occurredOn: 'asc' }, { daySequence: 'asc' }],
-      include: { cashEntries: true, securityEntries: true },
+      include: { cashEntries: true, securityEntries: true, split: true },
     });
     return replayBalances(events);
   }
@@ -303,6 +303,7 @@ export class InvestmentPostingService {
       where: { accountId, activeSlot: 1 },
       orderBy: [{ occurredOn: 'asc' }, { daySequence: 'asc' }],
       include: {
+        split: true,
         cashEntries: true,
         securityEntries: true,
         trade: { include: { instrument: { select: { currency: true } } } },
