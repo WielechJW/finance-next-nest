@@ -54,6 +54,7 @@ export type InvestmentSummary = {
 };
 export type InvestmentQuery = {
   page: number;
+  instrumentId?: string;
   type?: string;
   from?: string;
   to?: string;

@@ -125,6 +125,12 @@ test('runs deposit, purchase, partial sale, reload and historical correction aga
   await expect(
     cash(page).getByText('683,00 PLN', { exact: true }),
   ).toBeVisible();
+  const filters = page.getByRole('form', { name: 'Filtry operacji' });
+  await filters.getByLabel('Instrument w historii').selectOption(instrument.id);
+  await filters.getByRole('button', { name: 'Filtruj', exact: true }).click();
+  const history = page.getByRole('region', { name: 'Historia operacji inwestycyjnych' });
+  await expect(history.getByRole('heading', { name: 'Zakup · ' + instrument.ticker })).toBeVisible();
+  await expect(history.getByRole('heading', { name: 'Wpłata', exact: true })).toHaveCount(0);
   const accountPath = page.url();
   await logout(page);
   const stranger = await accounts.register();

@@ -19,7 +19,7 @@ function ActionForm({ action, save, onSaved }: { action: CorporateActionProposal
   const key = useRef<string | null>(null);
   const payload = useRef<unknown>(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
-  if (action.recordedEventId) return <p>{action.ticker} · {action.kind === 'SPLIT' ? 'Split' : 'Dywidenda'} · {action.exDate} · Zapisano{action.recordedRevisionDiffers ? '. Dostawca zmienił dane — sprawdź korektę w historii rachunku.' : '.'}</p>;
+  if (action.recordedEventId) return <p>{action.ticker} · {action.kind === 'SPLIT' ? 'Split' : 'Dywidenda'} · {action.exDate} · Zapisano{action.recordedRevisionDiffers ? '. Dane w historii rachunku wymagają uzgodnienia z propozycją.' : '.'}</p>;
   return <form aria-label={`Potwierdzenie ${action.ticker} ${action.kind}`} onSubmit={event => {
     event.preventDefault(); if (busy) return; const form = new FormData(event.currentTarget);
     key.current ??= crypto.randomUUID();

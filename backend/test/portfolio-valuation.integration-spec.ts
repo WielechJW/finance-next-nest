@@ -97,6 +97,8 @@ describe('Portfolio valuation, corporate actions and audit (PostgreSQL)', () => 
     try { await notifications.summary(s.userId, actionDay, now); } finally { delivery.mockRestore(); }
     expect((await ctx.prisma.notification.findFirstOrThrow({ where: { userId: s.userId } })).body).toContain('uzgodnij split');
     const first = await actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, input);
+    await expect(s.posting.postForUser(s.userId, { accountId: s.account.id, instrumentId, type: 'SPLIT', numerator: '2', denominator: '1',
+      occurredOn: actionDay, timePrecision: 'DATE', daySequence: 2, idempotencyKey: 'second-manual-split' })).rejects.toThrow('Split');
     const events = `/investments/portfolios/${s.portfolio.id}/accounts/${s.account.id}/events`;
     const filtered = await s.agent.get(events).query({ instrumentId, type: 'SPLIT' }).expect(200);
     expect(filtered.body).toMatchObject({ total: 1, items: [{ id: first.eventId, split: { instrumentId, numerator: '2.0000000000', denominator: '1.0000000000' } }] });
@@ -110,6 +112,27 @@ describe('Portfolio valuation, corporate actions and audit (PostgreSQL)', () => 
     await s.posting.correctForUser(s.userId, { accountId: s.account.id, targetEventId: s.buy.eventId, expectedRevision: 0, reason: 'Correct quantity', idempotencyKey: 'quantity-correction', replacement: { ...s.inputs.buy, quantity: '12', idempotencyKey: 'quantity-correction' } });
     summary = s.valuations.calculate(await s.valuations.load(s.userId, s.portfolio.id, actionDay), actionDay);
     expect(summary.positions[0]).toMatchObject({ quantity: '16.0000000000', cost: '403.33333333' });
+  });
+  it('reconciles manual splits against the provider and prevents applying the same split twice', async () => {
+    const s = await scenario();
+    const exDate = '2026-11-12';
+    const manual = await s.posting.postForUser(s.userId, { accountId: s.account.id, instrumentId,
+      type: 'SPLIT', numerator: '4', denominator: '2', occurredOn: exDate, timePrecision: 'DATE', daySequence: 1, idempotencyKey: 'manual-split' });
+    await s.history.saveBars(instrumentId, s.price('35', exDate));
+    await s.history.saveActions(instrumentId, parseActions([{ date: exDate, split: '2/1' }], 'SPLIT', 'PLN'));
+    const actions = ctx.app.get(CorporateActionsService);
+    const [proposal] = await actions.proposals(s.userId, s.portfolio.id, s.account.id);
+    expect(proposal).toMatchObject({ recordedEventId: manual.eventId, recordedRevisionDiffers: false });
+    await expect(actions.confirm(s.userId, s.portfolio.id, s.account.id, proposal.id, {
+      expectedRevision: 1, idempotencyKey: 'provider-split', occurredOn: exDate, daySequence: 2, acknowledged: true,
+    })).rejects.toThrow('Split');
+    expect(await s.valuations.current(s.userId, s.portfolio.id, new Date(exDate + 'T22:00:00Z')))
+      .toMatchObject({ complete: true, valuePln: '1153.00000000', positions: [{ quantity: '12.0000000000' }] });
+    await s.history.saveActions(instrumentId, parseActions([{ date: exDate, split: '3/1' }], 'SPLIT', 'PLN'));
+    const [revised] = await actions.proposals(s.userId, s.portfolio.id, s.account.id);
+    expect(revised).toMatchObject({ recordedEventId: manual.eventId, recordedRevisionDiffers: true });
+    expect(await s.valuations.current(s.userId, s.portfolio.id, new Date(exDate + 'T22:00:00Z')))
+      .toMatchObject({ complete: false, valuePln: null });
   });
   it('schedules active holdings of an archived account despite an invalid ledger and a missing calendar elsewhere', async () => {
     const s = await scenario();

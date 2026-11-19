@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import type { InvestmentCurrency } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { replayFifo, type FifoEvent } from './fifo.js';
+import { splitOnDate } from './split-reconciliation.js';
 import { preparePosting, replayBalances, type PostInvestmentInput, type ReplayEvent } from './posting.js';
 
 export type CorrectInvestmentInput = {
@@ -78,6 +79,11 @@ export class InvestmentPostingService {
           openingLot: { include: { instrument: { select: { currency: true } } } },
         },
       });
+      const split = posting.split;
+      if (split && history.some(event => (posting.corporateActionId || event.corporateActionId) &&
+          splitOnDate(event, split.instrumentId, posting.timing.occurredOn))) {
+        throw new ConflictException('Split tego instrumentu jest już zapisany na rachunku w tym dniu. Sprawdź historię operacji.');
+      }
       const candidate: ReplayEvent = {
         occurredOn: posting.timing.occurredOn,
         daySequence: posting.timing.daySequence,

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../prisma/prisma.service.js';
 import { InvestmentAccountsService } from '../investments/accounts.service.js';
 import { InvestmentPostingService } from '../investments/posting.service.js';
+import { reconcileSplit } from '../investments/split-reconciliation.js';
 import { eventInclude } from '../investments/events.service.js';
 import { replayBalances } from '../investments/posting.js';
 import { InvestmentCalculation as D } from '../investments/precision.js';
@@ -22,11 +23,13 @@ export class CorporateActionsService {
       const quantity = replayBalances(history.filter(event => event.occurredOn < action.exDate)).securities[action.instrumentId] ?? '0';
       if (!new D(quantity).gt(0)) return [];
       const applied = recorded.find(row => row.externalOperationId === actionKey(action));
+      const ledger = action.kind === 'SPLIT' ? reconcileSplit(history, action) : null;
       return [{ id: action.id, revision: action.revision, kind: action.kind, instrument: { id: action.instrument.id, ticker: action.instrument.ticker, currency: action.instrument.currency },
         exDate: action.exDate.toISOString().slice(0, 10), paymentOn: action.paymentOn?.toISOString().slice(0, 10) ?? null,
         quantity, suggestedGrossAmount: action.amount ? new D(action.amount.toString()).times(quantity).toFixed(2) : null,
         numerator: action.numerator?.toFixed(10) ?? null, denominator: action.denominator?.toFixed(10) ?? null,
-        recordedEventId: applied?.id ?? null, recordedRevisionDiffers: !!applied && applied.corporateActionId !== action.id }];
+        recordedEventId: ledger?.eventId ?? applied?.id ?? null,
+        recordedRevisionDiffers: ledger ? !!(ledger.eventId || applied) && !ledger.matches : !!applied && applied.corporateActionId !== action.id }];
     });
   }
   async confirm(userId: string, portfolioId: string, accountId: string, actionId: string, input: ActionConfirmation) {
