@@ -47,7 +47,7 @@ export async function requestAnalysis(
         case 502:
           throw new ApiError(
             502,
-            "LM Studio nie zwróciło gotowej odpowiedzi. Upewnij się, że model jest załadowany. Jeśli używasz Qwen w trybie Enable Thinking, spróbuj go wyłączyć.",
+            "LM Studio nie zwróciło odpowiedzi do wyświetlenia. Spróbuj ponownie z krótszym raportem lub bardziej konkretnym pytaniem.",
           );
         case 503:
           throw new ApiError(
@@ -57,7 +57,7 @@ export async function requestAnalysis(
         case 504:
           throw new ApiError(
             504,
-            "Analiza trwała zbyt długo. Spróbuj krótszego raportu lub wyłącz Enable Thinking w ustawieniach modelu.",
+            "Analiza trwała zbyt długo. Spróbuj krótszego raportu lub zapytaj o konkretny wskaźnik.",
           );
       }
     }

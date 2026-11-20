@@ -163,8 +163,9 @@ hosta Windows w `LM_STUDIO_BASE_URL` i wpisać token w `LM_STUDIO_API_KEY`.
 [Ustawienia serwera LM Studio](https://lmstudio.ai/docs/developer/core/server/settings)
 
 Ustaw kontekst modelu na 16–32 tys. tokenów, jeśli pozwalają na to zasoby.
-Gdy odpowiedź nie mieści się w limicie czasu, użyj krótszego raportu lub wyłącz
-**Enable Thinking** w ustawieniach Qwen w LM Studio.
+Czat wyłącza tryb Thinking dla swoich żądań do Qwen 3.5, aby wykorzystać limit
+generacji na odpowiedź. Gdy analiza trwa zbyt długo, użyj krótszego raportu
+lub zapytaj o konkretny wskaźnik.
 [Dokumentacja API LM Studio](https://lmstudio.ai/docs/developer/openai-compat)
 
 MVP obsługuje jeden PDF na rozmowę, do 15 MB i 250 stron, z warstwą tekstową.

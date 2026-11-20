@@ -81,10 +81,26 @@ describe('Fundamental analysis chat', () => {
 
   it('extracts PDF text with page references and includes prior turns when asking a follow-up', async () => {
     const reply = 'Przychody to 120 mln PLN w 2025 r. [str. 1]';
-    lmStudio.mockImplementation(async (url) => {
+    lmStudio.mockImplementation(async (url, init) => {
       if (url === 'http://127.0.0.1:1234/v1/models') {
         return Response.json({
           data: [{ id: 'qwen/qwen3.5-9b' }, { id: 'other-model' }],
+        });
+      }
+      if (
+        typeof init?.body === 'string' &&
+        JSON.parse(init.body).reasoning_effort !== 'none'
+      ) {
+        return Response.json({
+          choices: [
+            {
+              finish_reason: 'length',
+              message: {
+                content: '',
+                reasoning_content: 'Wykorzystano limit.',
+              },
+            },
+          ],
         });
       }
       return Response.json({ choices: [{ message: { content: reply } }] });
@@ -124,6 +140,7 @@ describe('Fundamental analysis chat', () => {
     if (typeof init?.body !== 'string') throw new Error('Expected a JSON body');
     const payload = JSON.parse(init.body);
     expect(payload.model).toBe('qwen/qwen3.5-9b');
+    expect(payload.reasoning_effort).toBe('none');
     expect(payload.messages.slice(1, 3)).toEqual(history);
     expect(payload.messages[3].content).toContain('Jaka była marża?');
     expect(payload.messages[3].content).toContain(
