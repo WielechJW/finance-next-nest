@@ -6,6 +6,7 @@ import {
   invalidateAuthRequests,
 } from "./api-client";
 import { authApi } from "./auth-api";
+import { requestAnalysis } from "./fundamental-analysis-api";
 
 const user = {
   id: "user-id",
@@ -81,6 +82,23 @@ describe("API client", () => {
     await expect(apiRequest("/auth/login")).rejects.toEqual(
       new ApiError(500, "Serwer nie mógł wykonać operacji. Spróbuj ponownie."),
     );
+  });
+
+  it("maps the empty model response to a chat message without exposing the server text", async () => {
+    fetchMock.mockResolvedValueOnce(
+      json(
+        { code: "MODEL_EMPTY", message: "private prompt or provider detail" },
+        502,
+      ),
+    );
+    await expect(
+      requestAnalysis("Raport", [], null, new AbortController().signal),
+    ).rejects.toMatchObject({
+      status: 502,
+      code: "MODEL_EMPTY",
+      message:
+        "Model zakończył generację bez odpowiedzi. Spróbuj ponownie z konkretnym pytaniem.",
+    });
   });
 
   it("replaces technical 403 errors and preserves useful 429 messages without invalidating the session", async () => {

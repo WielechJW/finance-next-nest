@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Header,
   HttpCode,
   HttpStatus,
@@ -31,6 +32,12 @@ class ChatInput {
 @UseGuards(SessionAuthGuard)
 export class FundamentalAnalysisController {
   constructor(private readonly analysis: FundamentalAnalysisService) {}
+
+  @Get('status')
+  @Header('Cache-Control', 'no-store')
+  status() {
+    return this.analysis.status();
+  }
 
   @Post('chat')
   @HttpCode(HttpStatus.OK)

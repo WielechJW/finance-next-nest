@@ -7,8 +7,9 @@ wskaźniki, porównania okresów i ocenę atrakcyjności ceny.
 Obecne MVP odpowiada po polsku przez Qwen 3.5 w LM Studio lub Bionic. Obsługuje
 jeden tekstowy PDF do 15 MB i 250 stron. Przy długim raporcie backend wybiera
 fragmenty, a do kolejnego pytania dołącza trzy ostatnie tury rozmowy. Raport
-i rozmowa są dostępne do odświeżenia lub opuszczenia strony. Na obecnym
-stanowisku z WSL połączenie z Bionic korzysta z tymczasowego mostu.
+i rozmowa są dostępne do odświeżenia lub opuszczenia strony. Pierwsza iteracja
+dodaje status połączenia, obsługę Bionic w WSL oraz kartę rachunku wyników
+sprawdzoną na raportach wzorcowych. [Raporty wzorcowe](fundamental-analysis-fixtures.md)
 
 Plan rozwija etap 8 platformy inwestycyjnej i wykorzystuje istniejący katalog
 instrumentów oraz notowania po sesji. [Mapa rozwoju inwestycji](investment-roadmap.md#etap-8-analiza-fundamentalna-i-porównywanie-spółek), [API danych rynkowych](market-data-api.md)

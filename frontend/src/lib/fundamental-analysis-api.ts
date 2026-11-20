@@ -1,8 +1,21 @@
 import { ApiError, apiRequest } from "./api-client";
 
+type Metric = "revenue" | "ebit" | "netIncome";
+export type ReportMetric =
+  | {
+      metric: Metric;
+      state: "verified";
+      amount: string;
+      period: string;
+      unit: string;
+      page: number;
+    }
+  | { metric: Metric; state: "missing" | "needs_review" };
+
 export type AnalysisReply = {
   answer: string;
   incomplete: boolean;
+  summary: ReportMetric[] | null;
   coverage: {
     totalPages: number;
     pagesWithText: number;
@@ -12,6 +25,44 @@ export type AnalysisReply = {
 };
 
 type Turn = { question: string; reply: AnalysisReply };
+
+const modelErrors: Record<string, string> = {
+  MODEL_CONFIG: "Sprawdź ustawienia adresu LM Studio w backendzie.",
+  MODEL_OFFLINE:
+    "LM Studio jest niedostępne. Sprawdź, czy lokalny serwer API działa.",
+  MODEL_AUTH:
+    "LM Studio odrzuciło token API. Sprawdź jego konfigurację w backendzie.",
+  MODEL_EMPTY:
+    "Model zakończył generację bez odpowiedzi. Spróbuj ponownie z konkretnym pytaniem.",
+  MODEL_RESPONSE:
+    "LM Studio zwróciło nieprawidłową odpowiedź. Sprawdź połączenie i spróbuj ponownie.",
+  MODEL_TIMEOUT: "LM Studio nie odpowiedziało w wyznaczonym czasie.",
+};
+
+async function analysisRequest<T>(
+  path: "status" | "chat",
+  options: Parameters<typeof apiRequest>[1],
+): Promise<T> {
+  try {
+    return await apiRequest<T>("/fundamental-analysis/" + path, options);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      const message =
+        error.status === 413
+          ? "Plik PDF może mieć maksymalnie 15 MB."
+          : error.code && modelErrors[error.code];
+      if (message) throw new ApiError(error.status, message, error.code);
+    }
+    throw error;
+  }
+}
+
+export function requestAnalysisStatus(signal: AbortSignal) {
+  return analysisRequest<{ model: string }>("status", {
+    signal,
+    timeoutMs: 8000,
+  });
+}
 
 export async function requestAnalysis(
   question: string,
@@ -32,35 +83,10 @@ export async function requestAnalysis(
   );
   if (report) body.set("report", report);
 
-  try {
-    return await apiRequest<AnalysisReply>("/fundamental-analysis/chat", {
-      method: "POST",
-      body,
-      signal,
-      timeoutMs: 200_000,
-    });
-  } catch (error) {
-    if (error instanceof ApiError) {
-      switch (error.status) {
-        case 413:
-          throw new ApiError(413, "Plik PDF może mieć maksymalnie 15 MB.");
-        case 502:
-          throw new ApiError(
-            502,
-            "LM Studio nie zwróciło odpowiedzi do wyświetlenia. Spróbuj ponownie z krótszym raportem lub bardziej konkretnym pytaniem.",
-          );
-        case 503:
-          throw new ApiError(
-            503,
-            "Nie udało się połączyć z LM Studio. Sprawdź adres i port w Local Model API (Bionic) lub Developer (LM Studio) oraz konfigurację backendu.",
-          );
-        case 504:
-          throw new ApiError(
-            504,
-            "Analiza trwała zbyt długo. Spróbuj krótszego raportu lub zapytaj o konkretny wskaźnik.",
-          );
-      }
-    }
-    throw error;
-  }
+  return analysisRequest<AnalysisReply>("chat", {
+    method: "POST",
+    body,
+    signal,
+    timeoutMs: 200_000,
+  });
 }

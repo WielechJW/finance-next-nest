@@ -151,10 +151,15 @@ LM_STUDIO_MODEL=
 LM_STUDIO_API_KEY=
 ```
 
-Jeśli serwer działa w Windows i nasłuchuje na `localhost`, a backend działa w
-WSL 2, włącz tryb sieci lustrzanej w Windows 11. Dodaj `networkingMode=mirrored`
-w sekcji `[wsl2]` pliku `%USERPROFILE%\.wslconfig` i zrestartuj WSL.
-W `LM_STUDIO_BASE_URL` użyj `127.0.0.1` z portem pokazanym przez serwer.
+Jeśli Bionic działa w Windows na `localhost`, a backend w WSL 2 w trybie NAT,
+ustaw `LM_STUDIO_WSL_WINDOWS=1` oraz `LM_STUDIO_BASE_URL` z adresem i portem
+pokazanym w **Local Model API**, np. `http://127.0.0.1:1235/v1`. Backend korzysta
+z systemowego `curl.exe` w Windows przez interop WSL. Po ponownym uruchomieniu
+WSL wystarczy uruchomić Bionic i aplikację, a w zakładce **Analiza spółek** można
+sprawdzić połączenie i wykryty model.
+
+W trybie sieci lustrzanej Windows 11 połączenie z `127.0.0.1` działa bezpośrednio.
+Użyj portu pokazanego przez serwer i ustaw `LM_STUDIO_WSL_WINDOWS=0`.
 
 Jeśli używasz trybu NAT, a Twoja wersja LM Studio udostępnia **Serve on Local
 Network** oraz **Require Authentication**, możesz włączyć obie opcje, podać adres
@@ -172,8 +177,11 @@ MVP obsługuje jeden PDF na rozmowę, do 15 MB i 250 stron, z warstwą tekstową
 Dla długich raportów model otrzymuje wybrane fragmenty i ostatnie trzy tury
 rozmowy. Czat działa do czasu opuszczenia lub odświeżenia strony. Backend
 przetwarza plik w pamięci, a tekst i pytania wysyła na skonfigurowany adres
-LM Studio. Ocena inwestycji opiera się na dostarczonych danych, w tym cenie
-akcji, jeśli użytkownik ją poda.
+LM Studio. Karta raportu pokazuje przychody, EBIT i zysk netto z rozpoznanego
+skonsolidowanego rachunku wyników wraz z jednostką, okresem i stroną PDF.
+Niejednoznaczne kolumny wymagają weryfikacji. Ocena inwestycji opiera się na
+dostarczonych danych, w tym cenie akcji, jeśli użytkownik ją poda.
+[Raporty wzorcowe i uruchomienie testów](docs/fundamental-analysis-fixtures.md)
 
 ## Rejestracja użytkownika
 
