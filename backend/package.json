@@ -58,6 +58,7 @@
     "dotenv": "^18.0.9",
     "express-session": "^1.19.0",
     "ioredis": "6.0.0",
+    "pdfjs-dist": "^6.5.438",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"

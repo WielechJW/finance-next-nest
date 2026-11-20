@@ -52,7 +52,7 @@ export class SessionStore {
     this.onChange = undefined;
   };
 
-  refresh = async (): Promise<void> => {
+  refresh = async ({ background = false } = {}): Promise<void> => {
     if (this.mutation) {
       this.refreshQueued = true;
       return;
@@ -60,7 +60,8 @@ export class SessionStore {
     const version = this.begin();
     const controller = new AbortController();
     this.controller = controller;
-    this.publish(LOADING);
+    if (!background || this.state.status !== "authenticated")
+      this.publish(LOADING);
     try {
       const user = await this.api.getCurrentUser(controller.signal);
       if (version === this.version)

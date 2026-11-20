@@ -119,6 +119,25 @@ describe("Session state", () => {
     });
   });
 
+  it("keeps the active view during a background check and clears it if the session expires", async () => {
+    const api = client();
+    const store = new SessionStore(api);
+    await store.refresh();
+    const check = deferred<UserDto>();
+    api.getCurrentUser.mockReturnValueOnce(check.promise);
+    const pending = store.refresh({ background: true });
+    expect(store.getSnapshot()).toMatchObject({
+      status: "authenticated",
+      user,
+    });
+    check.reject(new ApiError(401, "Unauthorized"));
+    await pending;
+    expect(store.getSnapshot()).toMatchObject({
+      status: "unauthenticated",
+      user: null,
+    });
+  });
+
   it("blocks concurrent authentication mutations", async () => {
     const api = client();
     const pending = deferred<UserDto>();

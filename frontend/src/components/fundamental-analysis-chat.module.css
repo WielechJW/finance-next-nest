@@ -1,0 +1,221 @@
+.workspace {
+  max-width: 1000px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  margin-bottom: 22px;
+}
+
+.header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.workspace button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.workspace button i {
+  font-size: 1.1rem;
+}
+
+.workspace .secondary,
+.workspace .remove {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--forest);
+}
+
+.workspace .secondary:hover,
+.workspace .remove:hover {
+  background: var(--mint);
+}
+
+.chat {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  height: clamp(255px, 46dvh, 540px);
+  overflow-y: auto;
+  padding: clamp(14px, 3vw, 28px);
+}
+
+.transcript:focus-visible {
+  outline-offset: -4px;
+}
+
+.empty {
+  max-width: 440px;
+  margin: auto;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 15px;
+  background: var(--mint);
+  color: var(--forest);
+  font-size: 1.65rem;
+}
+
+.empty h2 {
+  margin: 12px 0 8px;
+  font-size: 1.35rem;
+}
+
+.empty p {
+  margin: 5px 0;
+  color: var(--muted);
+  font-size: 0.93rem;
+}
+
+.turn {
+  display: grid;
+  gap: 13px;
+}
+
+.question {
+  justify-self: end;
+  max-width: 85%;
+  margin: 0;
+  padding: 10px 15px;
+  border-radius: 15px 15px 4px 15px;
+  background: var(--mint);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.reply {
+  width: min(100%, 75ch);
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 15px 15px 15px 4px;
+}
+
+.author,
+.pending {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.answer {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note,
+.footer,
+.fileLimit {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.note {
+  margin: 10px 0 0;
+}
+
+.footer {
+  margin: 10px 0 0;
+}
+
+.composer {
+  display: grid;
+  gap: 8px;
+  padding: clamp(14px, 3vw, 22px);
+  border-top: 1px solid var(--line);
+}
+
+.label {
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.composer textarea {
+  width: 100%;
+  min-height: 65px;
+  padding: 10px 12px;
+  resize: vertical;
+  border: 1px solid var(--field-line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.controls,
+.attachment {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.controls {
+  justify-content: space-between;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(100%, 375px);
+  min-height: 44px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: var(--mint);
+  color: var(--forest);
+  font-size: 0.9rem;
+}
+
+.file span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace .remove {
+  min-width: 34px;
+  padding: 3px;
+  background: transparent;
+  border-color: transparent;
+}
+
+.error {
+  margin: 2px 0 0;
+  color: var(--negative);
+}
+
+@media (max-width: 500px) {
+  .transcript {
+    height: clamp(230px, 34dvh, 380px);
+  }
+
+  .controls > button {
+    width: 100%;
+  }
+}

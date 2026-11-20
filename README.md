@@ -130,6 +130,45 @@ z bazą ani ustawionego `DATABASE_URL`.
 Testy konfiguracji i endpointu powitalnego działają bez bazy; test endpointu
 zastępuje dostawcę Prisma, ponieważ ten endpoint nie wykonuje zapytań.
 
+## Analiza spółek z LM Studio
+
+1. Załaduj Qwen 3.5 w LM Studio i w zakładce **Developer** uruchom serwer API.
+2. Uruchom frontend i backend projektu, zaloguj się i wybierz **Analiza spółek**.
+3. Dołącz PDF i kliknij **Analizuj raport** lub wpisz własne pytanie. Po analizie
+   możesz dopytywać o ten sam dokument. Przycisk **Nowa rozmowa** pozwala użyć
+   kolejnego raportu.
+
+Backend domyślnie łączy się z `http://127.0.0.1:1234/v1` i wykrywa jeden model
+Qwen 3.5. Jeżeli LM Studio zwraca kilka modeli Qwen 3.5 lub ma niestandardowy
+adres, ustaw odpowiednie wartości w `backend/.env` i zrestartuj backend.
+
+```dotenv
+LM_STUDIO_BASE_URL=http://127.0.0.1:1234/v1
+# Uzupełnij dokładnym polem id z GET /v1/models, gdy automatyczny wybór nie wystarcza.
+LM_STUDIO_MODEL=
+# Podaj token tylko wtedy, gdy serwer LM Studio wymaga uwierzytelnienia.
+LM_STUDIO_API_KEY=
+```
+
+Jeśli LM Studio działa w Windows, a backend w WSL 2, adres `127.0.0.1` działa
+w trybie sieci lustrzanej. W trybie NAT użyj adresu hosta Windows w
+`LM_STUDIO_BASE_URL` i włącz **Serve on Local Network** oraz **Require
+Authentication** w LM Studio. Dodaj wygenerowany token do `LM_STUDIO_API_KEY`.
+[Sieć w WSL](https://learn.microsoft.com/windows/wsl/networking),
+[Ustawienia serwera LM Studio](https://lmstudio.ai/docs/developer/core/server/settings)
+
+Ustaw kontekst modelu na 16–32 tys. tokenów, jeśli pozwalają na to zasoby.
+Gdy odpowiedź nie mieści się w limicie czasu, użyj krótszego raportu lub wyłącz
+**Enable Thinking** w ustawieniach Qwen w LM Studio.
+[Dokumentacja API LM Studio](https://lmstudio.ai/docs/developer/openai-compat)
+
+MVP obsługuje jeden PDF na rozmowę, do 15 MB i 250 stron, z warstwą tekstową.
+Dla długich raportów model otrzymuje wybrane fragmenty i ostatnie trzy tury
+rozmowy. Czat działa do czasu opuszczenia lub odświeżenia strony. Backend
+przetwarza plik w pamięci, a tekst i pytania wysyła na skonfigurowany adres
+LM Studio. Ocena inwestycji opiera się na dostarczonych danych, w tym cenie
+akcji, jeśli użytkownik ją poda.
+
 ## Rejestracja użytkownika
 
 `POST /auth/register` przyjmuje JSON z polami `email` i `password`:

@@ -19,6 +19,11 @@ const sections = [
     icon: "chart-line-up",
   },
   { href: "/dashboard/market", label: "Rynek i alerty", icon: "bell-ringing" },
+  {
+    href: "/dashboard/fundamental-analysis",
+    label: "Analiza spółek",
+    icon: "file-magnifying-glass",
+  },
 ];
 
 export function DashboardNav() {
