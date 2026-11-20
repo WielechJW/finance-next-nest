@@ -52,7 +52,7 @@ export async function requestAnalysis(
         case 503:
           throw new ApiError(
             503,
-            "Nie udało się połączyć z LM Studio. Uruchom serwer w zakładce Developer i sprawdź adres oraz token w konfiguracji backendu.",
+            "Nie udało się połączyć z LM Studio. Sprawdź adres i port w Local Model API (Bionic) lub Developer (LM Studio) oraz konfigurację backendu.",
           );
         case 504:
           throw new ApiError(

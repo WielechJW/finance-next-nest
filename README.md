@@ -132,15 +132,16 @@ zastępuje dostawcę Prisma, ponieważ ten endpoint nie wykonuje zapytań.
 
 ## Analiza spółek z LM Studio
 
-1. Załaduj Qwen 3.5 w LM Studio i w zakładce **Developer** uruchom serwer API.
+1. Załaduj Qwen 3.5 i uruchom serwer API. W Bionic użyj **Settings → Local Model API**.
+   W klasycznym LM Studio użyj zakładki **Developer**.
 2. Uruchom frontend i backend projektu, zaloguj się i wybierz **Analiza spółek**.
 3. Dołącz PDF i kliknij **Analizuj raport** lub wpisz własne pytanie. Po analizie
    możesz dopytywać o ten sam dokument. Przycisk **Nowa rozmowa** pozwala użyć
    kolejnego raportu.
 
 Backend domyślnie łączy się z `http://127.0.0.1:1234/v1` i wykrywa jeden model
-Qwen 3.5. Jeżeli LM Studio zwraca kilka modeli Qwen 3.5 lub ma niestandardowy
-adres, ustaw odpowiednie wartości w `backend/.env` i zrestartuj backend.
+Qwen 3.5. Jeśli w aplikacji serwer pokazuje inny port, wpisz go w
+`LM_STUDIO_BASE_URL` w `backend/.env` i zrestartuj backend.
 
 ```dotenv
 LM_STUDIO_BASE_URL=http://127.0.0.1:1234/v1
@@ -150,10 +151,14 @@ LM_STUDIO_MODEL=
 LM_STUDIO_API_KEY=
 ```
 
-Jeśli LM Studio działa w Windows, a backend w WSL 2, adres `127.0.0.1` działa
-w trybie sieci lustrzanej. W trybie NAT użyj adresu hosta Windows w
-`LM_STUDIO_BASE_URL` i włącz **Serve on Local Network** oraz **Require
-Authentication** w LM Studio. Dodaj wygenerowany token do `LM_STUDIO_API_KEY`.
+Jeśli serwer działa w Windows i nasłuchuje na `localhost`, a backend działa w
+WSL 2, włącz tryb sieci lustrzanej w Windows 11. Dodaj `networkingMode=mirrored`
+w sekcji `[wsl2]` pliku `%USERPROFILE%\.wslconfig` i zrestartuj WSL.
+W `LM_STUDIO_BASE_URL` użyj `127.0.0.1` z portem pokazanym przez serwer.
+
+Jeśli używasz trybu NAT, a Twoja wersja LM Studio udostępnia **Serve on Local
+Network** oraz **Require Authentication**, możesz włączyć obie opcje, podać adres
+hosta Windows w `LM_STUDIO_BASE_URL` i wpisać token w `LM_STUDIO_API_KEY`.
 [Sieć w WSL](https://learn.microsoft.com/windows/wsl/networking),
 [Ustawienia serwera LM Studio](https://lmstudio.ai/docs/developer/core/server/settings)
 
