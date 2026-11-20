@@ -329,6 +329,8 @@ jednego fizycznego doręczenia. Stan `unknown` ma ustaloną politykę obsługi.
 
 **Cel:** połączyć notowania z raportami i własnym procesem analizy.
 
+Rozwój czatu PDF z lokalnym modelem opisuje osobny plan. [Analiza fundamentalna wspierana przez lokalny model](fundamental-analysis-roadmap.md)
+
 - [ ] **8.1. Dodać `Company`, `FinancialReport` i `FundamentalFact`.** Powiązać
   emitenta z instrumentami. Zapisywać okres, walutę raportową, jednostkę,
   czas publikacji, źródło, wersję i korekty raportu. Dla USA ocenić SEC EDGAR;
