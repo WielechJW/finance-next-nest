@@ -130,6 +130,51 @@ z bazą ani ustawionego `DATABASE_URL`.
 Testy konfiguracji i endpointu powitalnego działają bez bazy; test endpointu
 zastępuje dostawcę Prisma, ponieważ ten endpoint nie wykonuje zapytań.
 
+## Analiza spółek z LM Studio
+
+1. Załaduj Qwen 3.5 i uruchom serwer API. W Bionic użyj **Settings → Local Model API**.
+   W klasycznym LM Studio użyj zakładki **Developer**.
+2. Uruchom frontend i backend projektu, zaloguj się i wybierz **Analiza spółek**.
+3. Dołącz PDF i kliknij **Analizuj raport** lub wpisz własne pytanie. Po analizie
+   możesz dopytywać o ten sam dokument. Przycisk **Nowa rozmowa** pozwala użyć
+   kolejnego raportu.
+
+Backend domyślnie łączy się z `http://127.0.0.1:1234/v1` i wykrywa jeden model
+Qwen 3.5. Jeśli w aplikacji serwer pokazuje inny port, wpisz go w
+`LM_STUDIO_BASE_URL` w `backend/.env` i zrestartuj backend.
+
+```dotenv
+LM_STUDIO_BASE_URL=http://127.0.0.1:1234/v1
+# Uzupełnij dokładnym polem id z GET /v1/models, gdy automatyczny wybór nie wystarcza.
+LM_STUDIO_MODEL=
+# Podaj token tylko wtedy, gdy serwer LM Studio wymaga uwierzytelnienia.
+LM_STUDIO_API_KEY=
+```
+
+Jeśli serwer działa w Windows i nasłuchuje na `localhost`, a backend działa w
+WSL 2, włącz tryb sieci lustrzanej w Windows 11. Dodaj `networkingMode=mirrored`
+w sekcji `[wsl2]` pliku `%USERPROFILE%\.wslconfig` i zrestartuj WSL.
+W `LM_STUDIO_BASE_URL` użyj `127.0.0.1` z portem pokazanym przez serwer.
+
+Jeśli używasz trybu NAT, a Twoja wersja LM Studio udostępnia **Serve on Local
+Network** oraz **Require Authentication**, możesz włączyć obie opcje, podać adres
+hosta Windows w `LM_STUDIO_BASE_URL` i wpisać token w `LM_STUDIO_API_KEY`.
+[Sieć w WSL](https://learn.microsoft.com/windows/wsl/networking),
+[Ustawienia serwera LM Studio](https://lmstudio.ai/docs/developer/core/server/settings)
+
+Ustaw kontekst modelu na 16–32 tys. tokenów, jeśli pozwalają na to zasoby.
+Czat wyłącza tryb Thinking dla swoich żądań do Qwen 3.5, aby wykorzystać limit
+generacji na odpowiedź. Gdy analiza trwa zbyt długo, użyj krótszego raportu
+lub zapytaj o konkretny wskaźnik.
+[Dokumentacja API LM Studio](https://lmstudio.ai/docs/developer/openai-compat)
+
+MVP obsługuje jeden PDF na rozmowę, do 15 MB i 250 stron, z warstwą tekstową.
+Dla długich raportów model otrzymuje wybrane fragmenty i ostatnie trzy tury
+rozmowy. Czat działa do czasu opuszczenia lub odświeżenia strony. Backend
+przetwarza plik w pamięci, a tekst i pytania wysyła na skonfigurowany adres
+LM Studio. Ocena inwestycji opiera się na dostarczonych danych, w tym cenie
+akcji, jeśli użytkownik ją poda.
+
 ## Rejestracja użytkownika
 
 `POST /auth/register` przyjmuje JSON z polami `email` i `password`:

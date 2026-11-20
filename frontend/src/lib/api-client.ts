@@ -21,6 +21,7 @@ export function isAbortError(error: unknown): boolean {
 
 type ApiOptions = Omit<RequestInit, "cache" | "credentials"> & {
   notifyUnauthorized?: boolean;
+  timeoutMs?: number;
 };
 
 function requestUrl(path: string): string {
@@ -70,7 +71,12 @@ export async function apiRequest<T>(
   path: string,
   options: ApiOptions = {},
 ): Promise<T> {
-  const { notifyUnauthorized = true, signal, ...init } = options;
+  const {
+    notifyUnauthorized = true,
+    signal,
+    timeoutMs = 15000,
+    ...init
+  } = options;
   const revision = authRevision;
   const controller = new AbortController();
   const cancel = () => controller.abort();
@@ -80,12 +86,16 @@ export async function apiRequest<T>(
   const timeout = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, 15000);
+  }, timeoutMs);
 
   try {
     const headers = new Headers(init.headers);
     headers.set("Accept", "application/json");
-    if (init.body && !headers.has("Content-Type"))
+    if (
+      init.body &&
+      !(init.body instanceof FormData) &&
+      !headers.has("Content-Type")
+    )
       headers.set("Content-Type", "application/json");
     const response = await fetch(requestUrl(path), {
       ...init,

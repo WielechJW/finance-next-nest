@@ -37,7 +37,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     store.setChangeListener(() => channel?.postMessage("session-changed"));
     const sync = () => {
-      if (document.visibilityState === "visible") void store.refresh();
+      if (document.visibilityState !== "visible") return;
+      // Keep the report open when the file picker returns focus to the chat.
+      void store.refresh({
+        background:
+          window.location.pathname === "/dashboard/fundamental-analysis",
+      });
     };
     const changed = (event: MessageEvent) => {
       if (event.data === "session-changed") {

@@ -54,6 +54,16 @@ describe("API client", () => {
     await expect(authApi.logout()).resolves.toBeUndefined();
   });
 
+  it("lets the browser set the multipart content type and boundary", async () => {
+    fetchMock.mockResolvedValueOnce(json({ answer: "Wynik analizy" }));
+    const body = new FormData();
+    body.set("report", new File(["%PDF-1.7"], "raport.pdf"));
+    await apiRequest("/fundamental-analysis/chat", { method: "POST", body });
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init?.body).toBe(body);
+    expect(new Headers(init?.headers).has("Content-Type")).toBe(false);
+  });
+
   it("preserves validation messages and status codes", async () => {
     fetchMock.mockResolvedValueOnce(
       json({ message: ["Błędny e-mail.", "Podaj hasło."] }, 400),
