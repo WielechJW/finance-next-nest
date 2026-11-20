@@ -10,7 +10,9 @@ import {
 import { ApiError } from "@/lib/api-client";
 import {
   requestAnalysis,
+  requestAnalysisStatus,
   type AnalysisReply,
+  type ReportMetric,
 } from "@/lib/fundamental-analysis-api";
 import { UiIcon } from "./ui-icon";
 import { useSession } from "./session-provider";
@@ -19,13 +21,140 @@ import styles from "./fundamental-analysis-chat.module.css";
 const DEFAULT_QUESTION =
   "Podsumuj najważniejsze informacje z raportu i oceń atrakcyjność inwestycji.";
 
-function ModelReply({ reply }: { reply: AnalysisReply }) {
+const metricLabels = {
+  revenue: "Przychody",
+  ebit: "EBIT",
+  netIncome: "Zysk netto",
+};
+
+function formatAmount(amount: string) {
+  const [integer, decimals] = amount.split(".");
+  return (
+    integer!.replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f") +
+    (decimals ? "," + decimals : "")
+  );
+}
+
+function ConnectionStatus() {
+  const [attempt, setAttempt] = useState(0);
+  const [state, setState] = useState<
+    | { kind: "checking" }
+    | { kind: "ready"; model: string }
+    | { kind: "failed"; message: string }
+  >({ kind: "checking" });
+  useEffect(() => {
+    const request = new AbortController();
+    void requestAnalysisStatus(request.signal).then(
+      ({ model }) => {
+        if (!request.signal.aborted) setState({ kind: "ready", model });
+      },
+      (error: unknown) => {
+        if (!request.signal.aborted)
+          setState({
+            kind: "failed",
+            message:
+              error instanceof ApiError
+                ? error.message
+                : "Nie udało się sprawdzić połączenia.",
+          });
+      },
+    );
+    return () => request.abort();
+  }, [attempt]);
+
+  return (
+    <div className={styles.connection}>
+      <div role="status">
+        <strong>Połączenie z modelem</strong>
+        {state.kind === "checking" && <p>Sprawdzanie połączenia…</p>}
+        {state.kind === "ready" && (
+          <p className={styles.connected}>
+            <UiIcon name="check-circle" /> {state.model}
+          </p>
+        )}
+        {state.kind === "failed" && (
+          <p className={styles.error}>{state.message}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        className={styles.secondary}
+        disabled={state.kind === "checking"}
+        onClick={() => {
+          setState({ kind: "checking" });
+          setAttempt((n) => n + 1);
+        }}
+      >
+        <UiIcon name="arrow-clockwise" /> Sprawdź połączenie
+      </button>
+    </div>
+  );
+}
+
+function ReportSummary({
+  facts,
+  pdfUrl,
+}: {
+  facts: ReportMetric[];
+  pdfUrl: string;
+}) {
+  return (
+    <section className={styles.reportSummary} aria-label="Karta raportu">
+      <h2>Karta raportu</h2>
+      <dl className={styles.metrics}>
+        {facts.map((fact) => (
+          <div className={styles.metric} key={fact.metric}>
+            <dt>{metricLabels[fact.metric]}</dt>
+            {fact.state === "verified" ? (
+              <dd>
+                <strong>
+                  {formatAmount(fact.amount)} {fact.unit}
+                </strong>
+                <span>{fact.period}</span>
+                <a
+                  href={pdfUrl + "#page=" + fact.page}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={
+                    metricLabels[fact.metric] +
+                    ", otwórz stronę " +
+                    fact.page +
+                    " PDF"
+                  }
+                >
+                  <UiIcon name="file-pdf" /> Strona {fact.page}
+                </a>
+              </dd>
+            ) : (
+              <dd>
+                {fact.state === "needs_review"
+                  ? "Wymaga weryfikacji"
+                  : "Brak danych w rachunku wyników"}
+              </dd>
+            )}
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function ModelReply({
+  reply,
+  pdfUrl,
+}: {
+  reply: AnalysisReply;
+  pdfUrl?: string;
+}) {
   const { coverage } = reply;
   return (
     <div className={styles.reply}>
       <div className={styles.author}>
         <UiIcon name="cpu" /> Lokalny model
       </div>
+      {reply.summary && pdfUrl && (
+        <ReportSummary facts={reply.summary} pdfUrl={pdfUrl} />
+      )}
       <p className={styles.answer}>{reply.answer}</p>
       {coverage?.partial && (
         <p className={styles.note}>
@@ -56,14 +185,26 @@ function Chat() {
     { question: string; reply: AnalysisReply }[]
   >([]);
   const [question, setQuestion] = useState("");
-  const [report, setReport] = useState<File | null>(null);
+  const [attachment, setAttachment] = useState<{
+    file: File;
+    url: string;
+  } | null>(null);
+  const report = attachment?.file ?? null;
   const [pendingQuestion, setPendingQuestion] = useState("");
   const [error, setError] = useState("");
   const upload = useRef<HTMLInputElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const activeRequest = useRef<AbortController | null>(null);
-  const reportLocked = turns.some(({ reply }) => reply.coverage !== null);
+  const reportTurn = turns.findIndex(({ reply }) => reply.coverage !== null);
+  const reportLocked = reportTurn !== -1;
+
+  useEffect(
+    () => () => {
+      if (attachment) URL.revokeObjectURL(attachment.url);
+    },
+    [attachment],
+  );
 
   useEffect(
     () => () => {
@@ -92,7 +233,7 @@ function Chat() {
       return;
     }
     setError("");
-    setReport(file);
+    setAttachment({ file, url: URL.createObjectURL(file) });
   }
 
   async function send(event: FormEvent<HTMLFormElement>) {
@@ -132,7 +273,7 @@ function Chat() {
 
   function reset() {
     setTurns([]);
-    setReport(null);
+    setAttachment(null);
     setQuestion("");
     setError("");
     input.current?.focus();
@@ -161,6 +302,7 @@ function Chat() {
         </button>
       </header>
 
+      <ConnectionStatus />
       <div className={styles.chat}>
         <div
           className={styles.transcript}
@@ -184,7 +326,10 @@ function Chat() {
           {turns.map(({ question, reply }, index) => (
             <div className={styles.turn} key={index}>
               <p className={styles.question}>{question}</p>
-              <ModelReply reply={reply} />
+              <ModelReply
+                reply={reply}
+                pdfUrl={index === reportTurn ? attachment?.url : undefined}
+              />
             </div>
           ))}
           {pendingQuestion && (
@@ -234,7 +379,7 @@ function Chat() {
                       aria-label="Usuń załącznik"
                       disabled={!!pendingQuestion}
                       onClick={() => {
-                        setReport(null);
+                        setAttachment(null);
                         setError("");
                       }}
                     >

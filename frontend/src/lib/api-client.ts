@@ -9,6 +9,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -129,6 +130,13 @@ export async function apiRequest<T>(
       throw new ApiError(
         response.status,
         errorMessage(response.status, payload),
+        payload &&
+          typeof payload === "object" &&
+          "code" in payload &&
+          typeof payload.code === "string" &&
+          /^[A-Z][A-Z0-9_]{1,63}$/.test(payload.code)
+          ? payload.code
+          : undefined,
       );
     }
     if (payload === undefined)

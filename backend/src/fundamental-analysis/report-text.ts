@@ -1,6 +1,11 @@
-import { BadRequestException } from '@nestjs/common';
 import { createRequire } from 'node:module';
 import { dirname, join, sep } from 'node:path';
+import { AnalysisError } from './analysis-error.js';
+import {
+  extractReportMetrics,
+  summarizeMetrics,
+  type ReportMetric,
+} from './report-summary.js';
 
 const require = createRequire(import.meta.url);
 const MAX_PAGES = 250;
@@ -16,9 +21,9 @@ export async function readReportText(
 ) {
   const signature = bytes.subarray(0, 1024).indexOf('%PDF-');
   if (signature === -1)
-    throw new BadRequestException('Dołącz poprawny plik PDF.');
+    throw new AnalysisError('PDF_INVALID', 400, 'Dołącz poprawny plik PDF.');
 
-  const { getDocument, PasswordException } =
+  const { getDocument, PasswordException, VerbosityLevel } =
     await import('pdfjs-dist/legacy/build/pdf.mjs');
   const pdfAssets = dirname(require.resolve('pdfjs-dist/package.json'));
   const task = getDocument({
@@ -27,16 +32,20 @@ export async function readReportText(
     cMapPacked: true,
     standardFontDataUrl: join(pdfAssets, 'standard_fonts') + sep,
     disableFontFace: true,
+    verbosity: VerbosityLevel.ERRORS,
   });
   try {
     const document = await task.promise;
     if (document.numPages > MAX_PAGES) {
-      throw new BadRequestException(
+      throw new AnalysisError(
+        'PDF_PAGE_LIMIT',
+        400,
         `PDF może mieć maksymalnie ${MAX_PAGES} stron. Wybierz istotne strony raportu.`,
       );
     }
 
     const pages: PageText[] = [];
+    const metrics: ReportMetric[] = [];
     for (let number = 1; number <= document.numPages; number++) {
       signal.throwIfAborted();
       const page = await document.getPage(number);
@@ -49,6 +58,18 @@ export async function readReportText(
         .replace(/[^\S\r\n]+/g, ' ')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
+      if (
+        /rachunek zysków i strat|sprawozdanie z (?:wyniku|całkowitych dochodów)|statements? of (?:operations|income|profit or loss)|income statements?/iu.test(
+          text.slice(0, 1800),
+        )
+      ) {
+        metrics.push(
+          ...extractReportMetrics(
+            items.filter((item) => 'str' in item),
+            number,
+          ),
+        );
+      }
       page.cleanup();
       if (text)
         pages.push({
@@ -59,13 +80,22 @@ export async function readReportText(
     }
 
     if (!pages.length) {
-      throw new BadRequestException(
+      throw new AnalysisError(
+        'PDF_NO_TEXT',
+        400,
         'PDF nie zawiera tekstu do odczytania. Użyj raportu z warstwą tekstową lub wersji po OCR.',
       );
     }
 
-    const context = selectPages(pages, question);
+    const summary = summarizeMetrics(metrics);
+    const sourcePages = new Set(
+      summary
+        .filter((item) => item.state === 'verified')
+        .map(({ page }) => page),
+    );
+    const context = selectPages(pages, question, sourcePages);
     return {
+      summary,
       text: context
         .map(({ number, text }) => `[str. ${number}]\n${text}`)
         .join('\n\n'),
@@ -79,13 +109,17 @@ export async function readReportText(
       },
     };
   } catch (error) {
-    if (signal.aborted || error instanceof BadRequestException) throw error;
+    if (signal.aborted || error instanceof AnalysisError) throw error;
     if (error instanceof PasswordException) {
-      throw new BadRequestException(
+      throw new AnalysisError(
+        'PDF_PASSWORD',
+        400,
         'PDF jest zabezpieczony hasłem. Dołącz odblokowany plik.',
       );
     }
-    throw new BadRequestException(
+    throw new AnalysisError(
+      'PDF_UNREADABLE',
+      400,
       'Nie udało się odczytać PDF. Sprawdź, czy plik nie jest uszkodzony.',
     );
   } finally {
@@ -102,7 +136,11 @@ const financialTerms = [
   /zestawienie|wybrane dane|financial highlights|financial statements/iu,
 ];
 
-function selectPages(pages: PageText[], question: string): PageText[] {
+function selectPages(
+  pages: PageText[],
+  question: string,
+  sourcePages: Set<number>,
+): PageText[] {
   if (
     pages.reduce((length, page) => length + page.text.length + 20, 0) <=
     CONTEXT_LIMIT
@@ -123,6 +161,7 @@ function selectPages(pages: PageText[], question: string): PageText[] {
       const text = page.text.toLowerCase();
       const score =
         100 * Number(referencedPages.has(page.number)) +
+        30 * Number(sourcePages.has(page.number)) +
         3 * words.filter((word) => text.includes(word)).length +
         financialTerms.filter((term) => term.test(text)).length;
       return { page, score };
