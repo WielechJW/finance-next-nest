@@ -278,6 +278,7 @@ function AccountContent({
           {ready.account.archivedAt && (
             <p>Rachunek zarchiwizowany. Historia i stan pozostają dostępne.</p>
           )}
+          <Link href={`${root}/${portfolioId}/accounts/${accountId}/imports`}>Import historii CSV</Link>
           <section className={styles.card} aria-label="Gotówka inwestycyjna">
             <h2>Gotówka</h2>
             <dl className={styles.balances}>
