@@ -1,6 +1,11 @@
 import { ApiError, apiRequest } from "./api-client";
 
-type Metric = "revenue" | "ebit" | "netIncome";
+type Metric =
+  | "revenue"
+  | "ebit"
+  | "netIncome"
+  | "operatingCashFlow"
+  | "longTermDebt";
 export type ReportMetric =
   | {
       metric: Metric;
@@ -9,6 +14,7 @@ export type ReportMetric =
       period: string;
       unit: string;
       page: number;
+      scope?: "consolidated" | "standalone";
     }
   | { metric: Metric; state: "missing" | "needs_review" };
 

@@ -1,11 +1,7 @@
 import { createRequire } from 'node:module';
 import { dirname, join, sep } from 'node:path';
 import { AnalysisError } from './analysis-error.js';
-import {
-  extractReportMetrics,
-  summarizeMetrics,
-  type ReportMetric,
-} from './report-summary.js';
+import { extractReportMetrics, summarizeMetrics } from './report-summary.js';
 
 const require = createRequire(import.meta.url);
 const MAX_PAGES = 250;
@@ -45,7 +41,7 @@ export async function readReportText(
     }
 
     const pages: PageText[] = [];
-    const metrics: ReportMetric[] = [];
+    const metrics: ReturnType<typeof extractReportMetrics> = [];
     for (let number = 1; number <= document.numPages; number++) {
       signal.throwIfAborted();
       const page = await document.getPage(number);
@@ -59,7 +55,7 @@ export async function readReportText(
         .replace(/\n{3,}/g, '\n\n')
         .trim();
       if (
-        /rachunek zysków i strat|sprawozdanie z (?:wyniku|całkowitych dochodów)|statements? of (?:operations|income|profit or loss)|income statements?/iu.test(
+        /rachunek (?:zysków i strat|przepływów\s+pieniężnych)|sprawozdanie z (?:wyniku|całkowitych dochodów|przepływów\s+pieniężnych|sytuacji finansowej)|bilans|statements? of (?:operations|income|profit or loss|cash flows|financial position)|(?:income|cash flow) statements?|balance sheets?/iu.test(
           text.slice(0, 1800),
         )
       ) {

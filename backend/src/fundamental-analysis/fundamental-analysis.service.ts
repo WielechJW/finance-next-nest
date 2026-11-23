@@ -85,7 +85,7 @@ export class FundamentalAnalysisService {
           question +
           '\n\n' +
           (facts?.length
-            ? 'Sprawdzone pozycje rachunku wyników (wartości w podanej jednostce):\n' +
+            ? 'Sprawdzone pozycje sprawozdania (wartości w podanej jednostce):\n' +
               JSON.stringify(facts) +
               '\n\n'
             : '') +

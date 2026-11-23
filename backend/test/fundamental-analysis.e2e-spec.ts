@@ -154,6 +154,7 @@ describe('Fundamental analysis chat', () => {
             unit: 'mln USD',
             period: '2025',
             page: 1,
+            scope: 'consolidated',
           },
           {
             metric: 'ebit',
@@ -162,6 +163,7 @@ describe('Fundamental analysis chat', () => {
             unit: 'mln USD',
             period: '2025',
             page: 1,
+            scope: 'consolidated',
           },
           {
             metric: 'netIncome',
@@ -170,7 +172,10 @@ describe('Fundamental analysis chat', () => {
             unit: 'mln USD',
             period: '2025',
             page: 1,
+            scope: 'consolidated',
           },
+          { metric: 'operatingCashFlow', state: 'missing' },
+          { metric: 'longTermDebt', state: 'missing' },
         ],
         incomplete: false,
       });
