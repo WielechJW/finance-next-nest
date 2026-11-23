@@ -181,8 +181,10 @@ LM Studio. Karta pokazuje zakres raportu, przychody, EBIT, zysk netto,
 przepływy operacyjne i dług długoterminowy. Odczytane liczby mają jednostkę,
 okres i stronę PDF. Dla odpowiedzi z niepełnym kontekstem można rozwinąć
 listę stron przekazanych modelowi.
-Niejednoznaczne kolumny wymagają weryfikacji. Ocena inwestycji opiera się na
-dostarczonych danych, w tym cenie akcji, jeśli użytkownik ją poda.
+Niejednoznaczne kolumny wymagają weryfikacji. Po wybraniu instrumentu z katalogu
+karta pokazuje ostatni zapisany kurs zamknięcia, sesję, walutę, źródło i świeżość.
+Backend liczy marżę EBIT z odczytanych przychodów i EBIT-u w tym samym okresie
+i jednostce. Model dostaje kurs, stan świeżości i obliczoną marżę.
 [Raporty wzorcowe i uruchomienie testów](docs/fundamental-analysis-fixtures.md)
 
 ## Rejestracja użytkownika

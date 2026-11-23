@@ -1,11 +1,7 @@
 import { ApiError, apiRequest } from "./api-client";
 
 type Metric =
-  | "revenue"
-  | "ebit"
-  | "netIncome"
-  | "operatingCashFlow"
-  | "longTermDebt";
+  "revenue" | "ebit" | "netIncome" | "operatingCashFlow" | "longTermDebt";
 export type ReportMetric =
   | {
       metric: Metric;
@@ -22,6 +18,13 @@ export type AnalysisReply = {
   answer: string;
   incomplete: boolean;
   summary: ReportMetric[] | null;
+  operatingMargin?: { percent: string; period: string; pages: number[] } | null;
+  market?: {
+    instrument: { id: string; ticker: string; mic: string; currency: string };
+    status: "fresh" | "stale" | "missing" | "unexpected";
+    expectedSessionOn: string;
+    quote: { close: string; sessionOn: string | null; source: string } | null;
+  } | null;
   coverage: {
     totalPages: number;
     pagesWithText: number;
@@ -76,6 +79,7 @@ export async function requestAnalysis(
   turns: Turn[],
   report: File | null,
   signal: AbortSignal,
+  instrumentId?: string,
 ): Promise<AnalysisReply> {
   const body = new FormData();
   body.set("question", question);
@@ -89,6 +93,7 @@ export async function requestAnalysis(
     ),
   );
   if (report) body.set("report", report);
+  if (report && instrumentId) body.set("instrumentId", instrumentId);
 
   return analysisRequest<AnalysisReply>("chat", {
     method: "POST",

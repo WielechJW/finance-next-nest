@@ -8,12 +8,14 @@ import {
   type FormEvent,
 } from "react";
 import { ApiError } from "@/lib/api-client";
+import type { InvestmentInstrument } from "@/lib/investments-api";
 import {
   requestAnalysis,
   requestAnalysisStatus,
   type AnalysisReply,
   type ReportMetric,
 } from "@/lib/fundamental-analysis-api";
+import { InstrumentPicker } from "./investments/instrument-picker";
 import { UiIcon } from "./ui-icon";
 import { useSession } from "./session-provider";
 import styles from "./fundamental-analysis-chat.module.css";
@@ -31,9 +33,10 @@ const metricLabels = {
 
 function formatAmount(amount: string) {
   const [integer, decimals] = amount.split(".");
+  const fraction = decimals?.replace(/0+$/, "");
   return (
     integer!.replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f") +
-    (decimals ? "," + decimals : "")
+    (fraction ? "," + fraction : "")
   );
 }
 
@@ -96,9 +99,13 @@ function ConnectionStatus() {
 function ReportSummary({
   facts,
   pdfUrl,
+  operatingMargin,
+  market,
 }: {
   facts: ReportMetric[];
   pdfUrl: string;
+  operatingMargin: AnalysisReply["operatingMargin"];
+  market: AnalysisReply["market"];
 }) {
   const verified = facts.find((fact) => fact.state === "verified");
   const scope = verified?.scope;
@@ -109,6 +116,33 @@ function ReportSummary({
         {scope === "consolidated" && " skonsolidowanego"}
         {scope === "standalone" && " jednostkowego"}
       </h2>
+      {market && (
+        <p className={styles.reportQuote}>
+          <strong>
+            {market.instrument.ticker} · {market.instrument.mic}
+          </strong>
+          {market.quote ? (
+            <>
+              {" "}
+              · {formatAmount(market.quote.close)} {market.instrument.currency}
+              {" · sesja "}
+              {market.quote.sessionOn}
+              {" · "}
+              {market.quote.source}
+            </>
+          ) : (
+            " · Brak kursu zamknięcia"
+          )}
+          {market.status === "stale" && (
+            <>
+              {" "}
+              · Kurs nieaktualny (oczekiwana sesja {market.expectedSessionOn})
+            </>
+          )}
+          {market.status === "unexpected" && " · Kurs wymaga weryfikacji"}
+          {market.status === "fresh" && " · Kurs aktualny"}
+        </p>
+      )}
       <dl className={styles.metrics}>
         {facts.map((fact) => (
           <div className={styles.metric} key={fact.metric}>
@@ -142,6 +176,25 @@ function ReportSummary({
             )}
           </div>
         ))}
+        {operatingMargin && (
+          <div className={styles.metric}>
+            <dt>Marża EBIT</dt>
+            <dd>
+              <strong>{formatAmount(operatingMargin.percent)}%</strong>
+              <span>{operatingMargin.period}</span>
+              {operatingMargin.pages.map((page) => (
+                <a
+                  key={page}
+                  href={pdfUrl + "#page=" + page}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <UiIcon name="file-pdf" /> Strona {page}
+                </a>
+              ))}
+            </dd>
+          </div>
+        )}
       </dl>
     </section>
   );
@@ -163,7 +216,12 @@ function ModelReply({
         <UiIcon name="cpu" /> Lokalny model
       </div>
       {showSummary && reply.summary && pdfUrl && (
-        <ReportSummary facts={reply.summary} pdfUrl={pdfUrl} />
+        <ReportSummary
+          facts={reply.summary}
+          pdfUrl={pdfUrl}
+          operatingMargin={reply.operatingMargin}
+          market={reply.market}
+        />
       )}
       <p className={styles.answer}>{reply.answer}</p>
       {coverage?.partial && (
@@ -221,6 +279,9 @@ function Chat() {
     url: string;
   } | null>(null);
   const report = attachment?.file ?? null;
+  const [instrument, setInstrument] = useState<InvestmentInstrument | null>(
+    null,
+  );
   const [pendingQuestion, setPendingQuestion] = useState("");
   const [error, setError] = useState("");
   const upload = useRef<HTMLInputElement>(null);
@@ -264,6 +325,7 @@ function Chat() {
       return;
     }
     setError("");
+    setInstrument(null);
     setAttachment({ file, url: URL.createObjectURL(file) });
   }
 
@@ -283,6 +345,7 @@ function Chat() {
         turns,
         report,
         controller.signal,
+        instrument?.id,
       );
       setTurns((previous) => [...previous, { question: prompt, reply }]);
       setQuestion("");
@@ -305,6 +368,7 @@ function Chat() {
   function reset() {
     setTurns([]);
     setAttachment(null);
+    setInstrument(null);
     setQuestion("");
     setError("");
     input.current?.focus();
@@ -398,6 +462,19 @@ function Chat() {
             onChange={attachReport}
             hidden
           />
+          {report && !reportLocked && (
+            <fieldset
+              className={styles.instrument}
+              disabled={!!pendingQuestion}
+            >
+              <legend>Instrument raportu (opcjonalnie)</legend>
+              <InstrumentPicker
+                selected={instrument}
+                onChange={setInstrument}
+                required={false}
+              />
+            </fieldset>
+          )}
           <div className={styles.controls}>
             <div className={styles.attachment}>
               {report ? (
@@ -412,6 +489,7 @@ function Chat() {
                       disabled={!!pendingQuestion}
                       onClick={() => {
                         setAttachment(null);
+                        setInstrument(null);
                         setError("");
                       }}
                     >

@@ -12,7 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import type { Response } from 'express';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import { FundamentalAnalysisService } from './fundamental-analysis.service.js';
@@ -26,6 +26,10 @@ class ChatInput {
   @IsString()
   @MaxLength(48_000)
   history?: string;
+
+  @IsOptional()
+  @IsUUID()
+  instrumentId?: string;
 }
 
 @Controller('fundamental-analysis')
@@ -47,7 +51,7 @@ export class FundamentalAnalysisController {
       limits: {
         fileSize: 15 * 1024 * 1024,
         files: 1,
-        fields: 2,
+        fields: 3,
         fieldSize: 128 * 1024,
       },
     }),
