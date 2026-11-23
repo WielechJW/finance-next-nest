@@ -103,6 +103,10 @@ export async function readReportText(
         totalPages: document.numPages,
         pagesWithText: pages.length,
         pagesInContext: context.length,
+        contextPages: context.map(({ number, partial }) => ({
+          number,
+          partial,
+        })),
         partial:
           context.length < document.numPages ||
           context.some((page) => page.partial),

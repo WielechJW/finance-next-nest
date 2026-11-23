@@ -143,6 +143,7 @@ describe('Fundamental analysis chat', () => {
           totalPages: 1,
           pagesWithText: 1,
           pagesInContext: 1,
+          contextPages: [{ number: 1, partial: false }],
           partial: false,
         },
         summary: [
