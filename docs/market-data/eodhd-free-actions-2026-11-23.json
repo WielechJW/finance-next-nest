@@ -1,0 +1,172 @@
+{
+  "provider": "EODHD",
+  "checkedAt": "2026-11-23T12:22:03.679Z",
+  "mode": "configured_free_key_actions",
+  "rawDataStored": false,
+  "maxCallUnits": 20,
+  "callUnitsReserved": 20,
+  "catalogs": {},
+  "instruments": [
+    {
+      "symbol": "CDR.WAR",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      }
+    },
+    {
+      "symbol": "PKN.WAR",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 1,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": true
+      }
+    },
+    {
+      "symbol": "PKO.WAR",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 1,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": false
+      }
+    },
+    {
+      "symbol": "PZU.WAR",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 1,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": false
+      }
+    },
+    {
+      "symbol": "KGH.WAR",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 1,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": false
+      }
+    },
+    {
+      "symbol": "AAPL.US",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 4,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": true
+      }
+    },
+    {
+      "symbol": "MSFT.US",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 4,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": true
+      }
+    },
+    {
+      "symbol": "TSLA.US",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      }
+    },
+    {
+      "symbol": "AMZN.US",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      }
+    },
+    {
+      "symbol": "MCD.US",
+      "splits": {
+        "httpStatus": 200,
+        "status": "empty",
+        "rows": 0
+      },
+      "div": {
+        "httpStatus": 200,
+        "status": "available",
+        "rows": 4,
+        "hasUnadjustedValue": true,
+        "hasPaymentDate": true
+      }
+    }
+  ],
+  "fundamentals": {
+    "status": "not_requested_free_plan"
+  },
+  "account": {
+    "status": "available",
+    "dailyRateLimit": 20,
+    "apiRequests": 0,
+    "apiRequestsDate": "2026-11-18"
+  },
+  "allowedCallUnits": 20,
+  "window": {
+    "from": "2025-11-23",
+    "to": "2026-11-22"
+  },
+  "actionsComplete": true,
+  "fullProviderVerificationComplete": false,
+  "requestsMade": 21
+}
