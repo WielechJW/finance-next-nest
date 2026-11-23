@@ -5,8 +5,13 @@ import {
   importApi,
   type ImportBatch,
   type ImportPreviewRow,
+  type ImportConfirmation,
 } from "@/lib/investment-import-api";
 import type { InvestmentInstrument } from "@/lib/investments-api";
+import {
+  ImportConfirmationForm,
+  ImportReconciliation,
+} from "./investment-import-confirmation";
 import { InstrumentPicker } from "./instrument-picker";
 import { useInvestmentResource } from "./use-investment-resource";
 import styles from "./investments.module.css";
@@ -100,6 +105,9 @@ export function ImportPreview({
 }) {
   const [showFrom, setShowFrom] = useState(0);
   const [editing, setEditing] = useState<number | null>(null);
+  const [confirmation, setConfirmation] = useState<ImportConfirmation | null>(
+    batch.confirmation,
+  );
   const load = useCallback(
     (signal: AbortSignal) =>
       importApi.preview(portfolioId, accountId, batch.id, signal),
@@ -190,7 +198,7 @@ export function ImportPreview({
                     {check && !check.mappingError && !check.duplicate && (
                       <p>Poprawny format</p>
                     )}
-                    {check?.needsInstrument && (
+                    {!confirmation && check?.needsInstrument && (
                       <button
                         type="button"
                         onClick={() => setEditing(row.number)}
@@ -223,6 +231,20 @@ export function ImportPreview({
             Następne wiersze
           </button>
         </div>
+      )}
+      {confirmation ? (
+        <ImportReconciliation result={confirmation} />
+      ) : (
+        batch.status === "PARSED" &&
+        state.status === "ready" && (
+          <ImportConfirmationForm
+            rows={state.value}
+            submit={(input) =>
+              importApi.confirm(portfolioId, accountId, batch.id, input)
+            }
+            onConfirmed={setConfirmation}
+          />
+        )
       )}
     </>
   );

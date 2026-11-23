@@ -21,6 +21,7 @@ const summary = {
 } satisfies Prisma.ImportBatchSelect;
 const detail = {
   ...summary,
+  confirmation: true,
   rows: {
     select: { number: true, data: true, error: true },
     orderBy: { number: 'asc' },

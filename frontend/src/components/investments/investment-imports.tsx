@@ -116,7 +116,9 @@ export function InvestmentImports({
           <p role="status">
             {batch.status === "PARSED"
               ? "Wiersze przeszły walidację."
-              : "Partia zawiera błędy."}{" "}
+              : batch.status === "CONFIRMED"
+                ? "Partia zatwierdzona."
+                : "Partia zawiera błędy."}{" "}
             Wiersze ({batch.rowCount}) · {batch.encoding}
           </p>
           <ImportPreview

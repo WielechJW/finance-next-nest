@@ -63,6 +63,7 @@ enum ImportFileFormat {
 enum ImportBatchStatus {
   PARSED
   INVALID
+  CONFIRMED
 }
 
 model ImportBatch {
@@ -78,6 +79,9 @@ model ImportBatch {
   separator   String            @db.Char(1)
   createdAt   DateTime          @default(now()) @db.Timestamptz(3)
   rows        ImportRow[]
+  confirmedAt DateTime?         @db.Timestamptz(3)
+  confirmationHash String?      @db.Char(64)
+  confirmation Json?
 
   @@unique([accountId, authorId, format, contentHash])
   @@index([authorId])

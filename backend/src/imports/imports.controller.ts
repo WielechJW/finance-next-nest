@@ -19,6 +19,8 @@ import { IsIn, IsUUID, ValidateIf } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import type { RegisteredUser } from '../users/users.service.js';
+import { ConfirmImportDto } from './confirm-import.dto.js';
+import { ImportConfirmationService } from './import-confirmation.service.js';
 import { maxImportBytes } from './csv-reader.js';
 import { importFormats, type ImportFormat } from './import-parser.js';
 import { ImportPreviewService } from './import-preview.service.js';
@@ -40,6 +42,7 @@ export class ImportsController {
   constructor(
     private readonly imports: ImportsService,
     private readonly previews: ImportPreviewService,
+    private readonly confirmation: ImportConfirmationService,
   ) {}
 
   @Post()
@@ -118,6 +121,25 @@ export class ImportsController {
       id,
       number,
       input.instrumentId,
+    );
+  }
+
+  @Post(':id/confirm')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  confirm(
+    @CurrentUser() user: RegisteredUser,
+    @Param('portfolioId', ParseUUIDPipe) portfolioId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() input: ConfirmImportDto,
+  ) {
+    return this.confirmation.confirm(
+      user.id,
+      portfolioId,
+      accountId,
+      id,
+      input,
     );
   }
 }
