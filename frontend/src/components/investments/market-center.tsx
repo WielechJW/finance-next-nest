@@ -8,6 +8,8 @@ import { useSession } from '../session-provider';
 import { useInvestmentResource } from './use-investment-resource';
 import styles from './investments.module.css';
 import { TelegramSettings } from './telegram-settings';
+import { CompanyFundamentals } from './company-fundamentals';
+import { ClosingPriceChart } from './closing-price-chart';
 
 export function MarketCenter() {
   const { state } = useSession();
@@ -96,9 +98,12 @@ function InstrumentContent({ instrumentId }: { instrumentId: string }) {
   return <section className={styles.panel}><Link href="/dashboard/market">Rynek i alerty</Link>
     {resource.state.status === 'loading' ? <p role="status">Ładowanie instrumentu…</p> : resource.state.status === 'error' ? <p role="alert">{resource.state.message}</p> : <>
       <h1>{resource.state.value.instrument.ticker} · {resource.state.value.instrument.mic}</h1>
+      {resource.state.value.instrument.name && <p>{resource.state.value.instrument.name}</p>}
       <p>{resource.state.value.quote ? `${formatInvestment(resource.state.value.quote.close, 2)} ${resource.state.value.instrument.currency} · ${resource.state.value.quote.sessionOn}` : 'Brak ceny'} · {resource.state.value.status === 'fresh' ? 'Aktualne' : 'Wymaga aktualizacji'}</p>
-      <h2>Historia cen dziennych</h2><ul className={styles.list}>{resource.state.value.prices.map(price => <li key={price.sessionOn}>{price.sessionOn} · {formatInvestment(price.close, 2)} {resource.state.status === 'ready' ? resource.state.value.instrument.currency : ''}</li>)}</ul>
+      <h2>Historia cen dziennych</h2>
+      <ClosingPriceChart prices={resource.state.value.prices} currency={resource.state.value.instrument.currency} />
     </>}
     <button type="button" onClick={resource.refresh}>Odśwież instrument</button>
+    <CompanyFundamentals instrumentId={instrumentId} />
   </section>;
 }

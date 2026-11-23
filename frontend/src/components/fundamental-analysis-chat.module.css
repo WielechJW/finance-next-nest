@@ -286,7 +286,8 @@
 .instrument input,
 .instrument select,
 .libraryFields input,
-.libraryFields select {
+.libraryFields select,
+.libraryFields textarea {
   width: 100%;
   min-width: 0;
   min-height: 40px;

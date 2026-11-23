@@ -1,4 +1,4 @@
-import { ApiError, apiRequest } from "./api-client";
+import { ApiError, apiRequest, requestUrl } from "./api-client";
 
 type Metric =
   "revenue" | "ebit" | "netIncome" | "operatingCashFlow" | "longTermDebt";
@@ -46,6 +46,7 @@ export type IssuerReport = {
   periodEnd: string;
   publishedOn: string;
   sourceUrl: string;
+  businessSummary: string | null;
   version: number;
   company: { id: string; name: string };
   instrument: { id: string; ticker: string; mic: string };
@@ -55,6 +56,37 @@ export type IssuerReport = {
     unit: string;
     period: string;
     page: number;
+  }[];
+};
+
+type TrailingYear = {
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  facts: {
+    metric: string;
+    amount: string;
+    unit: string;
+    sources: { reportId: string; page: number }[];
+  }[];
+};
+
+export type CompanyCard = {
+  sections: {
+    scope: IssuerReport["scope"];
+    annual: IssuerReport | null;
+    quarterly: IssuerReport | null;
+    trailingYear: TrailingYear | null;
+  }[];
+  activity: { text: string; sourceUrl: string } | null;
+  dividends: {
+    id: string;
+    exDate: string;
+    paymentOn: string | null;
+    amount: string | null;
+    currency: string | null;
+    amountBasis: string | null;
+    source: string;
   }[];
 };
 
@@ -128,6 +160,21 @@ export async function requestAnalysis(
 }
 
 const reportsPath = "/fundamental-analysis/reports";
+
+export function companyCard(instrumentId: string, signal: AbortSignal) {
+  return apiRequest<CompanyCard>(
+    reportsPath + "/company/" + encodeURIComponent(instrumentId),
+    { signal },
+  );
+}
+
+export function issuerReportPage(id: string, page: number) {
+  return (
+    requestUrl(reportsPath + "/" + encodeURIComponent(id) + "/pdf") +
+    "#page=" +
+    page
+  );
+}
 
 export function listIssuerReports(page: number, signal: AbortSignal) {
   return apiRequest<{ items: IssuerReport[]; hasNext: boolean }>(

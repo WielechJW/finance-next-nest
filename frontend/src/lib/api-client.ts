@@ -26,7 +26,7 @@ type ApiOptions = Omit<RequestInit, "cache" | "credentials"> & {
   responseType?: "json" | "blob";
 };
 
-function requestUrl(path: string): string {
+export function requestUrl(path: string): string {
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
   try {
     const url = new URL(base);

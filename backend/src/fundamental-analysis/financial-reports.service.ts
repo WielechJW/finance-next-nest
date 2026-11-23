@@ -14,6 +14,7 @@ import type {
   Prisma,
 } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { trailingYear } from './company-periods.js';
 import { parseReport, type ParsedReport } from './report-text.js';
 
 export type ReportImport = {
@@ -26,6 +27,7 @@ export type ReportImport = {
   publishedOn: string;
   sourceUrl: string;
   filename: string;
+  businessSummary?: string;
 };
 
 const PAGE_SIZE = 20;
@@ -47,6 +49,7 @@ const select = {
   periodEnd: true,
   publishedOn: true,
   sourceUrl: true,
+  businessSummary: true,
   version: true,
   company: { select: { id: true, name: true } },
   instrument: { select: { id: true, ticker: true, mic: true, currency: true } },
@@ -120,6 +123,78 @@ export class FinancialReportsService {
     };
   }
 
+  async companyCard(userId: string, instrumentId: string) {
+    const instrument = await this.prisma.instrument.findUnique({
+      where: { id: instrumentId },
+      select: { companyId: true },
+    });
+    if (!instrument) throw new NotFoundException('Nie znaleziono instrumentu.');
+    const where = instrument.companyId
+      ? { userId, companyId: instrument.companyId }
+      : { userId, instrumentId };
+    const [rows, dividends] = await Promise.all([
+      this.prisma.financialReport.findMany({
+        where,
+        distinct: ['scope', 'periodKind', 'periodStart', 'periodEnd'],
+        orderBy: [
+          { periodEnd: 'desc' },
+          { publishedOn: 'desc' },
+          { version: 'desc' },
+        ],
+        select,
+      }),
+      this.prisma.corporateAction.findMany({
+        where: {
+          instrumentId,
+          kind: 'DIVIDEND',
+          currentSlot: 1,
+          source: 'EODHD',
+        },
+        orderBy: [{ exDate: 'desc' }, { id: 'asc' }],
+        take: 20,
+        select: {
+          id: true,
+          exDate: true,
+          paymentOn: true,
+          amount: true,
+          currency: true,
+          amountBasis: true,
+          source: true,
+        },
+      }),
+    ]);
+    const reports = rows.map(serialize);
+    const sections = (['CONSOLIDATED', 'STANDALONE'] as const).map((scope) => {
+      const matching = reports.filter((report) => report.scope === scope);
+      const quarters = matching.filter(
+        (report) => report.periodKind === 'QUARTERLY',
+      );
+      return {
+        scope,
+        annual:
+          matching.find((report) => report.periodKind === 'ANNUAL') ?? null,
+        quarterly: quarters[0] ?? null,
+        trailingYear: trailingYear(quarters.slice(0, 4)),
+      };
+    });
+    const description = reports.find((report) => report.businessSummary);
+    return {
+      sections,
+      activity: description?.businessSummary
+        ? {
+            text: description.businessSummary,
+            sourceUrl: description.sourceUrl,
+          }
+        : null,
+      dividends: dividends.map((row) => ({
+        ...row,
+        amount: row.amount?.toFixed() ?? null,
+        exDate: row.exDate.toISOString().slice(0, 10),
+        paymentOn: row.paymentOn?.toISOString().slice(0, 10) ?? null,
+      })),
+    };
+  }
+
   async import(
     userId: string,
     input: ReportImport,
@@ -135,6 +210,7 @@ export class FinancialReportsService {
       );
     }
     const filename = input.filename.trim();
+    const businessSummary = input.businessSummary?.trim() || null;
     if (!filename) throw new BadRequestException('Podaj nazwę raportu.');
 
     const parsedReport = normalizeFacts(await parseReport(pdf, signal), input);
@@ -195,7 +271,16 @@ export class FinancialReportsService {
           where: { ...group, contentHash },
           select,
         });
-        if (duplicate) return duplicate;
+        if (duplicate) {
+          return businessSummary &&
+            businessSummary !== duplicate.businessSummary
+            ? tx.financialReport.update({
+                where: { id: duplicate.id },
+                data: { businessSummary },
+                select,
+              })
+            : duplicate;
+        }
         const latest = await tx.financialReport.aggregate({
           where: group,
           _max: { version: true },
@@ -207,6 +292,7 @@ export class FinancialReportsService {
             currency: input.currency,
             publishedOn: new Date(input.publishedOn),
             sourceUrl: input.sourceUrl,
+            businessSummary,
             filename,
             version: (latest._max.version ?? 0) + 1,
             pdf: new Uint8Array(pdf),

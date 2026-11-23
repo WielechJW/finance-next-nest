@@ -181,6 +181,10 @@ export function FundamentalReportLibrary({
               />
             </label>
             <label className={styles.libraryWide}>
+              Opis działalności z raportu (opcjonalnie)
+              <textarea name="businessSummary" maxLength={600} rows={3} />
+            </label>
+            <label className={styles.libraryWide}>
               Plik PDF
               <input
                 type="file"

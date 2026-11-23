@@ -132,6 +132,7 @@ model FinancialReport {
   publishedOn  DateTime                @db.Date
   currency     FinancialReportCurrency
   sourceUrl    String                  @db.VarChar(2048)
+  businessSummary String?              @db.VarChar(600)
   filename     String                  @db.VarChar(200)
   version      Int
   contentHash  String                  @db.Char(64)
