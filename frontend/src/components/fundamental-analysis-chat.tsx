@@ -25,6 +25,8 @@ const metricLabels = {
   revenue: "Przychody",
   ebit: "EBIT",
   netIncome: "Zysk netto",
+  operatingCashFlow: "Przepływy operacyjne netto",
+  longTermDebt: "Zadłużenie długoterminowe",
 };
 
 function formatAmount(amount: string) {
@@ -98,9 +100,15 @@ function ReportSummary({
   facts: ReportMetric[];
   pdfUrl: string;
 }) {
+  const verified = facts.find((fact) => fact.state === "verified");
+  const scope = verified?.scope;
   return (
     <section className={styles.reportSummary} aria-label="Karta raportu">
-      <h2>Karta raportu</h2>
+      <h2>
+        Karta raportu
+        {scope === "consolidated" && " skonsolidowanego"}
+        {scope === "standalone" && " jednostkowego"}
+      </h2>
       <dl className={styles.metrics}>
         {facts.map((fact) => (
           <div className={styles.metric} key={fact.metric}>
@@ -129,7 +137,7 @@ function ReportSummary({
               <dd>
                 {fact.state === "needs_review"
                   ? "Wymaga weryfikacji"
-                  : "Brak danych w rachunku wyników"}
+                  : "Brak odczytanej wartości"}
               </dd>
             )}
           </div>

@@ -177,8 +177,10 @@ MVP obsługuje jeden PDF na rozmowę, do 15 MB i 250 stron, z warstwą tekstową
 Dla długich raportów model otrzymuje wybrane fragmenty i ostatnie trzy tury
 rozmowy. Czat działa do czasu opuszczenia lub odświeżenia strony. Backend
 przetwarza plik w pamięci, a tekst i pytania wysyła na skonfigurowany adres
-LM Studio. Karta raportu pokazuje przychody, EBIT i zysk netto z rozpoznanego
-skonsolidowanego rachunku wyników wraz z jednostką, okresem i stroną PDF.
+LM Studio. Karta pokazuje zakres raportu, przychody, EBIT, zysk netto,
+przepływy operacyjne i dług długoterminowy. Odczytane liczby mają jednostkę,
+okres i stronę PDF. Dla odpowiedzi z niepełnym kontekstem można rozwinąć
+listę stron przekazanych modelowi.
 Niejednoznaczne kolumny wymagają weryfikacji. Ocena inwestycji opiera się na
 dostarczonych danych, w tym cenie akcji, jeśli użytkownik ją poda.
 [Raporty wzorcowe i uruchomienie testów](docs/fundamental-analysis-fixtures.md)
