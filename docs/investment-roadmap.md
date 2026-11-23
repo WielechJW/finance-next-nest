@@ -339,9 +339,9 @@ Rozwój czatu PDF z lokalnym modelem opisuje osobny plan. [Analiza fundamentalna
   dane z raportów właściciela i zapisane dywidendy. Wybór okresu i konsolidacji
   steruje tabelą z odsyłaczami do PDF. TTM wymaga czterech kolejnych kwartałów
   z porównywalnymi wartościami. Opis działalności można dołączyć przy imporcie raportu.
-- [ ] **8.3. Wyliczać jawnie zdefiniowane wskaźniki.** C/Z, C/WK, ROE,
-  marże i dynamika wyników. Sprawdzić zgodność okresów, jednostek i walut;
-  nieadekwatny lub brakujący mianownik daje opisany brak wskaźnika.
+- [x] **8.3. Wyliczać jawnie zdefiniowane wskaźniki.** Karta oblicza C/Z z raportu
+  rocznego, C/WK, ROE, marże i zmianę przychodów r/r. Wzory oraz warunki
+  dostępności są w [planie analizy](fundamental-analysis-roadmap.md#3-wskaźniki-i-cena-z-istniejącego-katalogu).
 - [ ] **8.4. Dodać notatki i porównanie.** Prywatna teza inwestycyjna, ryzyka,
   warunki ponownej analizy i zestawienie kilku spółek. Potem prosty screener
   z filtrami wskaźników; brak danych jest osobnym stanem filtra.

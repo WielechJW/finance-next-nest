@@ -1,7 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { extractReportMetrics, summarizeMetrics } from './report-summary.js';
+import {
+  extractReportMetrics,
+  summarizeMetrics,
+  summarizeValuationInputs,
+} from './report-summary.js';
 import { readReportText } from './report-text.js';
 
 function statement(lines: [number, number, string][]) {
@@ -13,6 +17,62 @@ function statement(lines: [number, number, string][]) {
 }
 
 describe('Report card verification', () => {
+  it('reads diluted EPS and the balance sheet valuation inputs in their published units', () => {
+    const income = extractReportMetrics(
+      statement([
+        [40, 800, 'Consolidated Statements of Income'],
+        [40, 780, 'In millions of USD'],
+        [400, 760, '2025'],
+        [480, 760, '2024'],
+        [40, 740, 'Earnings per share'],
+        [40, 725, 'Basic'],
+        [408, 725, '4'],
+        [488, 725, '3'],
+        [40, 710, 'Diluted'],
+        [408, 710, '3.5'],
+        [488, 710, '2.5'],
+      ]),
+      12,
+    );
+    const balance = extractReportMetrics(
+      statement([
+        [40, 800, 'Consolidated Balance Sheets'],
+        [40, 780, 'In millions of USD'],
+        [400, 760, '2025'],
+        [480, 760, '2024'],
+        [40, 740, 'Book value per share'],
+        [408, 740, '5'],
+        [488, 740, '4'],
+        [40, 725, 'Total equity'],
+        [408, 725, '110'],
+        [488, 725, '90'],
+      ]),
+      14,
+    );
+    expect(summarizeValuationInputs([...income, ...balance])).toMatchObject([
+      {
+        metric: 'dilutedEps',
+        state: 'verified',
+        amount: '3.5',
+        unit: 'USD / akcję',
+        page: 12,
+      },
+      {
+        metric: 'bookValuePerShare',
+        state: 'verified',
+        amount: '5',
+        unit: 'USD / akcję',
+        page: 14,
+      },
+      {
+        metric: 'totalEquity',
+        state: 'verified',
+        amount: '110',
+        unit: 'mln USD',
+        page: 14,
+      },
+    ]);
+  });
   it('uses the latest year column, excluding currency signs and per-share or non-EBIT labels', () => {
     const items = statement([
       [40, 800, 'CONSOLIDATED STATEMENTS OF OPERATIONS'],

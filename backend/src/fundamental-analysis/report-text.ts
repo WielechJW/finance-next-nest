@@ -4,6 +4,7 @@ import { AnalysisError } from './analysis-error.js';
 import {
   extractReportMetrics,
   summarizeMetrics,
+  summarizeValuationInputs,
   type ReportMetric,
 } from './report-summary.js';
 
@@ -17,6 +18,7 @@ export type ParsedReport = {
   pages: PageText[];
   totalPages: number;
   summary: ReportMetric[];
+  valuationInputs?: ReportMetric[];
 };
 
 export async function readReportText(
@@ -103,6 +105,7 @@ export async function parseReport(
       pages,
       totalPages: document.numPages,
       summary: summarizeMetrics(metrics),
+      valuationInputs: summarizeValuationInputs(metrics),
     };
   } catch (error) {
     if (signal.aborted || error instanceof AnalysisError) throw error;

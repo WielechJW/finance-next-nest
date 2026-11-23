@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   companyCard,
   issuerReportPage,
+  type CompanyIndicators,
   type IssuerReport,
 } from "@/lib/fundamental-analysis-api";
 import { formatInvestment } from "@/lib/investment-format";
@@ -23,6 +24,57 @@ const periods = {
   quarterly: "Kwartalne",
   trailingYear: "Ostatnie 12 miesięcy (TTM)",
 };
+const indicatorLabels: Record<keyof CompanyIndicators, string> = {
+  priceEarnings: "C/Z z raportu rocznego",
+  priceBook: "C/WK",
+  roe: "ROE",
+  operatingMargin: "Marża EBIT",
+  netMargin: "Marża netto",
+  revenueGrowth: "Zmiana przychodów r/r",
+};
+
+function Indicators({ values }: { values: CompanyIndicators }) {
+  return (
+    <>
+      <h3>Wskaźniki</h3>
+      <dl className={styles.companyFacts}>
+        {(Object.keys(indicatorLabels) as (keyof CompanyIndicators)[]).map(
+          (key) => {
+            const { value, reason, sources } = values[key];
+            const unit =
+              key === "priceEarnings" || key === "priceBook" ? "×" : "%";
+            return (
+              <div key={key}>
+                <dt>{indicatorLabels[key]}</dt>
+                <dd>
+                  {value === null ? (
+                    reason
+                  ) : (
+                    <strong>
+                      {formatInvestment(value, 2)}
+                      {unit}
+                    </strong>
+                  )}
+                  {sources.map(({ reportId, page }, index) => (
+                    <a
+                      key={reportId + ":" + page}
+                      href={issuerReportPage(reportId, page)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {sources.length > 1 && `Źródło ${index + 1}, `}strona{" "}
+                      {page} PDF
+                    </a>
+                  ))}
+                </dd>
+              </div>
+            );
+          },
+        )}
+      </dl>
+    </>
+  );
+}
 
 export function CompanyFundamentals({
   instrumentId,
@@ -52,6 +104,8 @@ export function CompanyFundamentals({
   const selected = sections.find((item) => item.scope === scope);
   const report = period === "trailingYear" ? null : selected?.[period];
   const trailing = period === "trailingYear" ? selected?.trailingYear : null;
+  const indicators =
+    period === "trailingYear" ? null : selected?.indicators?.[period];
   const result = report ?? trailing;
 
   return (
@@ -163,6 +217,7 @@ export function CompanyFundamentals({
               : "Brak zapisanego raportu dla wybranego okresu i zakresu."}
           </p>
         )}
+        {indicators && <Indicators values={indicators} />}
         <Link href="/dashboard/fundamental-analysis">
           Przejdź do raportów i analizy
         </Link>

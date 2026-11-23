@@ -115,6 +115,9 @@ enum FundamentalMetric {
   NET_INCOME
   OPERATING_CASH_FLOW
   LONG_TERM_DEBT
+  DILUTED_EPS
+  BOOK_VALUE_PER_SHARE
+  TOTAL_EQUITY
 }
 
 model FinancialReport {

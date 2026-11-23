@@ -49,6 +49,24 @@ które dostępne wartości aplikacja pominęła. Brak danych ma osobny stan.
 
 ## 3. Wskaźniki i cena z istniejącego katalogu
 
+Karta spółki liczy wskaźniki dziesiętnie i zaokrągla prezentację do dwóch miejsc.
+Wartości pieniężne z tego samego raportu oraz z raportu porównawczego sprowadza
+do tej samej skali. Wiersze wskazują strony ze źródłami. Przy braku porównywalnych
+danych karta pokazuje powód.
+
+| Wskaźnik | Wzór i wymagane dane |
+| --- | --- |
+| C/Z z raportu rocznego | Kurs zamknięcia / dodatni rozwodniony EPS z pełnego okresu rocznego. |
+| C/WK | Kurs zamknięcia / dodatnia zaraportowana wartość księgowa na akcję. |
+| ROE | Roczny zysk netto / średnia z dodatnich kapitałów własnych na początku i końcu okresu × 100. |
+| Marża EBIT i netto | Odpowiednio EBIT lub zysk netto / dodatnie przychody tego samego okresu × 100. |
+| Zmiana przychodów r/r | (Przychody / dodatnie przychody z porównywalnego okresu rok wcześniej − 1) × 100. |
+
+Wskaźniki kursowe wymagają świeżego kursu, zgodnej waluty i raportu dostępnego
+w dniu sesji. Zapisany split po okresie raportu wstrzymuje wyliczenie na akcję.
+Ponowny import tego samego PDF-u pozwala uzupełnić dodatkowe odczytane fakty
+w istniejącej wersji. [Definicja C/Z](https://www.investor.gov/introduction-investing/investing-basics/glossary/price-earnings-pe-ratio) · [Definicja C/WK](https://www.fidelity.com/learning-center/trading-investing/fundamental-analysis/company-valuation-ratios) · [Definicja ROE](https://www.fidelity.com/learning-center/trading-investing/fundamental-analysis/management-growth-ratios)
+
 - Użytkownik przypisuje raport do instrumentu po tickerze i giełdzie.
   W karcie pokazać kurs zamknięcia z istniejącego API, jego sesję, walutę,
   źródło i stan świeżości. Rozbieżność waluty raportu i notowania wymaga
