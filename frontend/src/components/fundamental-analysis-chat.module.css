@@ -284,7 +284,9 @@
 }
 
 .instrument input,
-.instrument select {
+.instrument select,
+.libraryFields input,
+.libraryFields select {
   width: 100%;
   min-width: 0;
   min-height: 40px;
@@ -294,6 +296,77 @@
   background: var(--surface);
   color: var(--ink);
   font: inherit;
+}
+
+.library {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.library summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.libraryImport {
+  margin-top: 12px;
+}
+
+.libraryImport form {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.libraryFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.libraryFields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.libraryWide {
+  grid-column: 1 / -1;
+}
+
+.libraryList {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.libraryList li {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.libraryList span {
+  color: var(--muted);
+  font-size: 0.87rem;
+}
+
+.libraryActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
 }
 
 .controls,

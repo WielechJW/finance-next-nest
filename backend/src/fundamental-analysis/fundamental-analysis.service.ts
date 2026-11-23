@@ -16,7 +16,11 @@ import {
   requestLmStudio,
   selectModel,
 } from './lm-studio.js';
-import { readReportText } from './report-text.js';
+import {
+  buildReportContext,
+  readReportText,
+  type ParsedReport,
+} from './report-text.js';
 
 const DEFAULT_QUESTION =
   'Podsumuj najważniejsze informacje z raportu i oceń atrakcyjność inwestycji.';
@@ -56,11 +60,13 @@ export class FundamentalAnalysisService {
     input: { question: string; history?: string; instrumentId?: string },
     report: Buffer | undefined,
     disconnect: AbortSignal,
+    saved?: { instrumentId: string; document: ParsedReport },
   ) {
-    const question = input.question.trim() || (report ? DEFAULT_QUESTION : '');
+    const question =
+      input.question.trim() || (report || saved ? DEFAULT_QUESTION : '');
     if (!question)
       throw new BadRequestException('Wpisz pytanie lub dołącz raport PDF.');
-    if (input.instrumentId && !report)
+    if (input.instrumentId && !report && !saved)
       throw new BadRequestException('Dołącz raport, aby przypisać instrument.');
     const history = parseHistory(input.history);
     if (this.busy) {
@@ -77,11 +83,13 @@ export class FundamentalAnalysisService {
     let generationMs: number | null = null;
     try {
       const pdfStarted = performance.now();
-      const context = report
-        ? await readReportText(report, question, signal).finally(() => {
-            pdfMs = Math.round(performance.now() - pdfStarted);
-          })
-        : undefined;
+      const context = saved
+        ? buildReportContext(saved.document, question)
+        : report
+          ? await readReportText(report, question, signal).finally(() => {
+              pdfMs = Math.round(performance.now() - pdfStarted);
+            })
+          : undefined;
       const config = getLmStudioConfig();
       const model = await selectModel(config, signal);
       const facts = context?.summary.filter(
@@ -90,8 +98,9 @@ export class FundamentalAnalysisService {
       const operatingMargin = context
         ? calculateOperatingMargin(context.summary)
         : null;
-      const market = input.instrumentId
-        ? await this.getMarketContext(input.instrumentId)
+      const instrumentId = saved?.instrumentId ?? input.instrumentId;
+      const market = instrumentId
+        ? await this.getMarketContext(instrumentId)
         : null;
       const prompt = context
         ? 'Pytanie użytkownika:\n' +

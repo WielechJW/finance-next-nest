@@ -75,7 +75,16 @@ export class BrowserDatabase {
           emails,
         ]);
         await client.query('DELETE FROM "PriceBar" WHERE "instrumentId" = ANY($1::uuid[])', [[...this.instrumentIds]]);
-        await client.query('DELETE FROM "Instrument" WHERE id = ANY($1::uuid[])', [[...this.instrumentIds]]);
+        const instruments = await client.query<{ companyId: string | null }>(
+          'DELETE FROM "Instrument" WHERE id = ANY($1::uuid[]) RETURNING "companyId"',
+          [[...this.instrumentIds]],
+        );
+        await client.query(
+          `DELETE FROM "Company" WHERE id = ANY($1::uuid[])
+           AND NOT EXISTS (SELECT 1 FROM "Instrument" WHERE "companyId" = "Company".id)
+           AND NOT EXISTS (SELECT 1 FROM "FinancialReport" WHERE "companyId" = "Company".id)`,
+          [instruments.rows.flatMap(({ companyId }) => companyId ? [companyId] : [])],
+        );
         await client.query('COMMIT');
       } catch (error) {
         await client.query('ROLLBACK');

@@ -22,6 +22,7 @@ model User {
   telegramConnection TelegramConnection?
   telegramPairings TelegramPairing[]
   notifications Notification[]
+  financialReports FinancialReport[]
 }
 
 model Portfolio {
@@ -63,6 +64,9 @@ model Instrument {
   mic              String                      @db.VarChar(4)
   currency         InvestmentCurrency
   isin             String?                     @db.VarChar(12)
+  companyId        String?                     @db.Uuid
+  company          Company?                    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  financialReports FinancialReport[]
   providerMappings InstrumentProviderMapping[]
   trades           Trade[]
   openingLots      OpeningLot[]
@@ -78,6 +82,81 @@ model Instrument {
   // Later investment events will reference this ID, never a mutable ticker.
   @@unique([mic, ticker])
   @@index([isin])
+  @@index([companyId])
+}
+
+model Company {
+  id          String            @id @default(uuid()) @db.Uuid
+  name        String            @db.VarChar(200)
+  instruments Instrument[]
+  reports     FinancialReport[]
+  createdAt   DateTime          @default(now())
+}
+
+enum FinancialReportScope {
+  CONSOLIDATED
+  STANDALONE
+}
+
+enum FinancialReportPeriod {
+  ANNUAL
+  QUARTERLY
+}
+
+enum FinancialReportCurrency {
+  PLN
+  USD
+  EUR
+}
+
+enum FundamentalMetric {
+  REVENUE
+  EBIT
+  NET_INCOME
+  OPERATING_CASH_FLOW
+  LONG_TERM_DEBT
+}
+
+model FinancialReport {
+  id           String                  @id @default(uuid()) @db.Uuid
+  userId       String                  @db.Uuid
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId    String                  @db.Uuid
+  company      Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  instrumentId String                  @db.Uuid
+  instrument   Instrument              @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  scope        FinancialReportScope
+  periodKind   FinancialReportPeriod
+  periodStart  DateTime                @db.Date
+  periodEnd    DateTime                @db.Date
+  publishedOn  DateTime                @db.Date
+  currency     FinancialReportCurrency
+  sourceUrl    String                  @db.VarChar(2048)
+  filename     String                  @db.VarChar(200)
+  version      Int
+  contentHash  String                  @db.Char(64)
+  pdf          Bytes
+  parsedReport Json
+  facts        FundamentalFact[]
+  createdAt    DateTime                @default(now()) @db.Timestamptz(3)
+
+  @@unique([userId, companyId, scope, periodKind, periodStart, periodEnd, version], map: "FinancialReport_period_version_key")
+  @@unique([userId, companyId, scope, periodKind, periodStart, periodEnd, contentHash], map: "FinancialReport_period_hash_key")
+  @@index([userId, createdAt])
+  @@index([companyId])
+  @@index([instrumentId])
+}
+
+model FundamentalFact {
+  reportId String            @db.Uuid
+  report   FinancialReport   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  metric   FundamentalMetric
+  amount   Decimal           @db.Decimal(38, 10)
+  unit     String            @db.VarChar(16)
+  period   String            @db.VarChar(64)
+  page     Int
+
+  @@id([reportId, metric])
 }
 
 model MarketDataBudget {

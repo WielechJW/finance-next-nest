@@ -13,9 +13,11 @@ import {
   requestAnalysis,
   requestAnalysisStatus,
   type AnalysisReply,
+  type IssuerReport,
   type ReportMetric,
 } from "@/lib/fundamental-analysis-api";
 import { InstrumentPicker } from "./investments/instrument-picker";
+import { FundamentalReportLibrary } from "./fundamental-report-library";
 import { UiIcon } from "./ui-icon";
 import { useSession } from "./session-provider";
 import styles from "./fundamental-analysis-chat.module.css";
@@ -275,10 +277,12 @@ function Chat() {
   >([]);
   const [question, setQuestion] = useState("");
   const [attachment, setAttachment] = useState<{
-    file: File;
+    name: string;
     url: string;
+    file?: File;
+    savedId?: string;
   } | null>(null);
-  const report = attachment?.file ?? null;
+  const report = attachment;
   const [instrument, setInstrument] = useState<InvestmentInstrument | null>(
     null,
   );
@@ -326,7 +330,7 @@ function Chat() {
     }
     setError("");
     setInstrument(null);
-    setAttachment({ file, url: URL.createObjectURL(file) });
+    setAttachment({ file, name: file.name, url: URL.createObjectURL(file) });
   }
 
   async function send(event: FormEvent<HTMLFormElement>) {
@@ -343,9 +347,10 @@ function Chat() {
       const reply = await requestAnalysis(
         prompt,
         turns,
-        report,
+        report?.file ?? null,
         controller.signal,
         instrument?.id,
+        report?.savedId,
       );
       setTurns((previous) => [...previous, { question: prompt, reply }]);
       setQuestion("");
@@ -366,12 +371,27 @@ function Chat() {
   }
 
   function reset() {
+    const request = activeRequest.current;
+    activeRequest.current = null;
+    request?.abort();
+    setPendingQuestion("");
     setTurns([]);
     setAttachment(null);
     setInstrument(null);
     setQuestion("");
     setError("");
     input.current?.focus();
+  }
+
+  function openSavedReport(saved: IssuerReport, pdf: Blob) {
+    if (pdf.type !== "application/pdf")
+      throw new Error("Serwer zwrócił nieprawidłowy plik PDF.");
+    reset();
+    setAttachment({
+      name: saved.filename,
+      savedId: saved.id,
+      url: URL.createObjectURL(pdf),
+    });
   }
 
   return (
@@ -398,6 +418,13 @@ function Chat() {
       </header>
 
       <ConnectionStatus />
+      <FundamentalReportLibrary
+        disabled={!!pendingQuestion}
+        onOpen={openSavedReport}
+        onRemove={(id) => {
+          if (attachment?.savedId === id) reset();
+        }}
+      />
       <div className={styles.chat}>
         <div
           className={styles.transcript}
@@ -462,7 +489,7 @@ function Chat() {
             onChange={attachReport}
             hidden
           />
-          {report && !reportLocked && (
+          {report?.file && !reportLocked && (
             <fieldset
               className={styles.instrument}
               disabled={!!pendingQuestion}
