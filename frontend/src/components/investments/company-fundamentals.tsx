@@ -11,6 +11,7 @@ import {
 import { formatInvestment } from "@/lib/investment-format";
 import { useInvestmentResource } from "./use-investment-resource";
 import styles from "./investments.module.css";
+import { InvestmentNote } from "./investment-note";
 
 const metrics = {
   REVENUE: "Przychody",
@@ -222,6 +223,7 @@ export function CompanyFundamentals({
           Przejdź do raportów i analizy
         </Link>
       </section>
+      <InvestmentNote key={instrumentId} instrumentId={instrumentId} />
       <section className={styles.card} aria-label="Dywidendy">
         <h2>Dywidendy</h2>
         {dividends.length ? (

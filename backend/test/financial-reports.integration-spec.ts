@@ -39,8 +39,8 @@ describe('Issuer report library (PostgreSQL)', () => {
     await context?.app.close();
   });
 
-  async function setup() {
-    const owner = await context.signIn();
+  async function setup(owner = context.signIn()) {
+    const signedIn = await owner;
     const instrument = await context.prisma.instrument.create({
       data: {
         ticker: 'R' + randomUUID().slice(0, 8),
@@ -62,10 +62,10 @@ describe('Issuer report library (PostgreSQL)', () => {
       sourceUrl: 'https://issuer.example/report.pdf',
     };
     return {
-      owner,
+      owner: signedIn,
       instrument,
       upload: (file = reportPdf(), changes: Record<string, string> = {}) =>
-        owner.agent
+        signedIn.agent
           .post(root)
           .set('Origin', context.origin)
           .field({ ...metadata, ...changes })
@@ -224,5 +224,100 @@ describe('Issuer report library (PostgreSQL)', () => {
     expect(stranger.body.sections[0].annual).toBeNull();
     expect(stranger.body.activity).toBeNull();
     expect(stranger.body.dividends).toEqual(response.body.dividends);
+  });
+
+  it('lists only the owner’s latest reports and filters missing margins independently', async () => {
+    const first = await setup();
+    const second = await setup(Promise.resolve(first.owner));
+    const privateIssuer = await setup();
+    await first.upload().expect(201);
+    const revision = await first
+      .upload(reportPdf('150'), {
+        publishedOn: '2026-03-04',
+      })
+      .expect(201);
+    await second.upload(reportPdf(), { currency: 'PLN' }).expect(201);
+    await privateIssuer.upload().expect(201);
+    const screen = '/fundamental-analysis/research/screen';
+    const { body } = await first.owner.agent
+      .get(screen)
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+    expect(body).toHaveLength(2);
+    expect(body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          instrument: expect.objectContaining({ id: first.instrument.id }),
+          report: expect.objectContaining({
+            id: revision.body.id,
+            currency: 'USD',
+          }),
+          operatingMargin: '6.00',
+          netMargin: '3.33',
+        }),
+        expect.objectContaining({
+          instrument: expect.objectContaining({ id: second.instrument.id }),
+          operatingMargin: null,
+          netMargin: null,
+        }),
+      ]),
+    );
+    await first.owner.agent
+      .get(`${screen}?missing=exclude&minOperatingMargin=6.01`)
+      .expect(200, []);
+    const filtered = await first.owner.agent
+      .get(`${screen}?missing=exclude&minNetMargin=3`)
+      .expect(200);
+    expect(
+      filtered.body.map(
+        (item: { instrument: { id: string } }) => item.instrument.id,
+      ),
+    ).toEqual([first.instrument.id]);
+    const missing = await first.owner.agent
+      .get(`${screen}?missing=only&minOperatingMargin=7`)
+      .expect(200);
+    expect(
+      missing.body.map(
+        (item: { instrument: { id: string } }) => item.instrument.id,
+      ),
+    ).toEqual([second.instrument.id]);
+    await first.owner.agent
+      .get(`${screen}?scope=STANDALONE&missing=exclude`)
+      .expect(200, []);
+    await first.owner.agent.get(`${screen}?minNetMargin=abc`).expect(400);
+  });
+
+  it('keeps note edits and deletion private on the same instrument', async () => {
+    const { owner, instrument } = await setup();
+    const other = await context.signIn();
+    const path = `/fundamental-analysis/research/notes/${instrument.id}`;
+    const input = {
+      thesis: ' Teza ',
+      risks: 'Ryzyko',
+      reviewConditions: 'Nowy raport',
+    };
+    await request(context.app.getHttpServer()).get(path).expect(401);
+    await owner.agent.get(path).expect(200, { note: null });
+    await owner.agent
+      .patch(path)
+      .set('Origin', context.origin)
+      .send(input)
+      .expect(200);
+    await other.agent.get(path).expect(200, { note: null });
+    await other.agent
+      .patch(path)
+      .set('Origin', context.origin)
+      .send({ ...input, thesis: 'Prywatna notatka drugiego konta' })
+      .expect(200);
+    const read = await owner.agent
+      .get(path)
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+    expect(read.body.note).toMatchObject({ ...input, thesis: 'Teza' });
+    await other.agent.delete(path).set('Origin', context.origin).expect(204);
+    const stillThere = await owner.agent.get(path).expect(200);
+    expect(stillThere.body).toEqual(read.body);
+    await owner.agent.delete(path).set('Origin', context.origin).expect(204);
+    await owner.agent.get(path).expect(200, { note: null });
   });
 });
