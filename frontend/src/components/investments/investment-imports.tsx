@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState, type FormEvent } from "react";
+import { ImportPreview } from "./investment-import-preview";
 import { importApi, type ImportBatch } from "@/lib/investment-import-api";
 import { useInvestmentResource } from "./use-investment-resource";
 import styles from "./investments.module.css";
@@ -28,15 +29,12 @@ export function InvestmentImports({
   const [batch, setBatch] = useState<ImportBatch | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [showFrom, setShowFrom] = useState(0);
-  const pageSize = 25;
 
   async function open(operation: () => Promise<ImportBatch>) {
     setBusy(true);
     setMessage("");
     try {
       setBatch(await operation());
-      setShowFrom(0);
       return true;
     } catch (error) {
       setMessage(
@@ -121,53 +119,12 @@ export function InvestmentImports({
               : "Partia zawiera błędy."}{" "}
             Wiersze ({batch.rowCount}) · {batch.encoding}
           </p>
-          <div className={styles.comparison}>
-            <table aria-label="Wiersze partii">
-              <thead>
-                <tr>
-                  <th scope="col">Wiersz</th>
-                  <th scope="col">Operacja</th>
-                  <th scope="col">Wynik odczytu</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batch.rows.slice(showFrom, showFrom + pageSize).map((row) => (
-                  <tr key={row.number}>
-                    <th scope="row">{row.number}</th>
-                    <td>
-                      {row.data &&
-                        [
-                          row.data.type,
-                          row.data.occurredOn,
-                          row.data.ticker ?? row.data.isin,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                    </td>
-                    <td>{row.error ?? "Poprawny format"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {batch.rows.length > pageSize && (
-            <div className={styles.actions}>
-              <button
-                type="button"
-                disabled={showFrom === 0}
-                onClick={() => setShowFrom((offset) => offset - pageSize)}
-              >
-                Poprzednie wiersze
-              </button>
-              <button
-                type="button"
-                disabled={showFrom + pageSize >= batch.rows.length}
-                onClick={() => setShowFrom((offset) => offset + pageSize)}
-              >
-                Następne wiersze
-              </button>
-            </div>
-          )}
+          <ImportPreview
+            key={batch.id}
+            batch={batch}
+            portfolioId={portfolioId}
+            accountId={accountId}
+          />
         </section>
       )}
       <section className={styles.card} aria-labelledby="import-history-title">

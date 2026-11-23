@@ -52,6 +52,17 @@ utworzonych według specyfikacji pól brokera.
 [definicje pól Trades](https://ibkrguides.com/reportingreference/reportguide/tradesfq.htm),
 [opcje układu pliku](https://ibkrguides.com/reportingreference/reportguide/delivery%20configuration%20and%20general%20configuration.htm).
 
+## Podgląd wpływu na rachunek
+
+Podgląd pokazuje waluty, kwoty, prowizje, wymiany i dywidendy z pliku. Katalog
+łączy instrument po tickerze, kodzie rynku MIC i ISIN, jeśli plik je zawiera.
+Gdy danych brakuje lub są sprzeczne, można wybrać właściwy instrument z katalogu.
+Waluta wybranego instrumentu musi odpowiadać walucie wiersza.
+
+Podobieństwo do istniejącej operacji jest ostrzeżeniem do przeglądu. Dwie
+operacje o tej samej dacie i wartościach mogą być odrębne. Podgląd osobno
+pokazuje znane identyfikatory źródłowe i powtórzone identyfikatory w pliku.
+
 ## Limity i wynik odczytu
 
 Plik może mieć do 1 MB i 5000 rekordów. Wiersz to jedna fizyczna linia o

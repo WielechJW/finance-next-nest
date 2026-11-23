@@ -90,8 +90,11 @@ model ImportRow {
   number  Int
   data    Json?
   error   String?     @db.VarChar(512)
+  mappedInstrumentId String? @db.Uuid
+  mappedInstrument Instrument? @relation(fields: [mappedInstrumentId], references: [id], onDelete: SetNull)
 
   @@id([batchId, number])
+  @@index([mappedInstrumentId])
 }
 
 enum InvestmentCurrency {
@@ -110,6 +113,7 @@ model Instrument {
   company          Company?                    @relation(fields: [companyId], references: [id], onDelete: SetNull)
   financialReports FinancialReport[]
   investmentNotes InvestmentNote[]
+  importRows ImportRow[]
   providerMappings InstrumentProviderMapping[]
   trades           Trade[]
   openingLots      OpeningLot[]

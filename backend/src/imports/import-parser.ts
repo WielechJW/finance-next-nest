@@ -158,9 +158,7 @@ function normalize(
 ) {
   const type = manualEventTypes.find((value) => value === fields.type);
   if (!type) throw new Error('Nieobsługiwany typ operacji.');
-  const instrumentEvent = ['BUY', 'SELL', 'SPLIT', 'OPENING_POSITION'].includes(
-    type,
-  );
+  const instrumentEvent = requiresInstrument(type);
   if (instrumentEvent && !ticker && !isin)
     throw new Error('Podaj ticker lub ISIN instrumentu.');
   if (ticker && !/^[A-Z0-9][A-Z0-9.\-_/ ]{0,31}$/i.test(ticker))
@@ -180,20 +178,14 @@ function normalize(
   const instrumentCurrency = instrumentEvent
     ? dollarsOrZloty(fields.currency ?? '')
     : undefined;
-  const operationFields = { ...fields };
-  if (instrumentEvent) delete operationFields.currency;
-  const dto = {
-    ...operationFields,
-    type,
-    occurredOn: fields.occurredOn,
-    daySequence: number,
-    idempotencyKey: 'csv-validation',
-    timePrecision: fields.executedAt ? 'INSTANT' : 'DATE',
-    ...(instrumentEvent ? { instrumentId: 'pending-mapping' } : {}),
-  } satisfies CreateInvestmentEventDto;
   preparePosting(
     'csv-validation',
-    toInvestmentInput('csv-validation', dto),
+    csvOperation(
+      'csv-validation',
+      fields,
+      number,
+      instrumentEvent ? 'pending-mapping' : undefined,
+    ),
     instrumentCurrency,
   );
   return {
@@ -203,6 +195,39 @@ function normalize(
     ...(isin ? { isin: isin.toUpperCase() } : {}),
     ...(externalId ? { externalId } : {}),
   };
+}
+
+export function requiresInstrument(type: string) {
+  return ['BUY', 'SELL', 'SPLIT', 'OPENING_POSITION'].includes(type);
+}
+
+export function csvOperation(
+  accountId: string,
+  data: Record<string, string>,
+  daySequence: number,
+  instrumentId?: string,
+) {
+  const {
+    ticker: _ticker,
+    mic: _mic,
+    isin: _isin,
+    externalId: _externalId,
+    ...fields
+  } = data;
+  const type = manualEventTypes.find((value) => value === fields.type);
+  if (!type) throw new BadRequestException('Nieobsługiwany typ operacji.');
+  const instrumentEvent = requiresInstrument(type);
+  if (instrumentEvent) delete fields.currency;
+  const dto = {
+    ...fields,
+    type,
+    occurredOn: fields.occurredOn,
+    daySequence,
+    idempotencyKey: 'csv-validation',
+    timePrecision: fields.executedAt ? 'INSTANT' : 'DATE',
+    ...(instrumentEvent && instrumentId ? { instrumentId } : {}),
+  } satisfies CreateInvestmentEventDto;
+  return toInvestmentInput(accountId, dto);
 }
 
 export function parseImportCsv(buffer: Buffer, format: ImportFormat) {
