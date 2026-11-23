@@ -16,12 +16,14 @@ test('imports a source PDF and opens the same saved version after reload', async
     .getByLabel('Szukaj instrumentu', { exact: true })
     .fill(instrument.ticker);
   await page
-    .getByLabel('Instrument', { exact: true })
+    .getByRole('combobox', { name: 'Instrument', exact: true })
     .selectOption(instrument.id);
   await page.getByLabel('Początek okresu', { exact: true }).fill('2025-02-01');
   await page.getByLabel('Koniec okresu', { exact: true }).fill('2026-01-31');
   await page.getByLabel('Data publikacji', { exact: true }).fill('2026-03-01');
-  await page.getByLabel('Waluta raportu', { exact: true }).selectOption('USD');
+  await page
+    .getByRole('combobox', { name: 'Waluta raportu', exact: true })
+    .selectOption('USD');
   await page
     .getByLabel('Adres dokumentu u emitenta', { exact: true })
     .fill('https://issuer.example/report.pdf');
