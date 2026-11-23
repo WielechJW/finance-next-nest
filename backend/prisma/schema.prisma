@@ -23,6 +23,7 @@ model User {
   telegramPairings TelegramPairing[]
   notifications Notification[]
   financialReports FinancialReport[]
+  investmentNotes InvestmentNote[]
 }
 
 model Portfolio {
@@ -67,6 +68,7 @@ model Instrument {
   companyId        String?                     @db.Uuid
   company          Company?                    @relation(fields: [companyId], references: [id], onDelete: SetNull)
   financialReports FinancialReport[]
+  investmentNotes InvestmentNote[]
   providerMappings InstrumentProviderMapping[]
   trades           Trade[]
   openingLots      OpeningLot[]
@@ -83,6 +85,20 @@ model Instrument {
   @@unique([mic, ticker])
   @@index([isin])
   @@index([companyId])
+}
+
+model InvestmentNote {
+  userId           String     @db.Uuid
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instrumentId     String     @db.Uuid
+  instrument       Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  thesis           String     @db.VarChar(4000)
+  risks            String     @db.VarChar(4000)
+  reviewConditions String     @db.VarChar(4000)
+  updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
+
+  @@id([userId, instrumentId])
+  @@index([instrumentId])
 }
 
 model Company {

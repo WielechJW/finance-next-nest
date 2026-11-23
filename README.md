@@ -194,6 +194,11 @@ wgranie identycznego pliku zwraca istniejącą wersję. Biblioteka jest przypisa
 do konta. Po odświeżeniu możesz ponownie otworzyć PDF w czacie i używać
 zapisanego tekstu. Usunięcie wersji usuwa plik, odczytany tekst i jej fakty.
 
+Na karcie spółki możesz prowadzić prywatną notatkę z tezą, ryzykami i warunkami
+ponownej analizy. Screener korzysta z najnowszych raportów rocznych zapisanych
+na koncie. Możesz filtrować po marżach i osobno wyświetlać braki. Porównanie
+pokazuje okres i walutę każdej spółki oraz odsyłacze do stron PDF z liczbami.
+
 ## Rejestracja użytkownika
 
 `POST /auth/register` przyjmuje JSON z polami `email` i `password`:

@@ -21,6 +21,7 @@ import { FundamentalReportLibrary } from "./fundamental-report-library";
 import { UiIcon } from "./ui-icon";
 import { useSession } from "./session-provider";
 import styles from "./fundamental-analysis-chat.module.css";
+import Link from "next/link";
 
 const DEFAULT_QUESTION =
   "Podsumuj najważniejsze informacje z raportu i oceń atrakcyjność inwestycji.";
@@ -417,6 +418,7 @@ function Chat() {
         </button>
       </header>
 
+      <Link href="/dashboard/fundamental-analysis/research">Screener i porównanie spółek</Link>
       <ConnectionStatus />
       <FundamentalReportLibrary
         disabled={!!pendingQuestion}
