@@ -335,9 +335,10 @@ Rozwój czatu PDF z lokalnym modelem opisuje osobny plan. [Analiza fundamentalna
   przyjmuje pliki PDF emitentów GPW i USA, wiąże je z instrumentem i zachowuje
   okres, walutę, jednostkę, datę publikacji, adres źródła oraz wersję raportu.
   Automatyczne pobieranie danych zależy od dalszej weryfikacji źródeł w #45.
-- [ ] **8.2. Zbudować kartę spółki.** Wykres, opis działalności, przychody,
-  zysk netto, cash flow, zadłużenie i historia dywidend. Oddzielić dane
-  kwartalne, roczne oraz TTM; zapewnić przejście do dokumentu źródłowego.
+- [x] **8.2. Zbudować kartę spółki.** Karta na ekranie rynku pokazuje ceny zamknięcia,
+  dane z raportów właściciela i zapisane dywidendy. Wybór okresu i konsolidacji
+  steruje tabelą z odsyłaczami do PDF. TTM wymaga czterech kolejnych kwartałów
+  z porównywalnymi wartościami. Opis działalności można dołączyć przy imporcie raportu.
 - [ ] **8.3. Wyliczać jawnie zdefiniowane wskaźniki.** C/Z, C/WK, ROE,
   marże i dynamika wyników. Sprawdzić zgodność okresów, jednostek i walut;
   nieadekwatny lub brakujący mianownik daje opisany brak wskaźnika.

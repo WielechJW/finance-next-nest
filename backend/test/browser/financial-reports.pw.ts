@@ -58,4 +58,26 @@ test('imports a source PDF and opens the same saved version after reload', async
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.goto('/dashboard/market/' + instrument.id);
+  const fundamentals = page.getByRole('region', {
+    name: 'Fundamenty spółki',
+    exact: true,
+  });
+  await expect(
+    fundamentals.getByText('120 mln USD', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    fundamentals
+      .getByRole('link', { name: 'strona 1 PDF', exact: true })
+      .first(),
+  ).toHaveAttribute('href', /\/reports\/[^/]+\/pdf#page=1$/);
+  await fundamentals
+    .getByRole('combobox', { name: 'Okres', exact: true })
+    .selectOption('trailingYear');
+  await expect(
+    fundamentals.getByText(
+      'Do TTM potrzeba czterech kolejnych kwartałów w tej samej walucie.',
+      { exact: true },
+    ),
+  ).toBeVisible();
 });

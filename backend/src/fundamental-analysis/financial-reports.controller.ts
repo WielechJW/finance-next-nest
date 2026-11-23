@@ -21,6 +21,7 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsOptional,
   IsString,
   IsUrl,
   IsUUID,
@@ -55,6 +56,7 @@ class ReportImportDto implements ReportImport {
   @IsUrl({ protocols: ['https'], require_protocol: true, disallow_auth: true })
   sourceUrl!: string;
   @IsString() @MaxLength(200) filename!: string;
+  @IsOptional() @IsString() @MaxLength(600) businessSummary?: string;
 }
 
 class ReportListDto {
@@ -72,6 +74,15 @@ export class FinancialReportsController {
     return this.reports.list(user.id, query.page);
   }
 
+  @Get('company/:instrumentId')
+  @Header('Cache-Control', 'no-store')
+  company(
+    @CurrentUser() user: RegisteredUser,
+    @Param('instrumentId', ParseUUIDPipe) instrumentId: string,
+  ) {
+    return this.reports.companyCard(user.id, instrumentId);
+  }
+
   @Post()
   @Header('Cache-Control', 'no-store')
   @UseInterceptors(
@@ -79,7 +90,7 @@ export class FinancialReportsController {
       limits: {
         fileSize: 15 * 1024 * 1024,
         files: 1,
-        fields: 9,
+        fields: 10,
         fieldSize: 4096,
       },
     }),

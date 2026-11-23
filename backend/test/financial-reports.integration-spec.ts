@@ -20,6 +20,9 @@ describe('Issuer report library (PostgreSQL)', () => {
       select: { companyId: true },
     });
     await context.cleanup();
+    await context.prisma.corporateAction.deleteMany({
+      where: { instrumentId: { in: instrumentIds } },
+    });
     await context.prisma.instrument.deleteMany({ where });
     await context.prisma.company.deleteMany({
       where: {
@@ -175,5 +178,51 @@ describe('Issuer report library (PostgreSQL)', () => {
         (item: { periodKind: string }) => item.periodKind,
       ),
     ).toEqual(['ANNUAL', 'ANNUAL']);
+  });
+
+  it('shows the latest owned report version alongside saved public dividends', async () => {
+    const { owner, instrument, upload } = await setup();
+    const other = await context.signIn();
+    await upload().expect(201);
+    const corrected = await upload(reportPdf('135'), {
+      publishedOn: '2026-03-05',
+      businessSummary: 'Produkty przemysłowe.',
+    }).expect(201);
+    await context.prisma.corporateAction.create({
+      data: {
+        instrumentId: instrument.id,
+        source: 'EODHD',
+        kind: 'DIVIDEND',
+        exDate: new Date('2026-09-15'),
+        currency: 'USD',
+        amount: '1.25',
+        amountBasis: 'unadjusted',
+        contentHash: 'a'.repeat(64),
+      },
+    });
+    const path = root + '/company/' + instrument.id;
+    const response = await owner.agent.get(path).expect(200);
+    expect(response.body.sections[0]).toMatchObject({
+      scope: 'CONSOLIDATED',
+      annual: { id: corrected.body.id, version: 2 },
+      quarterly: null,
+      trailingYear: null,
+    });
+    expect(response.body.activity).toEqual({
+      text: 'Produkty przemysłowe.',
+      sourceUrl: 'https://issuer.example/report.pdf',
+    });
+    expect(response.body.dividends).toMatchObject([
+      {
+        exDate: '2026-09-15',
+        paymentOn: null,
+        amount: '1.25',
+        currency: 'USD',
+      },
+    ]);
+    const stranger = await other.agent.get(path).expect(200);
+    expect(stranger.body.sections[0].annual).toBeNull();
+    expect(stranger.body.activity).toBeNull();
+    expect(stranger.body.dividends).toEqual(response.body.dividends);
   });
 });

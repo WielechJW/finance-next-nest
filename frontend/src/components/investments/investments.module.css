@@ -1,6 +1,42 @@
 .panel {
   min-width: 0;
 }
+
+.priceChart {
+  display: block;
+  width: 100%;
+  max-width: 730px;
+  height: auto;
+  margin-bottom: 12px;
+  color: var(--accent);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.companyFilters,
+.companyFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 12px;
+}
+
+.companyFacts > div {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.companyFacts dt {
+  font-weight: 650;
+}
+
+.companyFacts dd {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
 .panel a {
   color: var(--accent);
   overflow-wrap: anywhere;
