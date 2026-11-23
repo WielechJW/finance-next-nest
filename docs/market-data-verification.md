@@ -307,3 +307,28 @@ Pełny odbiór wymaga próby GPW u dostawcy z odpowiednim dostępem do cen,
 splitów, dywidend i fundamentów, potwierdzenia waluty oraz warunków
 przechowywania i prezentacji. Dla obecnego kandydata EODHD oznacza to
 powtórzenie próby własnym kluczem z właściwymi uprawnieniami.
+
+## 10. Bezpłatne alternatywy dla dłuższej historii i fundamentów
+
+23 listopada 2026 r. sprawdzono alternatywy pod kątem prywatnego użycia.
+[Wyniki prób publicznych](market-data/free-alternatives-2026-11-23.json)
+zawierają statusy odpowiedzi i liczniki.
+
+| Źródło | Wynik i zakres |
+| --- | --- |
+| Twelve Data | Demo zwróciło 7 sesji AAPL w USD z czerwca 2022 r. Zapytanie o CDR na XWAR zwróciło HTTP 401. W aktualnym wykazie giełd USA są w planie Basic, a XWAR wymaga Ultra dla użytkowników indywidualnych lub Enterprise dla firm. [Wykaz giełd](https://twelvedata.com/exchanges?level=overview) · [Historia cen](https://support.twelvedata.com/en/articles/5656039-how-to-get-historical-prices) |
+| Massive Stocks Basic | Oferta bezpłatna obejmuje USA, dwa lata dziennych cen oraz zdarzenia korporacyjne w zakresie planu. API udostępnia ceny surowe przez `adjusted=false`. Weryfikacja opiera się na dokumentacji. Użycie indywidualne obejmuje własne cele osobiste, a udostępnianie danych innym wymaga planu biznesowego. [Plany](https://massive.com/pricing?product=stocks) · [Surowe ceny](https://massive.com/knowledge-base/categories/stocks) · [Warunki użycia](https://massive.com/knowledge-base/article/which-plan-do-i-need-to-show-massive-data-in-my-app) |
+| Alpha Vantage | Bezpłatny zakres surowych cen dziennych obejmuje 100 ostatnich obserwacji. Pełna historia oraz źródło dziennych korekt cen, splitów i dywidend wymagają Premium. [Dokumentacja](https://www.alphavantage.co/documentation/) |
+| Stooq | Strona pobierania wymagała weryfikacji w przeglądarce. Pozostaje sprawdzenie surowej skali cen oraz warunków przechowywania i prezentacji w aplikacji. [Strona danych](https://stooq.com/db/h/) |
+| Agent Rynku | Próba GPW z sekcji 8 potwierdziła wybrane dane. Ceny były skorygowane, a odpowiedź pomijała walutę notowań. Publiczny katalog ma ceny, dywidendy i KPI. Warunki ograniczają utrzymywanie kopii danych w zewnętrznym systemie. [Dokumentacja GPW](https://agentrynku.pl/docs/historia-cen-gpw) · [Regulamin](https://agentrynku.pl/regulamin) |
+| SEC EDGAR | Bezpłatne publiczne API udostępnia historię zgłoszeń i fakty XBRL dla USA. Pięć prób `companyfacts` na AAPL, MSFT, TSLA, AMZN i MCD zwróciło HTTP 403 z obecnego środowiska. Do wdrożenia automatycznego importu potrzebna jest próba z docelowej sieci. [Dokumentacja API](https://www.sec.gov/search-filings/edgar-application-programming-interfaces) · [Warunki ponownego użycia](https://www.sec.gov/about/webmaster-frequently-asked-questions) |
+
+Zweryfikowany zakres bez opłat obejmuje notowania EODHD Free, dłuższą próbkę
+AAPL z Twelve Data oraz [raporty emitentów GPW i USA](fundamental-analysis-fixtures.md).
+Historia emitenta potwierdza realny split Apple 4:1 i pierwszą sesję z kursem
+po splicie 31.08.2020. To źródło referencyjne do przyszłej próby dostawcy.
+[Apple Investor Relations](https://investor.apple.com/dividend-history/)
+
+Do odbioru #45 pozostają starsze surowe notowania w PLN dla całej próbki GPW,
+porównanie historycznych splitów w danych dostawcy z dokumentami źródłowymi,
+pełna weryfikacja fundamentów w API i warunki użycia docelowego zestawu.

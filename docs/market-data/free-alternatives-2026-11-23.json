@@ -1,0 +1,68 @@
+{
+  "rawDataStored": false,
+  "probes": [
+    {
+      "provider": "Twelve Data demo",
+      "checkedAt": "2026-11-23T12:38:20.659212+00:00",
+      "window": {
+        "start_date": "2022-06-01",
+        "end_date": "2022-06-10"
+      },
+      "rawDataStored": false,
+      "instruments": [
+        {
+          "ticker": "AAPL",
+          "exchange": "NASDAQ",
+          "httpStatus": 200,
+          "providerCode": null,
+          "rows": 7,
+          "currency": "USD",
+          "earliestSession": "2022-06-01"
+        },
+        {
+          "ticker": "CDR",
+          "exchange": "XWAR",
+          "httpStatus": 401,
+          "error": "HTTPError"
+        }
+      ]
+    },
+    {
+      "provider": "SEC EDGAR",
+      "checkedAt": "2026-11-23T12:35:50.332419+00:00",
+      "rawDataStored": false,
+      "instruments": [
+        {
+          "ticker": "AAPL",
+          "cik": "0000320193",
+          "httpStatus": 403,
+          "error": "HTTPError"
+        },
+        {
+          "ticker": "MSFT",
+          "cik": "0000789019",
+          "httpStatus": 403,
+          "error": "HTTPError"
+        },
+        {
+          "ticker": "TSLA",
+          "cik": "0001318605",
+          "httpStatus": 403,
+          "error": "HTTPError"
+        },
+        {
+          "ticker": "AMZN",
+          "cik": "0001018724",
+          "httpStatus": 403,
+          "error": "HTTPError"
+        },
+        {
+          "ticker": "MCD",
+          "cik": "0000063908",
+          "httpStatus": 403,
+          "error": "HTTPError"
+        }
+      ]
+    }
+  ]
+}
