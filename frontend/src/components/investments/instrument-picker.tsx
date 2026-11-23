@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { investmentsApi, type InvestmentInstrument } from "@/lib/investments-api";
 import styles from "./investments.module.css";
 
-export function InstrumentPicker({ selected, onChange }: {
+export function InstrumentPicker({ selected, onChange, required = true }: {
   selected: InvestmentInstrument | null;
   onChange(instrument: InvestmentInstrument | null): void;
+  required?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -35,7 +36,7 @@ export function InstrumentPicker({ selected, onChange }: {
       <input type="search" maxLength={80} placeholder="Ticker, nazwa lub ISIN" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} />
     </label>
     <label>Instrument
-      <select value={selected?.id ?? ""} onChange={event => onChange(options.find(item => item.id === event.target.value) ?? null)} required>
+      <select value={selected?.id ?? ""} onChange={event => onChange(options.find(item => item.id === event.target.value) ?? null)} required={required}>
         <option value="">Wybierz instrument</option>
         {options.map(item => <option key={item.id} value={item.id}>{item.ticker} · {item.mic} · {item.currency}</option>)}
       </select>

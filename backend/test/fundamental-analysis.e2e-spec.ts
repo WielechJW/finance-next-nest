@@ -10,6 +10,7 @@ import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/config/configure-app.js';
 import { getFrontendOrigin } from '../src/config/cors.js';
+import { MarketQualityService } from '../src/market-data/quality.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { SessionService } from '../src/sessions/session.service.js';
 import { UsersService } from '../src/users/users.service.js';
@@ -59,9 +60,11 @@ describe('Fundamental analysis chat', () => {
   const userId = '11111111-2222-4333-8444-555555555555';
   const endpoint = '/fundamental-analysis/chat';
   const lmStudio = vi.fn<typeof fetch>();
+  const quote = vi.fn<MarketQualityService['quote']>();
 
   beforeEach(async () => {
     lmStudio.mockReset();
+    quote.mockReset();
     vi.stubGlobal('fetch', lmStudio);
     vi.stubEnv('LM_STUDIO_BASE_URL', 'http://127.0.0.1:1234/v1');
     vi.stubEnv('LM_STUDIO_MODEL', '');
@@ -71,6 +74,8 @@ describe('Fundamental analysis chat', () => {
     })
       .overrideProvider(PrismaService)
       .useValue({})
+      .overrideProvider(MarketQualityService)
+      .useValue({ quote })
       .overrideProvider(UsersService)
       .useValue({ findPublicById: () => ({ id: userId }) })
       .overrideProvider(SessionService)
@@ -178,6 +183,8 @@ describe('Fundamental analysis chat', () => {
           { metric: 'longTermDebt', state: 'missing' },
         ],
         incomplete: false,
+        operatingMargin: { percent: '7.50', period: '2025', pages: [1] },
+        market: null,
       });
     const history = [
       { role: 'user', content: 'Podsumuj raport.' },
@@ -200,6 +207,75 @@ describe('Fundamental analysis chat', () => {
     expect(payload.messages[3].content).toContain(
       '[str. 1]\nCONSOLIDATED STATEMENTS OF OPERATIONS',
     );
+    expect(quote).not.toHaveBeenCalled();
+  });
+
+  it('uses the selected instrument and its saved closing price when analyzing a PDF', async () => {
+    const instrument = {
+      id: '90a41f31-e6c6-43d8-a409-d45cf48e5be8',
+      ticker: 'CDR',
+      name: 'CD PROJEKT',
+      mic: 'XWAR',
+      currency: 'PLN' as const,
+    };
+    quote.mockResolvedValue({
+      instrument,
+      status: 'stale',
+      expectedSessionOn: '2026-11-20',
+      missingSessions: ['2026-11-20'],
+      quote: {
+        id: 'price-id',
+        close: '150.0000000000',
+        source: 'EODHD',
+        sessionOn: '2026-11-19',
+        currency: 'PLN',
+        revision: 1,
+        fetchedAt: '2026-11-19T18:00:00Z',
+      },
+    });
+    lmStudio
+      .mockResolvedValueOnce(
+        Response.json({ data: [{ id: 'qwen/qwen3.5-9b' }] }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          choices: [{ message: { content: 'Wyniki raportu.' } }],
+        }),
+      );
+    const expectedMarket = {
+      instrument,
+      status: 'stale',
+      expectedSessionOn: '2026-11-20',
+      quote: {
+        close: '150.0000000000',
+        source: 'EODHD',
+        sessionOn: '2026-11-19',
+      },
+    };
+    await request(app.getHttpServer())
+      .post(endpoint)
+      .set('Origin', getFrontendOrigin())
+      .set('X-Test-Session', '1')
+      .field('question', 'Czy raport przemawia za ceną?')
+      .field('history', '[]')
+      .field('instrumentId', instrument.id)
+      .attach('report', reportPdf(), 'report.pdf')
+      .expect(200)
+      .expect(({ body }) => expect(body.market).toEqual(expectedMarket));
+    expect(quote).toHaveBeenCalledOnce();
+    expect(quote).toHaveBeenCalledWith(instrument.id);
+    const requestBody = lmStudio.mock.calls[1]?.[1]?.body;
+    if (typeof requestBody !== 'string')
+      throw new Error('Expected a JSON body');
+    const payload = JSON.parse(requestBody) as {
+      messages: { content: string }[];
+    };
+    const marketLine = payload.messages
+      .at(-1)
+      ?.content.split('\n')
+      .find((line) => line.startsWith('{"instrument":'));
+    if (!marketLine) throw new Error('Missing market context');
+    expect(JSON.parse(marketLine)).toEqual(expectedMarket);
   });
 
   it('requires a session and rejects invalid PDF data before calling LM Studio', async () => {

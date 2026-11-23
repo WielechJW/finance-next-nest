@@ -6,7 +6,9 @@ import {
   Logger,
   RequestTimeoutException,
 } from '@nestjs/common';
+import { MarketQualityService } from '../market-data/quality.service.js';
 import { AnalysisError } from './analysis-error.js';
+import { calculateOperatingMargin } from './report-indicators.js';
 import {
   getLmStudioConfig,
   isObject,
@@ -23,6 +25,7 @@ const SYSTEM_PROMPT = `Jesteś asystentem analizy fundamentalnej. Odpowiadaj po 
 Opieraj wnioski na dostarczonym dokumencie i danych użytkownika. Dla kluczowych liczb podawaj okres, jednostkę i stronę PDF w formacie [str. N], o ile numer strony wynika z materiału. Oddzielaj fakty od interpretacji. Nie wymyślaj liczb, odsyłaczy, cen ani informacji o bieżącym rynku.
 Przy pierwszej analizie streść najważniejsze wydarzenia, wyniki i ich zmianę, rentowność, przepływy pieniężne, zadłużenie i główne ryzyka, gdy są opisane w źródle. Na dalsze pytania odpowiadaj bez powtarzania całej analizy.
 Rozróżniaj kondycję spółki od atrakcyjności jej akcji. Przy pytaniu o inwestycję daj warunkową ocenę: wskaż argumenty za i przeciw oraz dane potrzebne do decyzji. Jeżeli brakuje aktualnej ceny lub danych do wyceny, powiedz wprost, że atrakcyjności zakupu nie da się ocenić. Nie wydawaj spersonalizowanego polecenia kupna lub sprzedaży.
+Korzystaj z obliczonej marży EBIT. Przy kursie podawaj sesję i walutę. Tylko kurs o stanie fresh jest aktualny. Przy brakującej cenie lub różnych walutach danych podaj ograniczenie oceny wyceny.
 Jeśli dostałeś wybrane fragmenty PDF, nie zakładaj, że widzisz cały dokument. Jeśli brakuje źródeł, poproś o brakujące informacje.`;
 
 type Message = { role: 'user' | 'assistant'; content: string };
@@ -31,6 +34,8 @@ type Message = { role: 'user' | 'assistant'; content: string };
 export class FundamentalAnalysisService {
   private readonly logger = new Logger(FundamentalAnalysisService.name);
   private busy = false;
+
+  constructor(private readonly marketQuality: MarketQualityService) {}
 
   async status() {
     const signal = AbortSignal.timeout(5000);
@@ -48,13 +53,15 @@ export class FundamentalAnalysisService {
   }
 
   async chat(
-    input: { question: string; history?: string },
+    input: { question: string; history?: string; instrumentId?: string },
     report: Buffer | undefined,
     disconnect: AbortSignal,
   ) {
     const question = input.question.trim() || (report ? DEFAULT_QUESTION : '');
     if (!question)
       throw new BadRequestException('Wpisz pytanie lub dołącz raport PDF.');
+    if (input.instrumentId && !report)
+      throw new BadRequestException('Dołącz raport, aby przypisać instrument.');
     const history = parseHistory(input.history);
     if (this.busy) {
       throw new HttpException(
@@ -80,6 +87,12 @@ export class FundamentalAnalysisService {
       const facts = context?.summary.filter(
         (fact) => fact.state === 'verified',
       );
+      const operatingMargin = context
+        ? calculateOperatingMargin(context.summary)
+        : null;
+      const market = input.instrumentId
+        ? await this.getMarketContext(input.instrumentId)
+        : null;
       const prompt = context
         ? 'Pytanie użytkownika:\n' +
           question +
@@ -87,6 +100,16 @@ export class FundamentalAnalysisService {
           (facts?.length
             ? 'Sprawdzone pozycje sprawozdania (wartości w podanej jednostce):\n' +
               JSON.stringify(facts) +
+              '\n\n'
+            : '') +
+          (operatingMargin
+            ? 'Marża EBIT obliczona w backendzie:\n' +
+              JSON.stringify(operatingMargin) +
+              '\n\n'
+            : '') +
+          (market
+            ? 'Instrument wybrany przez użytkownika i ostatni kurs zamknięcia:\n' +
+              JSON.stringify(market) +
               '\n\n'
             : '') +
           (context.coverage.partial
@@ -136,6 +159,8 @@ export class FundamentalAnalysisService {
         answer,
         coverage: context?.coverage ?? null,
         summary: context?.summary ?? null,
+        operatingMargin,
+        market,
         incomplete: choice?.finish_reason === 'length',
       };
     } catch (error) {
@@ -162,6 +187,21 @@ export class FundamentalAnalysisService {
         generationMs,
       });
     }
+  }
+
+  private async getMarketContext(instrumentId: string) {
+    const { instrument, status, expectedSessionOn, quote } =
+      await this.marketQuality.quote(instrumentId);
+    return {
+      instrument,
+      status,
+      expectedSessionOn,
+      quote: quote && {
+        close: quote.close,
+        sessionOn: quote.sessionOn,
+        source: quote.source,
+      },
+    };
   }
 }
 

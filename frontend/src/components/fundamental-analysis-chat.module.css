@@ -75,6 +75,13 @@
   font-size: 1rem;
 }
 
+.reportQuote {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -255,6 +262,38 @@
   border-radius: 10px;
   background: var(--surface);
   color: var(--ink);
+}
+
+.instrument {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.instrument legend,
+.instrument label {
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.instrument label {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.instrument input,
+.instrument select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid var(--field-line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
 }
 
 .controls,
