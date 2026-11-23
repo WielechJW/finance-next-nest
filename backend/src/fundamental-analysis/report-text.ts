@@ -1,7 +1,11 @@
 import { createRequire } from 'node:module';
 import { dirname, join, sep } from 'node:path';
 import { AnalysisError } from './analysis-error.js';
-import { extractReportMetrics, summarizeMetrics } from './report-summary.js';
+import {
+  extractReportMetrics,
+  summarizeMetrics,
+  type ReportMetric,
+} from './report-summary.js';
 
 const require = createRequire(import.meta.url);
 const MAX_PAGES = 250;
@@ -9,12 +13,24 @@ const PAGE_LIMIT = 16_000;
 const CONTEXT_LIMIT = 24_000;
 
 type PageText = { number: number; text: string; partial: boolean };
+export type ParsedReport = {
+  pages: PageText[];
+  totalPages: number;
+  summary: ReportMetric[];
+};
 
 export async function readReportText(
   bytes: Buffer,
   question: string,
   signal: AbortSignal,
 ) {
+  return buildReportContext(await parseReport(bytes, signal), question);
+}
+
+export async function parseReport(
+  bytes: Buffer,
+  signal: AbortSignal,
+): Promise<ParsedReport> {
   const signature = bytes.subarray(0, 1024).indexOf('%PDF-');
   if (signature === -1)
     throw new AnalysisError('PDF_INVALID', 400, 'Dołącz poprawny plik PDF.');
@@ -83,30 +99,10 @@ export async function readReportText(
       );
     }
 
-    const summary = summarizeMetrics(metrics);
-    const sourcePages = new Set(
-      summary
-        .filter((item) => item.state === 'verified')
-        .map(({ page }) => page),
-    );
-    const context = selectPages(pages, question, sourcePages);
     return {
-      summary,
-      text: context
-        .map(({ number, text }) => `[str. ${number}]\n${text}`)
-        .join('\n\n'),
-      coverage: {
-        totalPages: document.numPages,
-        pagesWithText: pages.length,
-        pagesInContext: context.length,
-        contextPages: context.map(({ number, partial }) => ({
-          number,
-          partial,
-        })),
-        partial:
-          context.length < document.numPages ||
-          context.some((page) => page.partial),
-      },
+      pages,
+      totalPages: document.numPages,
+      summary: summarizeMetrics(metrics),
     };
   } catch (error) {
     if (signal.aborted || error instanceof AnalysisError) throw error;
@@ -125,6 +121,28 @@ export async function readReportText(
   } finally {
     await task.destroy();
   }
+}
+
+export function buildReportContext(report: ParsedReport, question: string) {
+  const { pages, summary, totalPages } = report;
+  const sourcePages = new Set(
+    summary.filter((item) => item.state === 'verified').map(({ page }) => page),
+  );
+  const context = selectPages(pages, question, sourcePages);
+  return {
+    summary,
+    text: context
+      .map(({ number, text }) => `[str. ${number}]\n${text}`)
+      .join('\n\n'),
+    coverage: {
+      totalPages,
+      pagesWithText: pages.length,
+      pagesInContext: context.length,
+      contextPages: context.map(({ number, partial }) => ({ number, partial })),
+      partial:
+        context.length < totalPages || context.some((page) => page.partial),
+    },
+  };
 }
 
 const financialTerms = [

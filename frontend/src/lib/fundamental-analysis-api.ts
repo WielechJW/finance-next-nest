@@ -36,6 +36,28 @@ export type AnalysisReply = {
 
 type Turn = { question: string; reply: AnalysisReply };
 
+export type IssuerReport = {
+  id: string;
+  filename: string;
+  scope: "CONSOLIDATED" | "STANDALONE";
+  periodKind: "ANNUAL" | "QUARTERLY";
+  currency: "PLN" | "USD" | "EUR";
+  periodStart: string;
+  periodEnd: string;
+  publishedOn: string;
+  sourceUrl: string;
+  version: number;
+  company: { id: string; name: string };
+  instrument: { id: string; ticker: string; mic: string };
+  facts: {
+    metric: string;
+    amount: string;
+    unit: string;
+    period: string;
+    page: number;
+  }[];
+};
+
 const modelErrors: Record<string, string> = {
   MODEL_CONFIG: "Sprawdź ustawienia adresu LM Studio w backendzie.",
   MODEL_OFFLINE:
@@ -80,6 +102,7 @@ export async function requestAnalysis(
   report: File | null,
   signal: AbortSignal,
   instrumentId?: string,
+  reportId?: string,
 ): Promise<AnalysisReply> {
   const body = new FormData();
   body.set("question", question);
@@ -94,11 +117,44 @@ export async function requestAnalysis(
   );
   if (report) body.set("report", report);
   if (report && instrumentId) body.set("instrumentId", instrumentId);
+  if (reportId) body.set("reportId", reportId);
 
   return analysisRequest<AnalysisReply>("chat", {
     method: "POST",
     body,
     signal,
     timeoutMs: 200_000,
+  });
+}
+
+const reportsPath = "/fundamental-analysis/reports";
+
+export function listIssuerReports(page: number, signal: AbortSignal) {
+  return apiRequest<{ items: IssuerReport[]; hasNext: boolean }>(
+    reportsPath + "?page=" + page,
+    { signal },
+  );
+}
+
+export function importIssuerReport(body: FormData, signal: AbortSignal) {
+  return apiRequest<IssuerReport>(reportsPath, {
+    method: "POST",
+    body,
+    signal,
+    timeoutMs: 70_000,
+  });
+}
+
+export function openIssuerReport(id: string, signal: AbortSignal) {
+  return apiRequest<Blob>(reportsPath + "/" + encodeURIComponent(id) + "/pdf", {
+    responseType: "blob",
+    signal,
+  });
+}
+
+export function deleteIssuerReport(id: string, signal: AbortSignal) {
+  return apiRequest<void>(reportsPath + "/" + encodeURIComponent(id), {
+    method: "DELETE",
+    signal,
   });
 }

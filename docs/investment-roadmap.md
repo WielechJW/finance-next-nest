@@ -331,10 +331,10 @@ jednego fizycznego doręczenia. Stan `unknown` ma ustaloną politykę obsługi.
 
 Rozwój czatu PDF z lokalnym modelem opisuje osobny plan. [Analiza fundamentalna wspierana przez lokalny model](fundamental-analysis-roadmap.md)
 
-- [ ] **8.1. Dodać `Company`, `FinancialReport` i `FundamentalFact`.** Powiązać
-  emitenta z instrumentami. Zapisywać okres, walutę raportową, jednostkę,
-  czas publikacji, źródło, wersję i korekty raportu. Dla USA ocenić SEC EDGAR;
-  dla GPW wykorzystać zweryfikowanego dostawcę i odnośniki do raportów emitenta.
+- [x] **8.1. Dodać `Company`, `FinancialReport` i `FundamentalFact`.** Biblioteka
+  przyjmuje pliki PDF emitentów GPW i USA, wiąże je z instrumentem i zachowuje
+  okres, walutę, jednostkę, datę publikacji, adres źródła oraz wersję raportu.
+  Automatyczne pobieranie danych zależy od dalszej weryfikacji źródeł w #45.
 - [ ] **8.2. Zbudować kartę spółki.** Wykres, opis działalności, przychody,
   zysk netto, cash flow, zadłużenie i historia dywidend. Oddzielić dane
   kwartalne, roczne oraz TTM; zapewnić przejście do dokumentu źródłowego.

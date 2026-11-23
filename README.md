@@ -187,6 +187,13 @@ Backend liczy marżę EBIT z odczytanych przychodów i EBIT-u w tym samym okresi
 i jednostce. Model dostaje kurs, stan świeżości i obliczoną marżę.
 [Raporty wzorcowe i uruchomienie testów](docs/fundamental-analysis-fixtures.md)
 
+W **Zapisanych raportach** możesz dodać PDF z oficjalnym adresem i zaznaczyć
+instrument, okres, datę publikacji, walutę i zakres. Kolejny plik tego samego
+emitenta za ten sam okres i w tym samym zakresie tworzy nową wersję. Ponowne
+wgranie identycznego pliku zwraca istniejącą wersję. Biblioteka jest przypisana
+do konta. Po odświeżeniu możesz ponownie otworzyć PDF w czacie i używać
+zapisanego tekstu. Usunięcie wersji usuwa plik, odczytany tekst i jej fakty.
+
 ## Rejestracja użytkownika
 
 `POST /auth/register` przyjmuje JSON z polami `email` i `password`:

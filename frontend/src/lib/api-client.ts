@@ -23,6 +23,7 @@ export function isAbortError(error: unknown): boolean {
 type ApiOptions = Omit<RequestInit, "cache" | "credentials"> & {
   notifyUnauthorized?: boolean;
   timeoutMs?: number;
+  responseType?: "json" | "blob";
 };
 
 function requestUrl(path: string): string {
@@ -76,6 +77,7 @@ export async function apiRequest<T>(
     notifyUnauthorized = true,
     signal,
     timeoutMs = 15000,
+    responseType = "json",
     ...init
   } = options;
   const revision = authRevision;
@@ -91,7 +93,10 @@ export async function apiRequest<T>(
 
   try {
     const headers = new Headers(init.headers);
-    headers.set("Accept", "application/json");
+    headers.set(
+      "Accept",
+      responseType === "blob" ? "application/pdf" : "application/json",
+    );
     if (
       init.body &&
       !(init.body instanceof FormData) &&
@@ -111,7 +116,10 @@ export async function apiRequest<T>(
 
     let payload: unknown;
     try {
-      payload = await response.json();
+      payload =
+        response.ok && responseType === "blob"
+          ? await response.blob()
+          : await response.json();
     } catch {
       payload = undefined;
     }
