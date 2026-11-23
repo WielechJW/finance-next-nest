@@ -71,12 +71,30 @@ type TrailingYear = {
   }[];
 };
 
+export type CompanyIndicators = Record<
+  | "priceEarnings"
+  | "priceBook"
+  | "roe"
+  | "operatingMargin"
+  | "netMargin"
+  | "revenueGrowth",
+  {
+    value: string | null;
+    reason: string | null;
+    sources: { reportId: string; page: number }[];
+  }
+>;
+
 export type CompanyCard = {
   sections: {
     scope: IssuerReport["scope"];
     annual: IssuerReport | null;
     quarterly: IssuerReport | null;
     trailingYear: TrailingYear | null;
+    indicators: {
+      annual: CompanyIndicators | null;
+      quarterly: CompanyIndicators | null;
+    };
   }[];
   activity: { text: string; sourceUrl: string } | null;
   dividends: {

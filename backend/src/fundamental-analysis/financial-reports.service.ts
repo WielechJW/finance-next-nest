@@ -13,8 +13,12 @@ import type {
   FinancialReportScope,
   Prisma,
 } from '../generated/prisma/client.js';
+import { MarketQualityService } from '../market-data/quality.service.js';
+import { MarketDataError } from '../market-data/contracts.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { calculateCompanyIndicators } from './company-indicators.js';
 import { trailingYear } from './company-periods.js';
+import type { ReportMetric } from './report-summary.js';
 import { parseReport, type ParsedReport } from './report-text.js';
 
 export type ReportImport = {
@@ -37,6 +41,9 @@ const METRIC_KEYS = {
   netIncome: 'NET_INCOME',
   operatingCashFlow: 'OPERATING_CASH_FLOW',
   longTermDebt: 'LONG_TERM_DEBT',
+  dilutedEps: 'DILUTED_EPS',
+  bookValuePerShare: 'BOOK_VALUE_PER_SHARE',
+  totalEquity: 'TOTAL_EQUITY',
 } as const;
 
 const select = {
@@ -86,20 +93,23 @@ function normalizeFacts(
   document: ParsedReport,
   input: ReportImport,
 ): ParsedReport {
+  function normalize(fact: ReportMetric): ReportMetric {
+    if (fact.state !== 'verified') return fact;
+    const currency = fact.unit.includes('$')
+      ? 'USD'
+      : /\b(PLN|USD|EUR)\b/.exec(fact.unit)?.[1];
+    if (
+      currency !== input.currency ||
+      fact.scope.toUpperCase() !== input.scope ||
+      !/^-?\d{1,28}(?:\.\d{1,10})?$/.test(fact.amount)
+    )
+      return { metric: fact.metric, state: 'needs_review' };
+    return fact;
+  }
   return {
     ...document,
-    summary: document.summary.map((fact) => {
-      if (fact.state !== 'verified') return fact;
-      const currency = fact.unit.endsWith(' $') ? 'USD' : fact.unit.slice(-3);
-      if (
-        currency !== input.currency ||
-        fact.scope.toUpperCase() !== input.scope ||
-        !/^-?\d{1,28}(?:\.\d{1,10})?$/.test(fact.amount)
-      ) {
-        return { metric: fact.metric, state: 'needs_review' };
-      }
-      return fact;
-    }),
+    summary: document.summary.map(normalize),
+    valuationInputs: (document.valuationInputs ?? []).map(normalize),
   };
 }
 
@@ -107,7 +117,10 @@ function normalizeFacts(
 export class FinancialReportsService {
   private readonly logger = new Logger(FinancialReportsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly marketQuality: MarketQualityService,
+  ) {}
 
   async list(userId: string, page: number) {
     const rows = await this.prisma.financialReport.findMany({
@@ -132,7 +145,7 @@ export class FinancialReportsService {
     const where = instrument.companyId
       ? { userId, companyId: instrument.companyId }
       : { userId, instrumentId };
-    const [rows, dividends] = await Promise.all([
+    const [rows, dividends, market, splits] = await Promise.all([
       this.prisma.financialReport.findMany({
         where,
         distinct: ['scope', 'periodKind', 'periodStart', 'periodEnd'],
@@ -162,18 +175,43 @@ export class FinancialReportsService {
           source: true,
         },
       }),
+      this.marketQuality.quote(instrumentId).catch((error: unknown) => {
+        if (error instanceof MarketDataError) return null;
+        throw error;
+      }),
+      this.prisma.corporateAction.findMany({
+        where: { instrumentId, kind: 'SPLIT', currentSlot: 1 },
+        select: { exDate: true },
+      }),
     ]);
+    const quote = {
+      status: market?.status ?? 'missing',
+      price: market?.quote ?? null,
+    };
+    const splitDates = splits.map(({ exDate }) =>
+      exDate.toISOString().slice(0, 10),
+    );
     const reports = rows.map(serialize);
     const sections = (['CONSOLIDATED', 'STANDALONE'] as const).map((scope) => {
       const matching = reports.filter((report) => report.scope === scope);
       const quarters = matching.filter(
         (report) => report.periodKind === 'QUARTERLY',
       );
+      const annual =
+        matching.find((report) => report.periodKind === 'ANNUAL') ?? null;
+      const quarterly = quarters[0] ?? null;
       return {
         scope,
-        annual:
-          matching.find((report) => report.periodKind === 'ANNUAL') ?? null,
-        quarterly: quarters[0] ?? null,
+        annual,
+        quarterly,
+        indicators: {
+          annual:
+            annual &&
+            calculateCompanyIndicators(annual, matching, quote, splitDates),
+          quarterly:
+            quarterly &&
+            calculateCompanyIndicators(quarterly, matching, quote, splitDates),
+        },
         trailingYear: trailingYear(quarters.slice(0, 4)),
       };
     });
@@ -215,7 +253,10 @@ export class FinancialReportsService {
 
     const parsedReport = normalizeFacts(await parseReport(pdf, signal), input);
     const contentHash = createHash('sha256').update(pdf).digest('hex');
-    const facts = parsedReport.summary.flatMap((fact) =>
+    const facts = [
+      ...parsedReport.summary,
+      ...(parsedReport.valuationInputs ?? []),
+    ].flatMap((fact) =>
       fact.state === 'verified'
         ? [
             {
@@ -272,14 +313,23 @@ export class FinancialReportsService {
           select,
         });
         if (duplicate) {
-          return businessSummary &&
-            businessSummary !== duplicate.businessSummary
-            ? tx.financialReport.update({
-                where: { id: duplicate.id },
-                data: { businessSummary },
-                select,
-              })
-            : duplicate;
+          const valuationFacts = facts.filter(
+            ({ metric }) =>
+              ['DILUTED_EPS', 'BOOK_VALUE_PER_SHARE', 'TOTAL_EQUITY'].includes(
+                metric,
+              ) && !duplicate.facts.some((fact) => fact.metric === metric),
+          );
+          const descriptionChanged =
+            businessSummary && businessSummary !== duplicate.businessSummary;
+          if (!descriptionChanged && !valuationFacts.length) return duplicate;
+          return tx.financialReport.update({
+            where: { id: duplicate.id },
+            data: {
+              ...(descriptionChanged ? { businessSummary } : {}),
+              facts: { create: valuationFacts },
+            },
+            select,
+          });
         }
         const latest = await tx.financialReport.aggregate({
           where: group,

@@ -66,6 +66,7 @@ test('imports a source PDF and opens the same saved version after reload', async
   await expect(
     fundamentals.getByText('120 mln USD', { exact: true }),
   ).toBeVisible();
+  await expect(fundamentals.getByText('7,50%', { exact: true })).toBeVisible();
   await expect(
     fundamentals
       .getByRole('link', { name: 'strona 1 PDF', exact: true })
