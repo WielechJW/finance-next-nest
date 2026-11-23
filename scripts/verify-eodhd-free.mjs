@@ -2,10 +2,13 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { SAMPLE, summarizeSeries } from './verify-eodhd.mjs';
 
 // This probe never spends welcome/purchased extra calls or requests paid fundamentals.
-export async function runFreeProbe({ token, fetchImpl = fetch, pause = delay, now = new Date(), maxCalls = 12 }) {
+export async function runFreeProbe({
+  token, fetchImpl = fetch, pause = delay, now = new Date(), actions = false,
+  maxCalls = actions ? 20 : 12,
+}) {
   if (!token?.trim() || token === 'demo') throw new Error('Wymagany własny EODHD_API_TOKEN.');
   if (!Number.isInteger(maxCalls) || maxCalls < 0 || maxCalls > 20) throw new Error('Budżet musi być w zakresie 0–20.');
-  const report = { provider: 'EODHD', checkedAt: now.toISOString(), mode: 'configured_free_key', rawDataStored: false,
+  const report = { provider: 'EODHD', checkedAt: now.toISOString(), mode: actions ? 'configured_free_key_actions' : 'configured_free_key', rawDataStored: false,
     maxCallUnits: maxCalls, callUnitsReserved: 0, catalogs: {}, instruments: [], fundamentals: { status: 'not_requested_free_plan' } };
   let requests = 0;
   let stopped = false;
@@ -37,6 +40,31 @@ export async function runFreeProbe({ token, fetchImpl = fetch, pause = delay, no
   report.account = { status: 'available', dailyRateLimit: limit, apiRequests: used, apiRequestsDate: date };
   // A stale counter may overestimate usage; conservatively wait for a later run.
   report.allowedCallUnits = Math.min(maxCalls, Math.max(0, limit - used));
+  if (actions) {
+    const end = new Date(now);
+    end.setUTCDate(end.getUTCDate() - 1);
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - 364);
+    report.window = { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+
+    for (const instrument of SAMPLE) {
+      const symbol = `${instrument.code}.${instrument.exchange}`;
+      const results = { symbol };
+      for (const kind of ['splits', 'div']) {
+        const result = await request(`/api/${kind}/${symbol}`, report.window);
+        results[kind] = result.status === 'received'
+          ? { httpStatus: result.httpStatus, ...summarizeSeries(kind, result.payload) }
+          : result;
+      }
+      report.instruments.push(results);
+    }
+    report.actionsComplete = report.instruments.every(({ splits, div }) =>
+      [splits, div].every(({ status }) => status === 'available' || status === 'empty'),
+    );
+    report.fullProviderVerificationComplete = false;
+    report.requestsMade = requests;
+    return report;
+  }
   const catalogs = {};
   for (const exchange of ['WAR', 'US']) {
     const result = await request(`/api/exchange-symbol-list/${exchange}`);
@@ -67,9 +95,18 @@ export async function runFreeProbe({ token, fetchImpl = fetch, pause = delay, no
 if (import.meta.main) {
   try {
     const args = process.argv.slice(2);
+    const actions = args[0] === '--actions';
+    if (actions) args.shift();
     if (args.length && (args.length !== 2 || args[0] !== '--max-calls')) throw new Error();
-    const report = await runFreeProbe({ token: process.env.EODHD_API_TOKEN, maxCalls: args.length ? Number(args[1]) : 12 });
+    const report = await runFreeProbe({
+      token: process.env.EODHD_API_TOKEN,
+      actions,
+      maxCalls: args.length ? Number(args[1]) : undefined,
+    });
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-    process.exitCode = report.pricesAndIdentityComplete ? 0 : 2;
-  } catch { process.stderr.write('Ustaw własny EODHD_API_TOKEN; opcja: --max-calls 0–20.\n'); process.exitCode = 1; }
+    process.exitCode = (actions ? report.actionsComplete : report.pricesAndIdentityComplete) ? 0 : 2;
+  } catch {
+    process.stderr.write('Ustaw własny EODHD_API_TOKEN; opcje: [--actions] [--max-calls 0–20].\n');
+    process.exitCode = 1;
+  }
 }

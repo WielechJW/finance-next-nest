@@ -4,14 +4,20 @@ Data: 16 listopada 2026 r. Zadanie: [#45](https://github.com/WielechJW/finance-n
 Zakres: [decyzje domenowe](investment-decisions.md) i etap 0
 [roadmapy](investment-roadmap.md).
 
+**Aktualizacja 23 listopada 2026:** [próba splitów i dywidend na Free](market-data/eodhd-free-actions-2026-11-23.json)
+objęła wszystkie dziesięć spółek. Oba endpointy odpowiedziały poprawnie
+w okresie 23.11.2025–22.11.2026. W tym oknie wszystkie listy splitów były puste,
+a dywidendy pojawiły się dla czterech spółek z GPW i trzech z USA.
+W próbie GPW PKO, PZU i KGHM nie zwróciły dat wypłaty. Do pełnego odbioru
+potrzeba próby obejmującej znane splity, dłuższej historii, fundamentów
+i potwierdzenia warunków docelowego użycia.
+
 **Aktualizacja 18 listopada 2026:** własny klucz Free potwierdził oba katalogi,
 tożsamość, walutę i ceny dzienne **5/5 spółek GPW oraz 5/5 USA**. Raport
 [próby Free](market-data/eodhd-free-2026-11-18.json) zawiera tylko statusy i liczniki.
 Osobna [próba operacji](market-data/eodhd-free-actions-2026-11-18.json) potwierdziła
 endpointy dywidend i splitów PKO oraz Apple; pusta lista splitów dotyczy wyłącznie
 sprawdzonego okresu. PKO nie zwróciło daty wypłaty dywidendy.
-Pełny odbiór #45 pozostaje otwarty: zdarzenia wszystkich dziesięciu spółek,
-dłuższa historia i fundamenty nie zostały zweryfikowane własnym kluczem.
 Przyjęty zakres prywatnej wersji B korzysta z cen dziennych i jawnie opisanych braków;
 uruchomienie adaptera nie oznacza potwierdzenia pełnego zakresu #45.
 
@@ -251,8 +257,13 @@ Nie zastępuje pełnej próby opisanej poniżej. Błędy nie ujawniają tokenu a
 
 ```bash
 node --env-file-if-exists=backend/.env scripts/verify-eodhd-free.mjs --max-calls 12
+node --env-file-if-exists=backend/.env scripts/verify-eodhd-free.mjs --actions --max-calls 20
 node --test scripts/verify-eodhd-free.test.mjs scripts/verify-eodhd.test.mjs
 ```
+
+Tryb `--actions` sprawdza wyłącznie splity i dywidendy w ostatnich 365 dniach
+danych, do wczoraj UTC. Pole `actionsComplete` potwierdza poprawną strukturę
+odpowiedzi dla całej próbki, w tym poprawnie obsłużone puste listy.
 
 Z katalogu głównego, Node.js 24, bez dodatkowych zależności:
 
@@ -288,7 +299,7 @@ korekcie danych lub uprawnień; zachowujemy datę i zakres każdej próby.
 
 | Kryterium #45 | Dowód / pozostały warunek |
 | --- | --- |
-| Porównanie 5+5, waluty, ceny, zdarzenia, fundamenty | Sekcje 1–3 i 8 oraz raporty JSON; EODHD GPW odmawia dostępu, publiczne źródło GPW nie podaje splitów i waluty notowania. |
+| Porównanie 5+5, waluty, ceny, zdarzenia, fundamenty | Próby Free potwierdzają ceny, waluty i odczyt zdarzeń. Brakuje próby z rzeczywistymi splitami, dłuższej historii i fundamentów. |
 | Próba, luki, plany, limity, koszty, warunki | Sekcje 4–8; wyceny komercyjnej nie zamawiano. |
 | Brak sekretów, obsługa braków, rekomendacja | Raporty bez wartości finansowych, syntetyczne testy EODHD, rekomendacja warunkowa. |
 

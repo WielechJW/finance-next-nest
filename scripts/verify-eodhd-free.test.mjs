@@ -41,3 +41,31 @@ test('quota response stops without retry, and exceptions never expose URLs or cr
     assert.ok(!JSON.stringify(report).includes('PRIVATE_SECRET'));
   }
 });
+
+test('actions mode probes splits and dividends for both markets within the daily allowance', async () => {
+  const paths = [];
+  const report = await runFreeProbe({
+    token: 'SYNTHETIC_SECRET',
+    actions: true,
+    now: new Date('2026-11-23T12:00:00Z'),
+    pause: async () => {},
+    fetchImpl: async (url) => {
+      if (url.pathname === '/api/user') {
+        return Response.json({ apiRequests: 0, dailyRateLimit: 20 });
+      }
+      paths.push(url.pathname);
+      assert.equal(url.searchParams.get('from'), '2025-11-23');
+      assert.equal(url.searchParams.get('to'), '2026-11-22');
+      if (url.pathname.startsWith('/api/splits/')) return Response.json([]);
+      return Response.json([{ date: '2026-06-01', value: 5, currency: 'PLN' }]);
+    },
+  });
+  assert.deepEqual(paths, SAMPLE.flatMap(({ code, exchange }) =>
+    ['splits', 'div'].map((kind) => `/api/${kind}/${code}.${exchange}`),
+  ));
+  assert.equal(report.callUnitsReserved, 20);
+  assert.equal(report.actionsComplete, true);
+  assert.equal(report.fullProviderVerificationComplete, false);
+  assert.equal(report.instruments[0].div.hasPaymentDate, false);
+  assert.ok(!JSON.stringify(report).includes('SYNTHETIC_SECRET'));
+});
