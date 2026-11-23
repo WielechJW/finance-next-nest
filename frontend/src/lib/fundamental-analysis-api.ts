@@ -20,6 +20,7 @@ export type AnalysisReply = {
     totalPages: number;
     pagesWithText: number;
     pagesInContext: number;
+    contextPages?: { number: number; partial: boolean }[];
     partial: boolean;
   } | null;
 };

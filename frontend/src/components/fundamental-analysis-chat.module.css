@@ -215,6 +215,21 @@
   margin: 10px 0 0;
 }
 
+.contextPages {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.contextPages summary {
+  cursor: pointer;
+}
+
+.contextPages ul {
+  margin: 4px 0 0;
+  padding-left: 1.25rem;
+}
+
 .footer {
   margin: 10px 0 0;
 }

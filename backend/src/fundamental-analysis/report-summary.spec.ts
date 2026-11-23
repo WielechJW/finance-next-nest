@@ -152,9 +152,18 @@ describe.skipIf(!fixtureDir)('Report card for public issuer PDFs', () => {
       const bytes = await readFile(join(fixtureDir!, file));
       const report = await readReportText(
         bytes,
-        'Podsumuj wyniki spółki.',
+        'Podsumuj wyniki spółki i sprawdź stronę ' + page + '.',
         AbortSignal.timeout(15000),
       );
+      const pageNumbers = Array.from(
+        report.text.matchAll(/^\[str\. (\d+)\]$/gm),
+        (match) => Number(match[1]),
+      );
+      expect(report.coverage.partial).toBe(true);
+      expect(report.coverage.contextPages.map((item) => item.number)).toEqual(
+        pageNumbers,
+      );
+      expect(pageNumbers).toContain(page);
       const metrics = ['revenue', 'ebit', 'netIncome'];
       expect(report.summary).toEqual(
         amounts.map((amount, index) =>

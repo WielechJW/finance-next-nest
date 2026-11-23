@@ -142,9 +142,11 @@ function ReportSummary({
 function ModelReply({
   reply,
   pdfUrl,
+  showSummary,
 }: {
   reply: AnalysisReply;
   pdfUrl?: string;
+  showSummary: boolean;
 }) {
   const { coverage } = reply;
   return (
@@ -152,17 +154,38 @@ function ModelReply({
       <div className={styles.author}>
         <UiIcon name="cpu" /> Lokalny model
       </div>
-      {reply.summary && pdfUrl && (
+      {showSummary && reply.summary && pdfUrl && (
         <ReportSummary facts={reply.summary} pdfUrl={pdfUrl} />
       )}
       <p className={styles.answer}>{reply.answer}</p>
       {coverage?.partial && (
-        <p className={styles.note}>
-          Do modelu trafiły fragmenty z {coverage.pagesInContext} z{" "}
-          {coverage.totalPages} stron PDF.
-          {coverage.pagesWithText < coverage.totalPages &&
-            " Część stron nie zawierała tekstu do odczytania."}
-        </p>
+        <>
+          <p className={styles.note}>
+            Model otrzymał tekst z {coverage.pagesInContext} z{" "}
+            {coverage.totalPages} stron PDF.
+            {coverage.pagesWithText < coverage.totalPages &&
+              " Część stron nie zawierała tekstu do odczytania."}
+          </p>
+          {pdfUrl && !!coverage.contextPages?.length && (
+            <details className={styles.contextPages}>
+              <summary>Strony przekazane modelowi</summary>
+              <ul>
+                {coverage.contextPages.map(({ number, partial }) => (
+                  <li key={number}>
+                    <a
+                      href={pdfUrl + "#page=" + number}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Strona {number}
+                    </a>
+                    {partial && " (fragment)"}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
       )}
       {reply.incomplete && (
         <p className={styles.note}>
@@ -328,7 +351,8 @@ function Chat() {
               <p className={styles.question}>{question}</p>
               <ModelReply
                 reply={reply}
-                pdfUrl={index === reportTurn ? attachment?.url : undefined}
+                pdfUrl={reply.coverage ? attachment?.url : undefined}
+                showSummary={index === reportTurn}
               />
             </div>
           ))}
