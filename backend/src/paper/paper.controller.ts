@@ -15,13 +15,18 @@ import {
   PaperConnectionDto,
   PaperEventDto,
   PaperOrderDto,
+  SubmitPaperOrderDto,
 } from './paper.dto.js';
+import { PaperExecutionService } from './paper-execution.service.js';
 import { PaperService } from './paper.service.js';
 
 @Controller('investment-paper/connections')
 @UseGuards(SessionAuthGuard)
 export class PaperController {
-  constructor(private readonly paper: PaperService) {}
+  constructor(
+    private readonly paper: PaperService,
+    private readonly execution: PaperExecutionService,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -66,5 +71,51 @@ export class PaperController {
     @Body() input: PaperEventDto,
   ) {
     return this.paper.recordEvent(user.id, connectionId, orderId, input);
+  }
+
+  @Post(':connectionId/orders/:orderId/submit')
+  @Header('Cache-Control', 'no-store')
+  submit(
+    @CurrentUser() user: RegisteredUser,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: SubmitPaperOrderDto,
+  ) {
+    return this.execution.submit(
+      user.id,
+      connectionId,
+      orderId,
+      body.fault ?? 'NONE',
+    );
+  }
+
+  @Get(':connectionId/venue-orders/:clientOrderId')
+  @Header('Cache-Control', 'no-store')
+  lookup(
+    @CurrentUser() user: RegisteredUser,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+    @Param('clientOrderId', ParseUUIDPipe) clientOrderId: string,
+  ) {
+    return this.execution.lookup(user.id, connectionId, clientOrderId);
+  }
+
+  @Post(':connectionId/orders/:orderId/venue-events')
+  @Header('Cache-Control', 'no-store')
+  venueEvent(
+    @CurrentUser() user: RegisteredUser,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: PaperEventDto,
+  ) {
+    return this.execution.venueEvent(user.id, connectionId, orderId, body);
+  }
+
+  @Post(':connectionId/reconcile')
+  @Header('Cache-Control', 'no-store')
+  reconcile(
+    @CurrentUser() user: RegisteredUser,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+  ) {
+    return this.execution.reconcile(user.id, connectionId);
   }
 }

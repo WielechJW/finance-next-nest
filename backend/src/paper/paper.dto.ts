@@ -65,3 +65,8 @@ export class PaperEventDto {
   @Type(() => FillDto)
   fill?: FillDto;
 }
+
+export class SubmitPaperOrderDto {
+  @IsOptional() @IsIn(['NONE', 'BEFORE_RECEIPT', 'AFTER_RECEIPT']) fault?:
+    'NONE' | 'BEFORE_RECEIPT' | 'AFTER_RECEIPT';
+}

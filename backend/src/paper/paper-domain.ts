@@ -35,9 +35,14 @@ export async function lockPaperAccount(
   connectionId: string,
 ) {
   const [account] = await tx.$queryRaw<
-    { id: string; accountId: string; openingOn: Date }[]
+    {
+      id: string;
+      accountId: string;
+      openingOn: Date;
+      reconciliationRequired: boolean;
+    }[]
   >`
-    SELECT c."id", c."accountId", c."openingOn" FROM "BrokerConnection" c
+    SELECT c."id", c."accountId", c."openingOn", c."reconciliationRequired" FROM "BrokerConnection" c
     JOIN "InvestmentAccount" a ON a."id" = c."accountId"
     JOIN "Portfolio" p ON p."id" = a."portfolioId"
     WHERE c."id" = ${connectionId}::uuid AND c."userId" = ${userId}::uuid AND p."userId" = ${userId}::uuid

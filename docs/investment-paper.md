@@ -45,3 +45,16 @@ Pierwsze dwa numery dnia są zarezerwowane dla sald otwarcia.
 W trybie lokalnym obsługiwane są akcje GPW i USA, kupno, sprzedaż oraz zlecenia
 market i limit. Warunek ceny oraz dostępne saldo i ilość są sprawdzane przed
 zaksięgowaniem wykonania.
+
+## Uzgodnienie stanu
+
+Adapter lokalny zapisuje przyjęcie i wykonania po stronie symulatora w
+oddzielnym zbiorze zdarzeń. Po timeout aplikacja szuka trwałego
+`clientOrderId`. Gdy wynik pozostaje niepewny, zlecenie ma stan `UNKNOWN`,
+a kolejne wysyłki z rachunku są wstrzymane. Ponowne uzgodnienie po restarcie
+korzysta z trwałego stanu symulatora.
+
+Raport porównuje otwarte zlecenia, wykonania, pozycje, gotówkę i gotówkę dostępną
+po kwotach oczekujących zakupów z ustalonym limitem. Uzgodnienie odtwarza
+brakujące wykonania dokładnie raz. Gdy identyfikator nie występuje jeszcze
+po stronie symulatora albo występuje inna różnica, blokada pozostaje aktywna.
