@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { NotificationsService } from '../src/notifications/notifications.service.js';
@@ -418,5 +419,113 @@ describe('Investment strategy versions and runs (PostgreSQL)', () => {
     expect(rows.body[0]).toMatchObject({
       decision: { kind: 'NO_SIGNAL', reason: 'MARKET_DATA_TIMEOUT' },
     });
+  });
+
+  it('stores a complete report and failed trial, and freezes a non-overlapping test version', async () => {
+    const owner = await setup();
+    const other = await setup();
+    const registered = await owner.agent
+      .post(owner.root)
+      .set('Origin', context.origin)
+      .send({
+        name: 'Test historyczny',
+        instrumentId: owner.instrument.id,
+        parameters,
+      })
+      .expect(201);
+    const strategy = `${owner.root}/${registered.body.id}`;
+    const endpoint = `${strategy}/backtests`;
+    const example = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../frontend/public/examples/backtest-snapshot.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ) as Record<string, unknown>;
+    const send = (data: object) =>
+      owner.agent
+        .post(endpoint)
+        .set('Origin', context.origin)
+        .attach('snapshot', Buffer.from(JSON.stringify(data)), 'snapshot.json');
+    await send({ ...example, unknown: true }).expect(400);
+    const trained = await send(example)
+      .expect(201)
+      .expect('Cache-Control', 'no-store');
+    expect(trained.body).toMatchObject({
+      status: 'COMPLETE',
+      phase: 'DEVELOPMENT',
+      version: { number: 1 },
+      report: {
+        strategy: {
+          initialCapital: '1000.00000000',
+          finalCapital: '938.00000000',
+          profit: '-62.00000000',
+          maxDrawdownPercent: '7.8585',
+          turnover: '260.00000000',
+          executedTrades: 1,
+          curve: [
+            { capital: '1000.00000000' },
+            { capital: '1018.00000000' },
+            { capital: '938.00000000' },
+          ],
+        },
+        benchmark: {
+          key: 'same-instrument-buy-and-hold',
+          finalCapital: '938.00000000',
+          executedTrades: 1,
+        },
+        costs: { commissionFixed: '2' },
+        assumptions: { fillPrice: 'NEXT_OPEN' },
+      },
+    });
+    await other.agent.get(endpoint).expect(404);
+    await other.agent.get(`${endpoint}/${trained.body.id}`).expect(404);
+    const failed = await send({ ...example, sessions: [] }).expect(201);
+    expect(failed.body).toMatchObject({
+      status: 'FAILED',
+      report: null,
+      error: expect.stringContaining('wszystkie sesje'),
+    });
+    const outOfSample = {
+      ...example,
+      phase: 'OUT_OF_SAMPLE',
+      baselineId: trained.body.id,
+    };
+    await send(outOfSample).expect(400);
+    await owner.agent
+      .post(`${strategy}/versions`)
+      .set('Origin', context.origin)
+      .send({ parameters: { ...parameters, validForMinutes: 45 } })
+      .expect(201);
+    const tested = await send({
+      ...outOfSample,
+      fromOn: '2026-07-14',
+      toOn: '2026-07-14',
+      sessions: [
+        {
+          sessionOn: '2026-07-14',
+          decidedAt: '2026-07-14T22:00:00Z',
+          opening: null,
+        },
+      ],
+    }).expect(201);
+    expect(tested.body).toMatchObject({
+      status: 'COMPLETE',
+      phase: 'OUT_OF_SAMPLE',
+      version: { number: 1 },
+      baselineId: trained.body.id,
+      report: { strategy: { executedTrades: 0 } },
+    });
+    const history = await owner.agent.get(endpoint).expect(200);
+    expect(history.body.map((row: { status: string }) => row.status)).toEqual([
+      'COMPLETE',
+      'FAILED',
+      'COMPLETE',
+    ]);
+    await owner.agent
+      .get(`${endpoint}/${trained.body.id}`)
+      .expect(200, trained.body);
   });
 });

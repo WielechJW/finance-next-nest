@@ -8,6 +8,7 @@ import {
   type Strategy,
   type StrategyParameters,
 } from "@/lib/strategies-api";
+import { BacktestPanel } from "./backtest-panel";
 import { InstrumentPicker } from "./instrument-picker";
 import { StrategyHistory } from "./strategy-history";
 import { useInvestmentResource } from "./use-investment-resource";
@@ -245,6 +246,11 @@ function SelectedStrategy({
         strategyId={strategy.id}
         currency={strategy.instrument.currency}
       />
+      <BacktestPanel
+        portfolioId={portfolioId}
+        accountId={accountId}
+        strategyId={strategy.id}
+      />{" "}
     </>
   );
 }

@@ -43,3 +43,28 @@ w dzień wolny, model dolicza ją na kolejnej sesji. Model cen skorygowanych
 odrzuca jednoczesne księgowanie dywidend lub splitów. Cena otwarcia, zamknięcie
 i ilości muszą pochodzić z wybranej bazy cen. Dla zlecenia po splicie model
 stosuje stałą ilość jednostek z ustawień.
+
+## Raport i próba poza okresem doboru
+
+W panelu strategii wgraj plik JSON według przykładu **Pobierz próbkę JSON z
+danymi testowymi**. Do jego ręcznego odtworzenia utwórz strategię dla
+instrumentu XNAS w USD z oknami dwóch i trzech sesji. Zakup dwóch akcji po
+130 USD z prowizją 2 USD pozostawia 738 USD. Przy zamknięciu 140 USD kapitał
+wynosi 1018 USD, a przy następnym zamknięciu 100 USD spada do 938 USD. Wynik
+wynosi −62 USD, a maksymalne obsunięcie 7,8585%.
+
+Benchmark `same-instrument-buy-and-hold` składa jeden zakup tego samego
+instrumentu po pierwszej sesji z kursem zamknięcia i gotówką. Używa takiej
+samej ilości, warunków otwarcia, kosztów, waluty i polityki zdarzeń. Wykres
+pokazuje kapitał obu prób na zakończenie sesji. Ekspozycja jest średnią
+odsetka kapitału w akcjach. Obrót jest sumą wartości wykonanych transakcji
+bez prowizji. FX wyceny pochodzi z informacji dostępnych do końca sesji i
+może mieć do siedmiu dni kalendarzowych. Przy luce raport zaznacza brak
+ceny lub przeliczenia i nie podaje maksymalnego obsunięcia ani średniej
+ekspozycji całego okresu.
+
+Użyj `"phase": "DEVELOPMENT"` przy doborze parametrów. Do późniejszego testu
+ustaw `"phase": "OUT_OF_SAMPLE"`, dodaj `baselineId` wcześniejszej zakończonej
+próby tej samej strategii i wybierz okres zaczynający się po jej zakończeniu.
+Test użyje wersji parametrów z wcześniejszej próby. Nieudane obliczenia
+zostają zapisane wraz z przyczyną oraz identyfikatorem zestawu wejściowego.

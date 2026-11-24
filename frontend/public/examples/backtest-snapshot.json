@@ -1,0 +1,80 @@
+{
+  "phase": "DEVELOPMENT",
+  "fromOn": "2026-07-09",
+  "toOn": "2026-07-13",
+  "reportingCurrency": "USD",
+  "priceBasis": "RAW",
+  "startingCash": { "PLN": "0", "USD": "1000" },
+  "orderQuantity": "2",
+  "maxWaitSessions": 2,
+  "costs": {
+    "commissionFixed": "2",
+    "commissionBps": 0,
+    "spreadBps": 0,
+    "slippageBps": 0
+  },
+  "sessions": [
+    {
+      "sessionOn": "2026-07-09",
+      "decidedAt": "2026-07-09T22:00:00Z",
+      "opening": { "price": "50", "availableQuantity": "100" }
+    },
+    {
+      "sessionOn": "2026-07-10",
+      "decidedAt": "2026-07-10T22:00:00Z",
+      "opening": { "price": "130", "availableQuantity": "100" }
+    },
+    {
+      "sessionOn": "2026-07-13",
+      "decidedAt": "2026-07-13T22:00:00Z",
+      "opening": { "price": "160", "availableQuantity": "100" }
+    }
+  ],
+  "bars": [
+    {
+      "id": "close-06",
+      "revision": 1,
+      "sessionOn": "2026-07-06",
+      "availableAt": "2026-07-06T21:50:00Z",
+      "close": "120"
+    },
+    {
+      "id": "close-07",
+      "revision": 1,
+      "sessionOn": "2026-07-07",
+      "availableAt": "2026-07-07T21:50:00Z",
+      "close": "85"
+    },
+    {
+      "id": "close-08",
+      "revision": 1,
+      "sessionOn": "2026-07-08",
+      "availableAt": "2026-07-08T21:50:00Z",
+      "close": "95"
+    },
+    {
+      "id": "close-09",
+      "revision": 1,
+      "sessionOn": "2026-07-09",
+      "availableAt": "2026-07-09T21:50:00Z",
+      "close": "125"
+    },
+    {
+      "id": "close-10",
+      "revision": 1,
+      "sessionOn": "2026-07-10",
+      "availableAt": "2026-07-10T21:50:00Z",
+      "close": "140"
+    },
+    {
+      "id": "close-13",
+      "revision": 1,
+      "sessionOn": "2026-07-13",
+      "availableAt": "2026-07-13T21:50:00Z",
+      "close": "100"
+    }
+  ],
+  "fxMarks": [],
+  "fx": [],
+  "actions": []
+}
