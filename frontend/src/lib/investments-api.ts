@@ -132,6 +132,8 @@ function account(value: unknown): InvestmentAccount {
     archivedAt: v.archivedAt as string | null,
   };
 }
+export { instrument as parseInvestmentInstrument };
+
 function instrument(value: unknown): InvestmentInstrument {
   const v = object(value);
   return {

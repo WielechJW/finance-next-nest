@@ -117,4 +117,256 @@ describe('Investment CSV import batches (PostgreSQL)', () => {
     await upload(file).expect(409);
     await owner.agent.get(`${owner.imports}/${created.body.id}`).expect(200);
   });
+
+  it('warns on overlaps with manual events and lets the owner map an unknown ticker in its own currency', async () => {
+    const owner = await setup();
+    const other = await setup();
+    await owner.agent
+      .post(`${owner.path}/events`)
+      .send({
+        type: 'DEPOSIT',
+        currency: 'USD',
+        amount: '20.00',
+        occurredOn: '2025-01-08',
+        timePrecision: 'DATE',
+        daySequence: 1,
+        idempotencyKey: 'manual-before-import',
+      })
+      .expect(201);
+    const instrument = await context.prisma.instrument.create({
+      data: { ticker: 'IMPORT81TEST', mic: 'XNAS', currency: 'USD' },
+    });
+    try {
+      const rows = [
+        [
+          'type',
+          'occurredOn',
+          'currency',
+          'amount',
+          'ticker',
+          'mic',
+          'quantity',
+          'unitPrice',
+          'commission',
+          'externalId',
+          'soldCurrency',
+          'boughtCurrency',
+          'soldAmount',
+          'boughtAmount',
+          'grossAmount',
+          'withholdingTax',
+        ],
+        [
+          'DEPOSIT',
+          '2025-01-08',
+          'USD',
+          '20',
+          '',
+          '',
+          '',
+          '',
+          '',
+          'd1',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ],
+        [
+          'DEPOSIT',
+          '2025-01-08',
+          'USD',
+          '20',
+          '',
+          '',
+          '',
+          '',
+          '',
+          'd2',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ],
+        [
+          'BUY',
+          '2025-01-09',
+          'USD',
+          '',
+          'UNKNOWNCSV',
+          'XNAS',
+          '2',
+          '9',
+          '0.25',
+          'p1',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ],
+        [
+          'BUY',
+          '2025-01-09',
+          'PLN',
+          '',
+          instrument.ticker,
+          'XNAS',
+          '2',
+          '9',
+          '0.25',
+          'p2',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ],
+        [
+          'FX',
+          '2025-01-09',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '0.10',
+          'fx1',
+          'PLN',
+          'USD',
+          '40',
+          '10',
+          '',
+          '',
+        ],
+        [
+          'DIVIDEND',
+          '2025-01-09',
+          'USD',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          'dv1',
+          '',
+          '',
+          '',
+          '',
+          '5',
+          '1',
+        ],
+        [
+          'DEPOSIT',
+          '2025-02-30',
+          'USD',
+          '20',
+          '',
+          '',
+          '',
+          '',
+          '',
+          'd3',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ],
+      ];
+      const upload = await owner.agent
+        .post(owner.imports)
+        .set('Origin', context.origin)
+        .field('format', 'GENERIC')
+        .attach(
+          'csv',
+          Buffer.from(rows.map((row) => row.join(',')).join('\n')),
+          'preview.csv',
+        )
+        .expect(201);
+      const { id } = upload.body as { id: string };
+      const preview = `${owner.imports}/${id}/preview`;
+      await other.agent.get(preview).expect(404);
+      const read = await owner.agent
+        .get(preview)
+        .expect(200)
+        .expect('Cache-Control', 'no-store');
+      expect(read.body).toMatchObject([
+        {
+          number: 2,
+          duplicate: 'POSSIBLE',
+          details: { currency: 'USD', amount: '20' },
+        },
+        { number: 3, duplicate: 'POSSIBLE' },
+        {
+          number: 4,
+          instrument: null,
+          mappingError: expect.stringContaining('Nie znaleziono'),
+          details: { commission: '0.25' },
+        },
+        {
+          number: 5,
+          instrument: null,
+          mappingError: expect.stringContaining('Waluta'),
+        },
+        {
+          number: 6,
+          needsInstrument: false,
+          details: {
+            soldCurrency: 'PLN',
+            boughtCurrency: 'USD',
+            commission: '0.1',
+          },
+        },
+        { number: 7, details: { grossAmount: '5', withholdingTax: '1' } },
+      ]);
+      const map = (number: number) =>
+        `${owner.imports}/${id}/rows/${number}/instrument`;
+      await other.agent
+        .patch(map(4))
+        .set('Origin', context.origin)
+        .send({ instrumentId: instrument.id })
+        .expect(404);
+      await owner.agent
+        .patch(map(5))
+        .set('Origin', context.origin)
+        .send({ instrumentId: instrument.id })
+        .expect(400);
+      await owner.agent
+        .patch(map(4))
+        .set('Origin', context.origin)
+        .send({ instrumentId: instrument.id })
+        .expect(204);
+      const mapped = await owner.agent.get(preview).expect(200);
+      expect(mapped.body[2]).toMatchObject({
+        number: 4,
+        instrument: { id: instrument.id },
+        mappingError: null,
+      });
+      await owner.agent
+        .patch(map(4))
+        .set('Origin', context.origin)
+        .send({ instrumentId: null })
+        .expect(204);
+      expect(
+        (await owner.agent.get(preview).expect(200)).body[2],
+      ).toMatchObject({ instrument: null });
+      expect(
+        await context.prisma.investmentEvent.count({
+          where: { accountId: owner.accountId },
+        }),
+      ).toBe(1);
+    } finally {
+      await context.prisma.instrument.delete({ where: { id: instrument.id } });
+    }
+  });
 });
