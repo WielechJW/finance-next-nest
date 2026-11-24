@@ -39,11 +39,26 @@ const orderInclude = {
 } satisfies Prisma.OrderInclude;
 type Order = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 const exchanges = ['XWAR', 'XNAS', 'XNYS', 'XASE', 'ARCX'];
+const signalSelect = {
+  id: true,
+  side: true,
+  decidedAt: true,
+  validUntil: true,
+  instrument: { select: { id: true, ticker: true, mic: true, currency: true } },
+} satisfies Prisma.SignalSelect;
+const signalOwner = (userId: string) => ({
+  run: {
+    version: {
+      strategy: { account: { portfolio: { userId, mode: 'MANUAL' as const } } },
+    },
+  },
+});
 
 function serialize(order: Order) {
   return {
     id: order.id,
     clientOrderId: order.clientOrderId,
+    signalId: order.signalId,
     side: order.side,
     type: order.type,
     state: order.state,
@@ -85,6 +100,16 @@ export class PaperService {
     private readonly prisma: PrismaService,
     private readonly posting: InvestmentPostingService,
   ) {}
+
+  async signal(userId: string, signalId: string) {
+    const signal = await this.prisma.signal.findFirst({
+      where: { id: signalId, ...signalOwner(userId) },
+      select: signalSelect,
+    });
+    if (!signal)
+      throw new NotFoundException('Nie znaleziono sygnału strategii.');
+    return signal;
+  }
 
   list(userId: string) {
     return this.prisma.brokerConnection.findMany({
@@ -190,10 +215,26 @@ export class PaperService {
           take: 100,
           include: orderInclude,
         });
+        const lastReconciliation = await tx.paperReconciliation.findFirst({
+          where: { connectionId },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          select: { createdAt: true, matched: true, result: true },
+        });
+        const balances = replayBalances(ledger);
+        const instruments = await tx.instrument.findMany({
+          where: { id: { in: Object.keys(balances.securities) } },
+          orderBy: [{ mic: 'asc' }, { ticker: 'asc' }],
+          select: { id: true, ticker: true, mic: true, currency: true },
+        });
         const { accountId: _privateLedger, ...visible } = connection;
         return {
           ...visible,
-          balances: replayBalances(ledger),
+          balances,
+          lastReconciliation,
+          positions: instruments.map((instrument) => ({
+            ...instrument,
+            quantity: balances.securities[instrument.id],
+          })),
           orders: orders.map(serialize),
         };
       },
@@ -218,7 +259,9 @@ export class PaperService {
       quantity,
       limitPrice,
     };
-    const payloadHash = paperHash(content);
+    const payloadHash = paperHash(
+      input.signalId ? { ...content, signalId: input.signalId } : content,
+    );
     const key = { connectionId, idempotencyKey: input.idempotencyKey };
     return this.prisma.$transaction(async (tx) => {
       await lockPaperAccount(tx, userId, connectionId);
@@ -232,6 +275,36 @@ export class PaperService {
             'Klucz został już użyty dla innej intencji.',
           );
         return serialize(existing);
+      }
+      const signalId = input.signalId ?? null;
+      if (signalId) {
+        const signal = await tx.signal.findFirst({
+          where: { id: signalId, ...signalOwner(userId) },
+          select: signalSelect,
+        });
+        const now = new Date();
+        if (!signal)
+          throw new NotFoundException('Nie znaleziono sygnału strategii.');
+        if (
+          signal.instrument.id !== input.instrumentId ||
+          signal.side !== input.side
+        )
+          throw new BadRequestException(
+            'Instrument i strona muszą odpowiadać sygnałowi.',
+          );
+        if (signal.decidedAt > now || signal.validUntil <= now)
+          throw new ConflictException(
+            'Sygnał strategii jest poza okresem ważności.',
+          );
+        if (
+          await tx.order.findUnique({
+            where: { connectionId_signalId: { connectionId, signalId } },
+            select: { id: true },
+          })
+        )
+          throw new ConflictException(
+            'Ten sygnał ma już zlecenie na rachunku.',
+          );
       }
       const instrument = await tx.instrument.findUnique({
         where: { id: input.instrumentId },
@@ -247,7 +320,7 @@ export class PaperService {
         );
       return serialize(
         await tx.order.create({
-          data: { ...content, ...key, payloadHash },
+          data: { ...content, ...key, signalId, payloadHash },
           include: orderInclude,
         }),
       );

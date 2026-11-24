@@ -76,6 +76,8 @@ function run(value: unknown) {
   const row = marketObject(value);
   return {
     id: marketText(row.id),
+    signalId:
+      row.signal == null ? null : marketText(marketObject(row.signal).id),
     decidedAt: marketText(row.decidedAt),
     version: version(row.version),
     decision: decision(row.decision),

@@ -404,4 +404,100 @@ describe('Local paper order ledger (PostgreSQL)', () => {
       }),
     ).toBe(0);
   });
+  it('keeps a simulated session expiry non-executing and books operator events exactly once', async () => {
+    const owner = await setup();
+    const instrument = await stock('XNAS');
+    const post = (path: string, body: object) =>
+      owner.agent.post(path).set('Origin', context.origin).send(body);
+    const newIntent = () =>
+      post(`${owner.path}/orders`, {
+        instrumentId: instrument.id,
+        side: 'BUY',
+        type: 'LIMIT',
+        quantity: '3',
+        limitPrice: '60',
+        idempotencyKey: randomUUID(),
+      }).expect(201);
+    const first = (await newIntent()).body as {
+      id: string;
+      clientOrderId: string;
+    };
+    const endpoint = `${owner.path}/orders/${first.id}`;
+    await post(`${endpoint}/submit`, { fault: 'SESSION_EXPIRED' }).expect(201, {
+      clientOrderId: first.clientOrderId,
+      state: 'INTENT',
+      sessionExpired: true,
+    });
+    await owner.agent
+      .get(`${owner.path}/venue-orders/${first.clientOrderId}`)
+      .expect(200, {
+        clientOrderId: first.clientOrderId,
+        found: false,
+        venueState: null,
+        fillIds: [],
+      });
+    await post(`${endpoint}/submit`, {}).expect(201, {
+      clientOrderId: first.clientOrderId,
+      state: 'ACCEPTED',
+    });
+
+    const execution = {
+      idempotencyKey: randomUUID(),
+      kind: 'FILL',
+      fill: { quantity: '1', price: '50', fee: '0.5' },
+    };
+    await post(`${endpoint}/simulate`, {
+      ...execution,
+      fill: { ...execution.fill, price: '61' },
+    }).expect(409);
+    await Promise.all([
+      post(`${endpoint}/simulate`, execution).expect(201),
+      post(`${endpoint}/simulate`, execution).expect(201),
+    ]);
+    await post(`${endpoint}/simulate`, {
+      ...execution,
+      fill: { ...execution.fill, price: '49' },
+    }).expect(409);
+    expect(
+      (await post(`${owner.path}/reconcile`, {}).expect(201)).body,
+    ).toMatchObject({
+      matched: true,
+      local: {
+        cash: { PLN: '1000.00', USD: '949.50' },
+        fillIds: [`simulation:${execution.idempotencyKey}`],
+      },
+      venue: {
+        cash: { PLN: '1000.00', USD: '949.50' },
+        available: { PLN: '1000.00', USD: '829.50' },
+      },
+    });
+    await post(`${endpoint}/simulate`, {
+      kind: 'CANCELLED',
+      idempotencyKey: randomUUID(),
+    }).expect(201);
+    await post(`${owner.path}/reconcile`, {}).expect(201);
+    const second = (await newIntent()).body as { id: string };
+    const next = `${owner.path}/orders/${second.id}`;
+    await post(`${next}/submit`, {}).expect(201);
+    await post(`${next}/simulate`, {
+      kind: 'REJECTED',
+      idempotencyKey: randomUUID(),
+    }).expect(201);
+    expect(
+      (await post(`${owner.path}/reconcile`, {}).expect(201)).body,
+    ).toMatchObject({
+      matched: true,
+      local: { available: { PLN: '1000.00', USD: '949.50' }, openOrders: [] },
+    });
+    const account = await owner.agent.get(owner.path).expect(200);
+    expect(account.body).toMatchObject({
+      reconciliationRequired: false,
+      lastReconciliation: { matched: true },
+      positions: [{ id: instrument.id, mic: 'XNAS', quantity: '1.0000000000' }],
+      orders: [
+        { state: 'REJECTED', fills: [] },
+        { state: 'CANCELLED', fills: [{ quantity: '1.0000000000' }] },
+      ],
+    });
+  });
 });

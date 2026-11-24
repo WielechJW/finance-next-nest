@@ -15,6 +15,7 @@ import {
   PaperConnectionDto,
   PaperEventDto,
   PaperOrderDto,
+  SimulatePaperEventDto,
   SubmitPaperOrderDto,
 } from './paper.dto.js';
 import { PaperExecutionService } from './paper-execution.service.js';
@@ -41,6 +42,15 @@ export class PaperController {
     @Body() input: PaperConnectionDto,
   ) {
     return this.paper.create(user.id, input);
+  }
+
+  @Get('signals/:signalId')
+  @Header('Cache-Control', 'no-store')
+  signal(
+    @CurrentUser() user: RegisteredUser,
+    @Param('signalId', ParseUUIDPipe) signalId: string,
+  ) {
+    return this.paper.signal(user.id, signalId);
   }
 
   @Get(':connectionId')
@@ -108,6 +118,17 @@ export class PaperController {
     @Body() body: PaperEventDto,
   ) {
     return this.execution.venueEvent(user.id, connectionId, orderId, body);
+  }
+
+  @Post(':connectionId/orders/:orderId/simulate')
+  @Header('Cache-Control', 'no-store')
+  simulate(
+    @CurrentUser() user: RegisteredUser,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() body: SimulatePaperEventDto,
+  ) {
+    return this.execution.simulate(user.id, connectionId, orderId, body);
   }
 
   @Post(':connectionId/reconcile')

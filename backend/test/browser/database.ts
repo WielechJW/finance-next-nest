@@ -27,11 +27,11 @@ export class BrowserDatabase {
     return { email, password: '  Testowe hasło przeglądarkowe 123!  ' };
   }
 
-  async investmentInstrument() {
+  async investmentInstrument(mic: 'XWAR' | 'XNAS' = 'XWAR') {
     const id = randomUUID();
     const ticker = 'PW' + randomUUID().slice(0, 8);
     await this.pool.query('INSERT INTO "Instrument" (id, ticker, mic, currency, "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, NOW(), NOW())',
-      [id, ticker, 'XWAR', 'PLN']);
+      [id, ticker, mic, mic === 'XWAR' ? 'PLN' : 'USD']);
     this.instrumentIds.add(id);
     return { id, ticker };
   }
@@ -57,10 +57,10 @@ export class BrowserDatabase {
       throw new Error('Brak sesji konta testowego do wygaszenia.');
   }
 
-  async investmentQuote(instrumentId: string, close = '70') {
+  async investmentQuote(instrumentId: string, close = '70', on = expectedSession('XWAR'), fetchedAt = new Date()) {
     if (!this.instrumentIds.has(instrumentId)) throw new Error('Instrument nie należy do testu.');
-    await this.pool.query('INSERT INTO "PriceBar" (id, "instrumentId", source, "sessionOn", open, high, low, close, "adjustedClose", volume, revision, "currentSlot", "contentHash", "fetchedAt") VALUES ($1, $2, $3, $4, $5, $5, $5, $5, $5, 100, 1, 1, $6, NOW())',
-      [randomUUID(), instrumentId, 'EODHD', expectedSession('XWAR'), close, '0'.repeat(64)]);
+    await this.pool.query('INSERT INTO "PriceBar" (id, "instrumentId", source, "sessionOn", open, high, low, close, "adjustedClose", volume, revision, "currentSlot", "contentHash", "fetchedAt") VALUES ($1, $2, $3, $4, $5, $5, $5, $5, $5, 100, 1, 1, $6, $7)',
+      [randomUUID(), instrumentId, 'EODHD', on, close, '0'.repeat(64), fetchedAt]);
   }
 
   async dispose(): Promise<void> {

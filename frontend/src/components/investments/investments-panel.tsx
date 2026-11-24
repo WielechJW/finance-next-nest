@@ -137,6 +137,7 @@ function PortfolioList() {
         Prowadź ręcznie portfele akcji GPW i USA. Gotówka i koszt zakupu są
         rozdzielone według walut.
       </p>
+      <Link href={`${root}/paper`}>Lokalny symulator zleceń</Link>
       {resource.state.status !== "ready" ? (
         <ResourceStatus state={resource.state} retry={resource.refresh} />
       ) : (

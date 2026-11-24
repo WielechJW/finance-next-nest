@@ -764,6 +764,7 @@ model Signal {
   decidedAt         DateTime           @db.Timestamptz(3)
   validUntil        DateTime           @db.Timestamptz(3)
   notification      Notification?
+  paperOrders       Order[]
 
   @@index([instrumentId, decidedAt])
 }
@@ -873,10 +874,14 @@ model Order {
   events      OrderEvent[]
   fills       Fill[]
   venue       PaperVenueOrder?
+  signalId    String?          @db.Uuid
+  signal      Signal?          @relation(fields: [signalId], references: [id], onDelete: SetNull)
 
   @@unique([id, connectionId])
   @@unique([connectionId, clientOrderId])
   @@unique([connectionId, idempotencyKey])
+  @@unique([connectionId, signalId])
+  @@index([signalId])
   @@index([connectionId, createdAt])
   @@index([instrumentId])
 }
