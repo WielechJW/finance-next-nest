@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState, type FormEvent } from "react";
+import { InvestmentExports } from "./investment-exports";
 import { ImportPreview } from "./investment-import-preview";
 import { importApi, type ImportBatch } from "@/lib/investment-import-api";
 import { useInvestmentResource } from "./use-investment-resource";
@@ -129,6 +130,7 @@ export function InvestmentImports({
           />
         </section>
       )}
+      <InvestmentExports portfolioId={portfolioId} accountId={accountId} />
       <section className={styles.card} aria-labelledby="import-history-title">
         <h2 id="import-history-title">Ostatnie partie</h2>
         {state.status === "loading" && <p role="status">Wczytywanie partii…</p>}

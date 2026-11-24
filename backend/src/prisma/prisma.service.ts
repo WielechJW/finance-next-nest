@@ -14,7 +14,12 @@ export class PrismaService
 {
   constructor() {
     super({
-      adapter: new PrismaPg({ connectionString: getDatabaseUrl() }),
+      // The adapter sends UTC wall-clock parameters. Use the same time zone
+      // when PostgreSQL interprets timestamptz values without an offset.
+      adapter: new PrismaPg({
+        connectionString: getDatabaseUrl(),
+        options: '-c timezone=UTC',
+      }),
     });
   }
 

@@ -47,6 +47,12 @@ function localClock(value: Date, timeZone: string): string {
   return `${part('year').padStart(4, '0')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:${part('second')}`;
 }
 
+export function formatInvestmentSourceInstant(date: Date, timeZone: string): string {
+  const offset = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+    .formatToParts(date).find((item) => item.type === 'timeZoneName')!.value.replace('GMT', '') || 'Z';
+  return localClock(date, timeZone) + '.' + String(date.getUTCMilliseconds()).padStart(3, '0') + offset;
+}
+
 function instant(value: string): Date {
   // An offset is mandatory: a source-local wall clock alone may be ambiguous at DST.
   const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
