@@ -21,3 +21,17 @@ z ostatniej wymaganej sesji. Sesje są ustalane według kalendarza giełdowego.
 Sygnał podaje instrument, kierunek, datę decyzji, ostatnią wymaganą sesję,
 przyczynę, termin ważności, średnie i identyfikatory użytych rewizji cen.
 Posiadana ilość i dostępna gotówka pochodzą ze stanu rachunku w chwili decyzji.
+
+## Wersje i historia decyzji
+
+Zapis strategii wyznacza rachunek i instrument. Zmiana parametrów tworzy
+kolejny numer wersji. Wersja użyta do uruchomienia zachowuje ustawienia
+oraz identyfikator kodu. Uruchomienie zapisuje gotówkę, ilość, identyfikatory
+operacji, ceny i rewizje dostępne do podanego czasu. Dla chwil historycznych
+aplikacja wybiera zapisy według czasu ich pozyskania i uwzględnia starsze
+wersje rejestru sprzed późniejszych korekt.
+
+Ponowienie uruchomienia dla tej samej wersji i chwili zwraca zapisany wynik.
+Operacja odtworzenia używa poprzedniego zestawu danych i jego parametrów.
+Identyfikator uruchomienia i ewentualnego sygnału są widoczne na koncie
+właściciela rachunku.

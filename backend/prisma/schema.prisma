@@ -50,6 +50,7 @@ model InvestmentAccount {
   updatedAt   DateTime  @updatedAt
   events      InvestmentEvent[]
   importBatches ImportBatch[]
+  strategies Strategy[]
 
   // Ownership is derived through Portfolio.userId, without a second userId.
   @@index([portfolioId])
@@ -118,6 +119,8 @@ model Instrument {
   financialReports FinancialReport[]
   investmentNotes InvestmentNote[]
   importRows ImportRow[]
+  strategies Strategy[]
+  signals Signal[]
   providerMappings InstrumentProviderMapping[]
   trades           Trade[]
   openingLots      OpeningLot[]
@@ -677,4 +680,67 @@ model Session {
 
   @@index([expire], map: "IDX_session_expire")
   @@map("session")
+}
+
+
+model Strategy {
+  id           String            @id @default(uuid()) @db.Uuid
+  accountId    String            @db.Uuid
+  account      InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instrumentId String            @db.Uuid
+  instrument   Instrument        @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  name         String            @db.VarChar(100)
+  enabled      Boolean           @default(false)
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  versions     StrategyVersion[]
+
+  @@index([accountId, createdAt])
+  @@index([instrumentId])
+}
+
+model StrategyVersion {
+  id          String        @id @default(uuid()) @db.Uuid
+  strategyId  String        @db.Uuid
+  strategy    Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  number      Int
+  ruleKey     String        @db.VarChar(80)
+  codeVersion String        @db.VarChar(32)
+  parameters  Json
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  runs        StrategyRun[]
+
+  @@unique([strategyId, number])
+}
+
+model StrategyRun {
+  id        String          @id @default(uuid()) @db.Uuid
+  versionId String          @db.Uuid
+  version   StrategyVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  decidedAt DateTime        @db.Timestamptz(3)
+  input     Json
+  decision  Json
+  createdAt DateTime        @default(now()) @db.Timestamptz(3)
+  signal    Signal?
+
+  @@unique([versionId, decidedAt])
+}
+
+enum StrategySignalSide {
+  BUY
+  SELL
+}
+
+model Signal {
+  id                String             @id @default(uuid()) @db.Uuid
+  runId             String             @unique @db.Uuid
+  run               StrategyRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  instrumentId      String             @db.Uuid
+  instrument        Instrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  side              StrategySignalSide
+  rationale         String             @db.VarChar(500)
+  expectedSessionOn DateTime           @db.Date
+  decidedAt         DateTime           @db.Timestamptz(3)
+  validUntil        DateTime           @db.Timestamptz(3)
+
+  @@index([instrumentId, decidedAt])
 }
