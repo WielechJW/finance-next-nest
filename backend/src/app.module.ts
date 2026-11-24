@@ -14,6 +14,7 @@ import { InvestmentsModule } from './investments/investments.module.js';
 import { MarketDataModule } from './market-data/market-data.module.js';
 import { PortfolioAnalyticsModule } from './portfolio-analytics/portfolio-analytics.module.js';
 import { AlertsModule } from './alerts/alerts.module.js';
+import { StrategiesModule } from './strategies/strategies.module.js';
 import { ImportsModule } from './imports/imports.module.js';
 import { FundamentalAnalysisModule } from './fundamental-analysis/fundamental-analysis.module.js';
 
@@ -34,6 +35,7 @@ import { FundamentalAnalysisModule } from './fundamental-analysis/fundamental-an
     OperationsModule,
     FundamentalAnalysisModule,
     ImportsModule,
+    StrategiesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
