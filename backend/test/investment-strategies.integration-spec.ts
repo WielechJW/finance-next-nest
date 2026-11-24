@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { NotificationsService } from '../src/notifications/notifications.service.js';
+import { TelegramClient } from '../src/notifications/telegram.client.js';
+import { StrategyRunnerService } from '../src/strategies/strategy-runner.service.js';
 import { investmentHttpContext } from './support/investment-http.js';
 
 const parameters = { fastSessions: 2, slowSessions: 3, validForMinutes: 30 };
@@ -14,6 +17,7 @@ const prices = [
 describe('Investment strategy versions and runs (PostgreSQL)', () => {
   let context: Awaited<ReturnType<typeof investmentHttpContext>>;
   const instruments: string[] = [];
+  const jobs: string[] = [];
   beforeAll(async () => {
     context = await investmentHttpContext();
   });
@@ -26,6 +30,8 @@ describe('Investment strategy versions and runs (PostgreSQL)', () => {
       where: { id: { in: instruments } },
     });
     instruments.length = 0;
+    await context.prisma.marketJob.deleteMany({ where: { key: { in: jobs } } });
+    jobs.length = 0;
   });
   afterAll(async () => {
     await context?.app.close();
@@ -65,14 +71,11 @@ describe('Investment strategy versions and runs (PostgreSQL)', () => {
     const { agent, instrument, root, path, accountId } = await setup();
     const external = await setup();
     const create = (values: object = parameters) =>
-      agent
-        .post(root)
-        .set('Origin', context.origin)
-        .send({
-          name: 'Reguła testowa',
-          instrumentId: instrument.id,
-          parameters: values,
-        });
+      agent.post(root).set('Origin', context.origin).send({
+        name: 'Reguła testowa',
+        instrumentId: instrument.id,
+        parameters: values,
+      });
     await create({ ...parameters, unverified: true }).expect(400);
     const registration = await create().expect(201);
     expect(registration.body).toMatchObject({
@@ -213,5 +216,207 @@ describe('Investment strategy versions and runs (PostgreSQL)', () => {
     expect(
       await context.prisma.investmentEvent.count({ where: { accountId } }),
     ).toBe(1);
+  });
+
+  async function scheduledFixture(linked: boolean) {
+    const owner = await setup();
+    const { agent, instrument, root, path, userId } = owner;
+    const registration = await agent
+      .post(root)
+      .set('Origin', context.origin)
+      .send({
+        name: 'Strategia harmonogramu',
+        instrumentId: instrument.id,
+        parameters,
+      })
+      .expect(201);
+    const id = registration.body.id as string;
+    const versionId = registration.body.versions[0].id as string;
+    const day = '2026-07-09';
+    const enable = (enabled: boolean) =>
+      agent
+        .patch(`${root}/${id}/schedule`)
+        .set('Origin', context.origin)
+        .send({ enabled, notifyOnSignal: true })
+        .expect(200);
+    await enable(true);
+    const deposit = await agent
+      .post(`${path}/events`)
+      .set('Origin', context.origin)
+      .send({
+        type: 'DEPOSIT',
+        currency: 'USD',
+        amount: '50',
+        occurredOn: '2026-07-06',
+        timePrecision: 'DATE',
+        daySequence: 1,
+        idempotencyKey: 'scheduler-cash',
+      })
+      .expect(201);
+    await context.prisma.investmentEvent.update({
+      where: { id: deposit.body.eventId },
+      data: { recordedAt: new Date('2026-07-06T15:00:00Z') },
+    });
+    if (linked)
+      await context.prisma.telegramConnection.create({
+        data: {
+          userId,
+          chatId: '1234' + String(jobs.length),
+          quietStart: 0,
+          quietEnd: 0,
+        },
+      });
+    jobs.push(`strategy_${versionId}_${day}`, `split-fixture_${id}`);
+    const price = (index: number) => {
+      const [on, close] = prices[index];
+      return context.prisma.priceBar.create({
+        data: {
+          instrumentId: instrument.id,
+          source: 'EODHD',
+          sessionOn: new Date(on),
+          open: close,
+          high: close,
+          low: close,
+          close,
+          adjustedClose: close,
+          volume: '100',
+          contentHash: on.padEnd(64, '0'),
+          fetchedAt: new Date(on + 'T21:45:00Z'),
+        },
+      });
+    };
+    const cover = () =>
+      context.prisma.marketJob.create({
+        data: {
+          key: `split-fixture_${id}`,
+          kind: 'splits',
+          status: 'SUCCEEDED',
+          payload: { instrumentId: instrument.id, from: '2026-03-01', to: day },
+        },
+      });
+    const runner = context.app.get(StrategyRunnerService);
+    const now = new Date(decidedAt);
+    return { ...owner, id, versionId, day, now, enable, price, cover, runner };
+  }
+
+  it('waits for the last close and split data, and a pair of workers records one signal', async () => {
+    const {
+      agent,
+      id,
+      versionId,
+      day,
+      now,
+      runner,
+      price,
+      cover,
+      userId,
+      root,
+      enable,
+    } = await scheduledFixture(false);
+    await Promise.all([runner.schedule(now), runner.schedule(now)]);
+    expect(
+      await context.prisma.marketJob.count({
+        where: { key: `strategy_${versionId}_${day}` },
+      }),
+    ).toBe(1);
+    await Promise.all([price(0), price(1), price(2)]);
+    await cover();
+    expect(await runner.execute(id, versionId, day, now)).toEqual({
+      retryAt: new Date('2026-07-09T22:05:00.000Z'),
+    });
+    await agent.get(`${root}/${id}/runs`).expect(200, []);
+    await price(3);
+    const [first, second] = await Promise.all([
+      runner.execute(id, versionId, day, now),
+      runner.execute(id, versionId, day, now),
+    ]);
+    expect(first).toEqual(second);
+    const runs = await agent.get(`${root}/${id}/runs`).expect(200);
+    expect(runs.body).toMatchObject([
+      { decision: { kind: 'SIGNAL', side: 'BUY' } },
+    ]);
+    const notifications = await context.prisma.notification.findMany({
+      where: { userId },
+    });
+    expect(notifications).toMatchObject([
+      { state: 'CANCELLED', kind: 'SIGNAL', lastError: 'disconnected' },
+    ]);
+    await enable(false);
+    expect(
+      await runner.execute(
+        id,
+        versionId,
+        '2026-07-10',
+        new Date('2026-07-10T22:00:00Z'),
+      ),
+    ).toEqual({ skipped: 'inactive' });
+  });
+
+  it('queues one notification, uses the existing retry path, and reports expired market-data jobs', async () => {
+    const {
+      runner,
+      id,
+      versionId,
+      day,
+      now,
+      price,
+      cover,
+      userId,
+      root,
+      agent,
+    } = await scheduledFixture(true);
+    await Promise.all([price(0), price(1), price(2), price(3)]);
+    expect(await runner.execute(id, versionId, day, now)).toEqual({
+      retryAt: new Date('2026-07-09T22:05:00.000Z'),
+    });
+    await cover();
+    await runner.execute(id, versionId, day, now);
+    const signal = await context.prisma.notification.findFirstOrThrow({
+      where: { userId, kind: 'SIGNAL' },
+    });
+    jobs.push(`signal_notification_${signal.signalId}`);
+    expect(
+      (
+        await context.prisma.marketJob.findUnique({
+          where: { key: `signal_notification_${signal.signalId}` },
+        })
+      )?.payload,
+    ).toMatchObject({ notificationId: signal.id });
+    const telegram = context.app.get(TelegramClient);
+    const enabled = vi.spyOn(telegram, 'enabled').mockReturnValue(true);
+    const send = vi
+      .spyOn(telegram, 'send')
+      .mockResolvedValueOnce({
+        state: 'RETRY',
+        code: 'rate_limit',
+        retryAfter: 10,
+      })
+      .mockResolvedValueOnce({ state: 'SENT', messageId: '1' });
+    try {
+      const deliver = context.app.get(NotificationsService);
+      expect(await deliver.deliver(signal.id, now)).toEqual({
+        retryAt: new Date('2026-07-09T22:00:10.000Z'),
+      });
+      await deliver.deliver(signal.id, new Date('2026-07-09T22:00:11Z'));
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(
+        await context.prisma.notification.findUnique({
+          where: { id: signal.id },
+        }),
+      ).toMatchObject({ state: 'SENT', attempts: 2 });
+    } finally {
+      enabled.mockRestore();
+      send.mockRestore();
+    }
+    await runner.execute(
+      id,
+      versionId,
+      '2026-07-10',
+      new Date('2026-07-13T22:00:00Z'),
+    );
+    const rows = await agent.get(`${root}/${id}/runs`).expect(200);
+    expect(rows.body[0]).toMatchObject({
+      decision: { kind: 'NO_SIGNAL', reason: 'MARKET_DATA_TIMEOUT' },
+    });
   });
 });

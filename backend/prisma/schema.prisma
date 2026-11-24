@@ -646,6 +646,8 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   eventId String? @unique @db.Uuid
   event AlertEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  signalId String? @unique @db.Uuid
+  signal Signal? @relation(fields: [signalId], references: [id], onDelete: Cascade)
   kind String @default("ALERT") @db.VarChar(20)
   summaryOn DateTime? @db.Date
   body String @db.VarChar(4000)
@@ -691,6 +693,7 @@ model Strategy {
   instrument   Instrument        @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
   name         String            @db.VarChar(100)
   enabled      Boolean           @default(false)
+  notifyOnSignal Boolean         @default(false)
   createdAt    DateTime          @default(now()) @db.Timestamptz(3)
   versions     StrategyVersion[]
 
@@ -712,17 +715,25 @@ model StrategyVersion {
   @@unique([strategyId, number])
 }
 
+enum StrategyRunMode {
+  MANUAL
+  SCHEDULED
+}
+
 model StrategyRun {
   id        String          @id @default(uuid()) @db.Uuid
   versionId String          @db.Uuid
   version   StrategyVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
   decidedAt DateTime        @db.Timestamptz(3)
+  mode      StrategyRunMode @default(MANUAL)
+  scheduledSessionOn DateTime? @db.Date
   input     Json
   decision  Json
   createdAt DateTime        @default(now()) @db.Timestamptz(3)
   signal    Signal?
 
-  @@unique([versionId, decidedAt])
+  @@unique([versionId, decidedAt, mode])
+  @@unique([versionId, scheduledSessionOn])
 }
 
 enum StrategySignalSide {
@@ -741,6 +752,7 @@ model Signal {
   expectedSessionOn DateTime           @db.Date
   decidedAt         DateTime           @db.Timestamptz(3)
   validUntil        DateTime           @db.Timestamptz(3)
+  notification      Notification?
 
   @@index([instrumentId, decidedAt])
 }

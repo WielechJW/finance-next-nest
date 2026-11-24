@@ -17,6 +17,7 @@ import {
 } from './market-data/contracts.js';
 import { expectedSession } from './market-data/calendar.js';
 import { PrismaService } from './prisma/prisma.service.js';
+import { StrategyRunnerService } from './strategies/strategy-runner.service.js';
 import { PriceAlertsService } from './alerts/alerts.service.js';
 
 async function bootstrap() {
@@ -33,12 +34,14 @@ async function bootstrap() {
   const sync = app.get(MarketSyncService);
   const scheduler = app.get(MarketSchedulerService);
   const notifications = app.get(NotificationsService);
+  const strategies = app.get(StrategyRunnerService);
   const kinds = [
     'prices',
     'dividends',
     'splits',
     'fx',
     'valuation',
+    'strategy',
     ...(app.get(TelegramClient).enabled()
       ? ['notification', 'retry_notification', 'summary']
       : []),
@@ -64,6 +67,25 @@ async function bootstrap() {
             payload.portfolioId,
             marketDate(payload.asOf),
           );
+      }
+      if (job.kind === 'strategy') {
+        if (
+          typeof payload.strategyId !== 'string' ||
+          typeof payload.versionId !== 'string' ||
+          ![payload.strategyId, payload.versionId].every((id) =>
+            /^[0-9a-f-]{36}$/i.test(id),
+          )
+        ) {
+          throw new MarketDataError(
+            'configuration',
+            'Niepoprawne zadanie strategii.',
+          );
+        }
+        return strategies.execute(
+          payload.strategyId,
+          payload.versionId,
+          marketDate(payload.sessionOn),
+        );
       }
       if (job.kind === 'notification' && typeof payload.eventId === 'string')
         return notifications.event(payload.eventId);
@@ -116,6 +138,7 @@ async function bootstrap() {
       await runWorkerCycle({
         market: () => scheduler.schedule(),
         summaries: () => notifications.scheduleSummaries(),
+        strategies: () => strategies.schedule(),
         dispatch: () => runtime.dispatch(),
         heartbeat: () => scheduler.heartbeat(),
       });

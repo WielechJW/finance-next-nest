@@ -8,18 +8,19 @@ import { MarketDataError } from '../market-data/contracts.js';
 @Injectable()
 export class MarketJobsService {
   constructor(private readonly prisma: PrismaService) {}
-  ensure(
+  async ensure(
     key: string,
     kind: string,
     payload: Prisma.InputJsonObject,
     priority = 10,
   ) {
-    return this.prisma.marketJob.upsert({
-      where: { key },
-      create: { key, kind, payload, priority },
-      update: {},
+    await this.prisma.marketJob.createMany({
+      data: { key, kind, payload, priority },
+      skipDuplicates: true,
     });
+    return this.prisma.marketJob.findUniqueOrThrow({ where: { key } });
   }
+
   async dispatch(
     queue: Pick<Queue, 'add'>,
     now = new Date(),

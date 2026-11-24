@@ -7,6 +7,7 @@ import {
 import { Prisma } from '../generated/prisma/client.js';
 import { InvestmentAccountsService } from '../investments/accounts.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { recordStrategyDecision } from './record-strategy-decision.js';
 import { movingAverage } from './moving-average.js';
 import {
   collectStrategyData,
@@ -22,7 +23,7 @@ export type StrategyScope = {
 };
 const instrumentSelect = { id: true, ticker: true, mic: true, currency: true };
 const latest = { orderBy: { number: 'desc' }, take: 1 } as const;
-const withLatest = {
+export const withLatest = {
   instrument: { select: instrumentSelect },
   versions: latest,
 } satisfies Prisma.StrategyInclude;
@@ -51,7 +52,7 @@ function ruleParameters(value: unknown) {
   }
 }
 
-async function lockStrategy(
+export async function lockStrategy(
   tx: Prisma.TransactionClient,
   scope: StrategyScope,
   strategyId: string,
@@ -62,7 +63,7 @@ async function lockStrategy(
     JOIN "Portfolio" p ON p."id" = a."portfolioId"
     WHERE s."id" = ${strategyId}::uuid AND a."id" = ${scope.accountId}::uuid
       AND p."id" = ${scope.portfolioId}::uuid AND p."userId" = ${scope.userId}::uuid
-    FOR UPDATE OF s
+    FOR UPDATE OF s, a
   `;
   if (!row) throw new NotFoundException('Nie znaleziono strategii.');
 }
@@ -161,6 +162,28 @@ export class StrategiesService {
     });
   }
 
+  configure(
+    scope: StrategyScope,
+    id: string,
+    enabled: boolean,
+    notifyOnSignal: boolean,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await lockStrategy(tx, scope, id);
+      const account = await tx.investmentAccount.findUniqueOrThrow({
+        where: { id: scope.accountId },
+        select: { archivedAt: true },
+      });
+      if (enabled && account.archivedAt)
+        throw new ConflictException('Rachunek jest zarchiwizowany.');
+      return tx.strategy.update({
+        where: { id },
+        data: { enabled, notifyOnSignal },
+        include: withLatest,
+      });
+    });
+  }
+
   async run(scope: StrategyScope, id: string, decidedAt = new Date()) {
     if (
       !Number.isFinite(decidedAt.getTime()) ||
@@ -178,9 +201,13 @@ export class StrategiesService {
           include: withLatest,
         });
         const version = strategy.versions[0];
-        const key = { versionId: version.id, decidedAt };
+        const key = {
+          versionId: version.id,
+          decidedAt,
+          mode: 'MANUAL' as const,
+        };
         const existing = await tx.strategyRun.findUnique({
-          where: { versionId_decidedAt: key },
+          where: { versionId_decidedAt_mode: key },
           include: withSignal,
         });
         if (existing) return existing;
@@ -199,30 +226,12 @@ export class StrategiesService {
           ruleParameters(version.parameters),
         );
         const decision = movingAverage.evaluate(recorded);
-        return tx.strategyRun.create({
-          data: {
-            ...key,
-            input: copySnapshot(recorded),
-            decision,
-            ...(decision.kind === 'SIGNAL'
-              ? {
-                  signal: {
-                    create: {
-                      instrumentId: strategy.instrument.id,
-                      side: decision.side,
-                      rationale: decision.reason,
-                      decidedAt,
-                      expectedSessionOn: new Date(
-                        decision.evidence.expectedSessionOn + 'T00:00:00Z',
-                      ),
-                      validUntil: new Date(decision.validUntil),
-                    },
-                  },
-                }
-              : {}),
-          },
-          include: withSignal,
-        });
+        return recordStrategyDecision(
+          tx,
+          version.id,
+          copySnapshot(recorded),
+          decision,
+        );
       },
       { timeout: 20000 },
     );
@@ -256,6 +265,7 @@ export class StrategiesService {
       run.version.codeVersion !== movingAverage.codeVersion
     )
       throw new ConflictException('Wersja kodu tej reguły jest niedostępna.');
+    if (run.input === null) return { run, computed: null };
     const snapshot = run.input as unknown as StrategySnapshot;
     const computed = movingAverage.evaluate(
       restoreSnapshot(snapshot, ruleParameters(run.version.parameters)),
