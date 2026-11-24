@@ -79,14 +79,19 @@ test('configures a private strategy, stops the schedule and replays a saved deci
   ) as Record<string, unknown>;
   data.reportingCurrency = 'PLN';
   data.startingCash = { PLN: '1000', USD: '0' };
+  const historical = data.history as { universe: Record<string, string>[] };
+  historical.universe[0] = {
+    ticker: instrument.ticker.toUpperCase(),
+    mic: 'XWAR',
+    currency: 'PLN',
+    listedOn: '2025-01-01',
+  };
   const backtest = page.getByRole('form', { name: 'Uruchom test historyczny' });
-  await backtest
-    .getByLabel('Dane testu JSON')
-    .setInputFiles({
-      name: 'snapshot.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(data)),
-    });
+  await backtest.getByLabel('Dane testu JSON').setInputFiles({
+    name: 'snapshot.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(data)),
+  });
   await backtest.getByRole('button', { name: 'Uruchom test' }).click();
   const report = page.getByRole('table', {
     name: 'Wyniki strategii i benchmarku',
@@ -98,6 +103,10 @@ test('configures a private strategy, stops the schedule and replays a saved deci
     page.getByRole('figure', {
       name: 'Krzywa kapitału strategii i benchmarku',
     }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Odtwórz test historyczny' }).click();
+  await expect(
+    page.getByText('Odtworzono identyczny wynik z zapisanego zestawu danych.'),
   ).toBeVisible();
   await logout(page);
   await login(page, stranger);

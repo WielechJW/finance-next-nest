@@ -444,6 +444,8 @@ describe('Investment strategy versions and runs (PostgreSQL)', () => {
         'utf8',
       ),
     ) as Record<string, unknown>;
+    const historical = example.history as { universe: { ticker: string }[] };
+    historical.universe[0].ticker = owner.instrument.ticker.toUpperCase();
     const send = (data: object) =>
       owner.agent
         .post(endpoint)
@@ -482,6 +484,20 @@ describe('Investment strategy versions and runs (PostgreSQL)', () => {
     });
     await other.agent.get(endpoint).expect(404);
     await other.agent.get(`${endpoint}/${trained.body.id}`).expect(404);
+    const replayed = await owner.agent
+      .get(`${endpoint}/${trained.body.id}/replay`)
+      .expect(200);
+    expect(replayed.body).toMatchObject({
+      verified: true,
+      modelVersion: 'next-open-2',
+      report: trained.body.report,
+    });
+    await other.agent.get(`${endpoint}/${trained.body.id}/replay`).expect(404);
+    const missing = await send({ ...example, bars: [] }).expect(201);
+    expect(missing.body).toMatchObject({
+      status: 'FAILED',
+      error: expect.stringContaining('Brak wymaganego wejścia'),
+    });
     const failed = await send({ ...example, sessions: [] }).expect(201);
     expect(failed.body).toMatchObject({
       status: 'FAILED',
@@ -503,6 +519,16 @@ describe('Investment strategy versions and runs (PostgreSQL)', () => {
       ...outOfSample,
       fromOn: '2026-07-14',
       toOn: '2026-07-14',
+      bars: [
+        ...(example.bars as unknown[]),
+        {
+          id: 'close-14',
+          revision: 1,
+          sessionOn: '2026-07-14',
+          availableAt: '2026-07-14T21:50:00Z',
+          close: '101',
+        },
+      ],
       sessions: [
         {
           sessionOn: '2026-07-14',
@@ -521,6 +547,7 @@ describe('Investment strategy versions and runs (PostgreSQL)', () => {
     const history = await owner.agent.get(endpoint).expect(200);
     expect(history.body.map((row: { status: string }) => row.status)).toEqual([
       'COMPLETE',
+      'FAILED',
       'FAILED',
       'COMPLETE',
     ]);

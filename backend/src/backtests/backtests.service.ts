@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,12 +10,26 @@ import { session, previousDay, zonedClock } from '../market-data/calendar.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { movingAverage } from '../strategies/moving-average.js';
 import type { StrategyScope } from '../strategies/strategies.service.js';
+import {
+  instrumentKey,
+  listedAt,
+  validateHistoricalContext,
+} from './historical-context.js';
 import type { StrategyInstrument } from '../strategies/strategy.js';
 import type { BacktestInputDto } from './backtest-input.js';
 import { buildBacktestReport } from './backtest-report.js';
 import type { ReplayCorporateAction } from './execution-policy.js';
 
-const modelVersion = 'next-open-1';
+const legacyModelVersion = 'next-open-1';
+const modelVersion = 'next-open-2';
+type HistoricalInstrument = StrategyInstrument & { ticker?: string };
+type SavedInput = {
+  instrument: HistoricalInstrument;
+  request: BacktestInputDto;
+  parameters: unknown;
+  ruleKey: string;
+  codeVersion: string;
+};
 const roundedDate = (day: string) => new Date(`${day}T00:00:00Z`);
 const day = (date: Date) => date.toISOString().slice(0, 10);
 function ownerWhere(scope: StrategyScope, id: string) {
@@ -105,45 +120,95 @@ function checkTimeline(
 
 export function generateReport(
   input: BacktestInputDto,
-  instrument: StrategyInstrument,
+  instrument: HistoricalInstrument,
   parameters: unknown,
+  chosenModel = modelVersion,
 ) {
   checkTimeline(input, instrument);
-  return buildBacktestReport({
-    rule: movingAverage,
-    instrument,
-    parameters: movingAverage.parseParameters(parameters),
-    reportingCurrency: input.reportingCurrency,
-    startingCash: input.startingCash,
-    orderQuantity: input.orderQuantity,
-    maxWaitSessions: input.maxWaitSessions,
-    sessions: input.sessions.map((row) => ({
-      sessionOn: row.sessionOn,
-      decidedAt: new Date(row.decidedAt),
-      opening: row.opening ?? null,
-    })),
-    bars: input.bars.map(({ id, sessionOn, revision, close, availableAt }) => ({
-      id,
-      sessionOn,
-      revision,
-      close,
-      instrumentId: instrument.id,
-      availableAt: new Date(availableAt),
-    })),
-    fxMarks: input.fxMarks.map(({ id, sessionOn, usdPln, availableAt }) => ({
-      id,
-      sessionOn,
-      usdPln,
-      availableAt: new Date(availableAt),
-    })),
-    splits: [],
-    execution: {
-      priceBasis: input.priceBasis,
-      costs: input.costs,
-      fx: input.fx,
-      actions: actions(input, instrument.id),
+  const strict = chosenModel === modelVersion;
+  let history:
+    | (NonNullable<BacktestInputDto['history']> & { selectedKey: string })
+    | undefined;
+  if (strict) {
+    if (!input.history?.source.trim() || !instrument.ticker)
+      throw new Error('Podaj źródło i historyczne uniwersum instrumentów.');
+    validateHistoricalContext(input.history);
+    const selectedKey = instrumentKey({
+      mic: instrument.mic,
+      ticker: instrument.ticker,
+    });
+    for (const row of input.sessions) {
+      if (
+        !listedAt(input.history.universe, row.sessionOn).some(
+          (item) =>
+            instrumentKey(item) === selectedKey &&
+            item.currency === instrument.currency,
+        )
+      )
+        throw new Error(
+          `Instrument nie należy do uniwersum w sesji ${row.sessionOn}.`,
+        );
+      if (row.opening === undefined)
+        throw new Error(`Brak obserwacji otwarcia w sesji ${row.sessionOn}.`);
+    }
+    history = {
+      source: input.history.source,
+      universe: input.history.universe,
+      reports: input.history.reports,
+      selectedKey,
+    };
+  }
+  const report = buildBacktestReport(
+    {
+      history,
+      rule: movingAverage,
+      instrument,
+      parameters: movingAverage.parseParameters(parameters),
+      reportingCurrency: input.reportingCurrency,
+      startingCash: input.startingCash,
+      orderQuantity: input.orderQuantity,
+      maxWaitSessions: input.maxWaitSessions,
+      sessions: input.sessions.map((row) => ({
+        sessionOn: row.sessionOn,
+        decidedAt: new Date(row.decidedAt),
+        opening: row.opening ?? null,
+      })),
+      bars: input.bars.map(
+        ({ id, sessionOn, revision, close, availableAt }) => ({
+          id,
+          sessionOn,
+          revision,
+          close,
+          instrumentId: instrument.id,
+          availableAt: new Date(availableAt),
+        }),
+      ),
+      fxMarks: input.fxMarks.map(({ id, sessionOn, usdPln, availableAt }) => ({
+        id,
+        sessionOn,
+        usdPln,
+        availableAt: new Date(availableAt),
+      })),
+      splits: [],
+      execution: {
+        priceBasis: input.priceBasis,
+        costs: input.costs,
+        fx: input.fx,
+        actions: actions(input, instrument.id),
+      },
     },
-  });
+    strict,
+  );
+  return history
+    ? {
+        ...report,
+        inputCoverage: {
+          source: history.source,
+          instruments: history.universe.length,
+          delisted: history.universe.filter((item) => item.delistedOn).length,
+        },
+      }
+    : report;
 }
 
 function canonicalJson(value: Prisma.InputJsonValue | null): string {
@@ -183,7 +248,9 @@ export class BacktestsService {
     const strategy = await this.prisma.strategy.findFirst({
       where: owned,
       include: {
-        instrument: { select: { id: true, mic: true, currency: true } },
+        instrument: {
+          select: { id: true, ticker: true, mic: true, currency: true },
+        },
         versions: { orderBy: { number: 'desc' }, take: 1 },
       },
     });
@@ -274,6 +341,48 @@ export class BacktestsService {
       take: 100,
       select: summary,
     });
+  }
+
+  async replay(scope: StrategyScope, strategyId: string, id: string) {
+    const run = await this.prisma.backtestRun.findFirst({
+      where: { id, version: { strategy: ownerWhere(scope, strategyId) } },
+      select: { ...detail, input: true },
+    });
+    if (!run) throw new NotFoundException('Nie znaleziono próby historycznej.');
+    if (run.status !== 'COMPLETE')
+      throw new ConflictException(
+        'Nieudana próba zawiera zapisaną przyczynę przerwania.',
+      );
+    const snapshot = run.input as unknown as SavedInput;
+    if (
+      ![legacyModelVersion, modelVersion].includes(run.modelVersion) ||
+      snapshot.ruleKey !== movingAverage.key ||
+      snapshot.codeVersion !== movingAverage.codeVersion
+    )
+      throw new ConflictException('Zapisana wersja modelu nie jest dostępna.');
+    if (
+      createHash('sha256')
+        .update(canonicalJson(run.input as Prisma.InputJsonObject))
+        .digest('hex') !== run.inputHash
+    )
+      throw new ConflictException(
+        'Zapisane wejście nie odpowiada skrótowi próby.',
+      );
+    const computed = generateReport(
+      snapshot.request,
+      snapshot.instrument,
+      snapshot.parameters,
+      run.modelVersion,
+    );
+    if (
+      canonicalJson(computed) !==
+      canonicalJson(run.report as Prisma.InputJsonObject)
+    )
+      throw new ConflictException(
+        'Odtworzenie różni się od zapisanego wyniku.',
+      );
+    const { input: _input, ...saved } = run;
+    return { ...saved, report: computed, verified: true };
   }
 
   async get(scope: StrategyScope, strategyId: string, id: string) {

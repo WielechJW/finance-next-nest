@@ -213,21 +213,42 @@ function buyAndHold<P>(parameters: P): StrategyRule<P> {
   };
 }
 
-export function buildBacktestReport<P>(input: ReportInput<P>) {
+export function buildBacktestReport<P>(
+  input: ReportInput<P>,
+  strictData = false,
+) {
   const actual = replayMarket(input);
+  const missing = actual.decisions.find(
+    ({ decision }) =>
+      decision.kind === 'NO_SIGNAL' &&
+      [
+        'STALE_PRICE',
+        'INSUFFICIENT_HISTORY',
+        'INVALID_PRICE',
+        'CALENDAR_UNAVAILABLE',
+      ].includes(decision.reason),
+  );
+  if (strictData && missing)
+    throw new Error(
+      `Brak wymaganego wejścia lub historii cen na sesję ${missing.sessionOn}.`,
+    );
   const passive = replayMarket({
     ...input,
     rule: buyAndHold(input.parameters),
   });
   const valuations = marks(input);
+  const strategy = summarize(input, actual, valuations);
+  const benchmark = summarize(input, passive, valuations);
+  if (strictData && (!strategy.complete || !benchmark.complete))
+    throw new Error('Brak ceny lub FX potrzebnych do pełnej wyceny symulacji.');
   return {
     currency: input.reportingCurrency,
     priceBasis: actual.priceBasis,
     costs: (input.execution ?? defaultExecutionPolicy).costs,
-    strategy: summarize(input, actual, valuations),
+    strategy,
     benchmark: {
       key: 'same-instrument-buy-and-hold',
-      ...summarize(input, passive, valuations),
+      ...benchmark,
     },
     attempts: actual.attempts,
     assumptions: {

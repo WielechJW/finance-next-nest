@@ -9,6 +9,12 @@ import {
 } from '../investments/precision.js';
 import { replayFifo, type FifoEvent } from '../investments/fifo.js';
 import {
+  instrumentKey,
+  listedAt,
+  reportsKnownAt,
+  type HistoricalContext,
+} from './historical-context.js';
+import {
   defaultExecutionPolicy,
   dividendAmounts,
   priceAndCommission,
@@ -44,6 +50,7 @@ export type ReplayInput<P> = {
   startingCash:
     string | Partial<Record<StrategyInstrument['currency'], string>>;
   execution?: ExecutionPolicy;
+  history?: HistoricalContext & { selectedKey: string };
   orderQuantity: string;
   maxWaitSessions: number;
   sessions: readonly ReplaySession[];
@@ -365,8 +372,34 @@ export function replayMarket<P>(input: ReplayInput<P>) {
       }
       if (result.attempt.state !== 'DEFERRED') pending = null;
     }
+    const universe = input.history
+      ? listedAt(input.history.universe, step.sessionOn)
+      : undefined;
+    const reports =
+      input.history && universe
+        ? reportsKnownAt(input.history.reports, universe, step.decidedAt)
+        : undefined;
+    const required = input.rule.requiredFundamentals ?? [];
+    const published =
+      reports?.filter(
+        (report) => instrumentKey(report) === input.history?.selectedKey,
+      ) ?? [];
+    if (
+      required.some(
+        (metric) =>
+          !published.some((report) =>
+            report.facts.some((fact) => fact.metric === metric),
+          ),
+      )
+    ) {
+      throw new Error(
+        `Brak wymaganych opublikowanych fundamentów na sesję ${step.sessionOn}.`,
+      );
+    }
     const decision = input.rule.evaluate({
       instrument,
+      universe,
+      reports,
       parameters: input.parameters,
       decidedAt: step.decidedAt,
       portfolio: {

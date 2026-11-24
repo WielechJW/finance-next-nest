@@ -20,6 +20,27 @@ export type StrategySplit = {
   availableAt: Date;
 };
 
+export type StrategyUniverseMember = {
+  ticker: string;
+  mic: string;
+  currency: 'PLN' | 'USD';
+  listedOn: string;
+  delistedOn?: string | null;
+};
+export type StrategyFundamentalReport = Pick<
+  StrategyUniverseMember,
+  'mic' | 'ticker'
+> & {
+  id: string;
+  periodEnd: string;
+  publishedAt: string;
+  availableAt: string;
+  revision: number;
+  scope: 'CONSOLIDATED' | 'STANDALONE';
+  sourceUrl: string;
+  facts: { metric: string; amount: string; unit: string }[];
+};
+
 export type StrategyInput<P> = {
   instrument: StrategyInstrument;
   decidedAt: Date;
@@ -27,6 +48,8 @@ export type StrategyInput<P> = {
   portfolio: { cash: string; quantity: string };
   bars: readonly StrategyBar[];
   splits: readonly StrategySplit[];
+  universe?: readonly StrategyUniverseMember[];
+  reports?: readonly StrategyFundamentalReport[];
   parameters: P;
 };
 
@@ -70,6 +93,7 @@ export type StrategyDecision = {
 export interface StrategyRule<P> {
   key: string;
   codeVersion: string;
+  requiredFundamentals?: readonly string[];
   parseParameters(input: unknown): P;
   evaluate(input: StrategyInput<P>): StrategyDecision;
 }

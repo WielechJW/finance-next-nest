@@ -104,4 +104,20 @@ export class BacktestsController {
       id,
     );
   }
+
+  @Get(':id/replay')
+  @Header('Cache-Control', 'no-store')
+  replay(
+    @CurrentUser() user: RegisteredUser,
+    @Param('portfolioId', ParseUUIDPipe) portfolioId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Param('strategyId', ParseUUIDPipe) strategyId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.backtests.replay(
+      { userId: user.id, portfolioId, accountId },
+      strategyId,
+      id,
+    );
+  }
 }
