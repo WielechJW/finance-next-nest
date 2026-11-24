@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { strategyLookbackDays } from '../strategies/strategy-data.js';
+import { movingAverage } from '../strategies/moving-average.js';
 import { MarketJobsService } from './jobs.service.js';
 import { MarketDataError } from '../market-data/contracts.js';
 import { createHash } from 'node:crypto';
@@ -38,7 +40,17 @@ export class MarketSchedulerService {
     }
     const watched = await this.prisma.watchlistItem.findMany({ select: { instrumentId: true } });
     const alerted = await this.prisma.priceAlert.findMany({ where: { active: true, deletedAt: null }, select: { instrumentId: true } });
-    const selected = new Set([...held, ...watched.map(row => row.instrumentId), ...alerted.map(row => row.instrumentId)]);
+    const strategies = await this.prisma.strategy.findMany({ where: { enabled: true, account: { archivedAt: null } },
+      select: { instrumentId: true, versions: { take: 1, orderBy: { number: 'desc' }, select: { ruleKey: true, codeVersion: true, parameters: true } } } });
+    const lookbacks = new Map<string, number>();
+    for (const strategy of strategies) {
+      const version = strategy.versions[0];
+      if (version?.ruleKey !== movingAverage.key || version.codeVersion !== movingAverage.codeVersion) continue;
+      const { slowSessions } = movingAverage.parseParameters(version.parameters);
+      const length = strategyLookbackDays(slowSessions);
+      lookbacks.set(strategy.instrumentId, Math.max(length, lookbacks.get(strategy.instrumentId) ?? 0));
+    }
+    const selected = new Set([...held, ...watched.map(row => row.instrumentId), ...alerted.map(row => row.instrumentId), ...lookbacks.keys()]);
     const latest = await this.prisma.priceBar.findMany({ where: { instrumentId: { in: [...selected] }, currentSlot: 1, source: 'EODHD' }, distinct: ['instrumentId'], orderBy: [{ instrumentId: 'asc' }, { sessionOn: 'desc' }], select: { instrumentId: true, sessionOn: true } });
     const instruments = await this.prisma.instrument.findMany({ where: { id: { in: [...selected] }, providerMappings: { some: { provider: 'EODHD' } } }, orderBy: { id: 'asc' } });
     instruments.sort((a, b) => Number(held.has(b.id)) - Number(held.has(a.id)) || (latest.find(row => row.instrumentId === a.id)?.sessionOn.getTime() ?? 0) - (latest.find(row => row.instrumentId === b.id)?.sessionOn.getTime() ?? 0));
@@ -46,12 +58,18 @@ export class MarketSchedulerService {
     for (const instrument of instruments) {
       const target = targetSession(instrument.mic);
       if (!target) continue;
-      const payload = { instrumentId: instrument.id, from: previousDay(target, 7), to: target, scheduled: true };
-      await this.jobs.ensure(`prices_${instrument.id}_${target}`, 'prices', payload, held.has(instrument.id) ? 2 : 10 + rank++);
+      const lookback = lookbacks.get(instrument.id);
+      const payload = { instrumentId: instrument.id, from: previousDay(target, lookback ?? 7), to: target, scheduled: true };
+      const priceKey = `prices_${instrument.id}_${target}${lookback ? '_' + lookback : ''}`;
+      await this.jobs.ensure(priceKey, 'prices', payload, held.has(instrument.id) ? 2 : 10 + rank++);
       // Price jobs have priority. Corporate actions share the same guarded daily budget.
       const week = Math.floor(Date.parse(target) / (7 * 86400000));
       const actionsFrom = previousDay(target, 90);
-      for (const kind of ['dividends', 'splits']) await this.jobs.ensure(`${kind}_${instrument.id}_${week}`, kind, { ...payload, from: actionsFrom }, 20);
+      for (const kind of ['dividends', 'splits']) {
+        const days = kind === 'splits' ? lookback : undefined;
+        await this.jobs.ensure(`${kind}_${instrument.id}_${days ? `${target}_${days}` : week}`, kind,
+          { ...payload, from: days ? previousDay(target, Math.max(days, 90)) : actionsFrom }, 20);
+      }
     }
     const portfolios = await this.prisma.portfolio.findMany({ select: { id: true, userId: true, accounts: { select: { events: { where: { activeSlot: 1 }, select: { id: true, revision: true }, orderBy: { id: 'asc' } } } } } });
     const prices = await this.prisma.priceBar.findMany({ where: { currentSlot: 1 }, select: { id: true }, orderBy: { id: 'asc' } });

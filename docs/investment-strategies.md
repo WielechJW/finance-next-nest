@@ -35,3 +35,15 @@ Ponowienie uruchomienia dla tej samej wersji i chwili zwraca zapisany wynik.
 Operacja odtworzenia używa poprzedniego zestawu danych i jego parametrów.
 Identyfikator uruchomienia i ewentualnego sygnału są widoczne na koncie
 właściciela rachunku.
+
+## Harmonogram i powiadomienia
+
+Włączona strategia otrzymuje jedno zadanie na wersję i sesję. Worker oczekuje
+kompletnego okna cen i zakończonej synchronizacji splitów. Zadanie ponawia się
+co pięć minut, gdy brakuje danych. Jeśli nadejdzie kolejna sesja, poprzednie
+zadanie zapisuje brak decyzji z przyczyną. Blokada rachunku i strategii oraz
+identyfikator wersji i sesji chronią przed powtórzeniem.
+
+Powiadomienia o sygnałach można włączyć dla wybranej strategii. Kanał Telegram
+korzysta z istniejącej kolejki i zasad ponawiania. Po utracie połączenia,
+wyłączeniu strategii lub wygaśnięciu sygnału powiadomienie zostaje anulowane.

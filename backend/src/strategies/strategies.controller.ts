@@ -5,12 +5,14 @@ import {
   Header,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsISO8601,
   IsObject,
@@ -39,6 +41,11 @@ class StrategyDto extends StrategyVersionDto {
   name!: string;
   @IsUUID() instrumentId!: string;
 }
+class StrategyScheduleDto {
+  @IsBoolean() enabled!: boolean;
+  @IsBoolean() notifyOnSignal!: boolean;
+}
+
 class RunStrategyDto {
   @IsOptional()
   @IsISO8601({ strict: true, strictSeparator: true })
@@ -80,6 +87,23 @@ export class StrategiesController {
       input.name,
       input.instrumentId,
       input.parameters,
+    );
+  }
+
+  @Patch(':id/schedule')
+  @Header('Cache-Control', 'no-store')
+  configure(
+    @CurrentUser() user: RegisteredUser,
+    @Param('portfolioId', ParseUUIDPipe) portfolioId: string,
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: StrategyScheduleDto,
+  ) {
+    return this.strategies.configure(
+      { userId: user.id, portfolioId, accountId },
+      id,
+      body.enabled,
+      body.notifyOnSignal,
     );
   }
 

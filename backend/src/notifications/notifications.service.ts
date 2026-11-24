@@ -125,7 +125,7 @@ export class NotificationsService {
         now,
       );
       lines.push(
-        `${portfolio.name}: ${value.complete ? `${value.valuePln} PLN; wynik ${value.resultPln ?? 'brak pełnych danych'} PLN` : value.pendingSplits.length ? `wycena niepełna — uzgodnij split: ${[...new Set(value.pendingSplits.map(split => split.ticker))].join(', ')}` : 'wycena niepełna — sprawdź ceny/FX w aplikacji'}`,
+        `${portfolio.name}: ${value.complete ? `${value.valuePln} PLN; wynik ${value.resultPln ?? 'brak pełnych danych'} PLN` : value.pendingSplits.length ? `wycena niepełna — uzgodnij split: ${[...new Set(value.pendingSplits.map((split) => split.ticker))].join(', ')}` : 'wycena niepełna — sprawdź ceny/FX w aplikacji'}`,
       );
     }
     if (!portfolios.length) lines.push('Brak portfeli inwestycyjnych.');
@@ -159,7 +159,20 @@ export class NotificationsService {
       await tx.$executeRaw`SELECT "id" FROM "User" WHERE "id" = ${candidate.userId}::uuid FOR UPDATE`;
       const row = await tx.notification.findUniqueOrThrow({
         where: { id },
-        include: { event: { include: { alert: true } } },
+        include: {
+          event: { include: { alert: true } },
+          signal: {
+            include: {
+              run: {
+                include: {
+                  version: {
+                    include: { strategy: { include: { account: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
       if (['SENT', 'UNKNOWN', 'CANCELLED', 'FAILED'].includes(row.state))
         return null;
@@ -180,17 +193,29 @@ export class NotificationsService {
       const connection = await tx.telegramConnection.findUnique({
         where: { userId: row.userId },
       });
+      const scheduledStrategy = row.signal?.run.version.strategy;
+      const signalCancelled =
+        row.signal &&
+        (now >= row.signal.validUntil
+          ? 'signal_expired'
+          : !scheduledStrategy?.enabled ||
+              !scheduledStrategy.notifyOnSignal ||
+              scheduledStrategy.account.archivedAt
+            ? 'signal_disabled'
+            : null);
       const cancelled = !connection
         ? 'disconnected'
         : row.event?.alert.deletedAt
           ? 'rule_deleted'
-          : row.kind === 'SUMMARY' && !connection.dailySummaryEnabled
-            ? 'summary_disabled'
-            : now.getTime() -
-                  (row.event?.createdAt ?? row.createdAt).getTime() >
-                86400000
-              ? 'expired'
-              : null;
+          : signalCancelled
+            ? signalCancelled
+            : row.kind === 'SUMMARY' && !connection.dailySummaryEnabled
+              ? 'summary_disabled'
+              : now.getTime() -
+                    (row.event?.createdAt ?? row.createdAt).getTime() >
+                  86400000
+                ? 'expired'
+                : null;
       if (cancelled) {
         await tx.notification.update({
           where: { id },

@@ -4,6 +4,8 @@ import { previousDay, zonedClock } from '../market-data/calendar.js';
 import type { StrategyInput, StrategyInstrument } from './strategy.js';
 
 export type StrategySnapshot = ReturnType<typeof copySnapshot>;
+export const strategyLookbackDays = (slowSessions: number) =>
+  Math.min(365, Math.ceil(slowSessions * 1.5) + 14);
 const day = (value: Date) => value.toISOString().slice(0, 10);
 const date = (value: string) => new Date(value + 'T00:00:00.000Z');
 
