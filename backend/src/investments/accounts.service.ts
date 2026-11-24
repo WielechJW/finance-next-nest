@@ -27,7 +27,7 @@ export class InvestmentAccountsService {
 
   listPortfolios(userId: string) {
     return this.safely(() => this.prisma.portfolio.findMany({
-      where: { userId }, select: portfolioSelect, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      where: { userId, mode: 'MANUAL' }, select: portfolioSelect, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     }));
   }
 
@@ -38,7 +38,7 @@ export class InvestmentAccountsService {
   getPortfolio(userId: string, portfolioId: string) {
     return this.safely(async () => {
       const portfolio = await this.prisma.portfolio.findFirst({
-        where: { id: portfolioId, userId }, select: portfolioSelect,
+        where: { id: portfolioId, userId, mode: 'MANUAL' }, select: portfolioSelect,
       });
       if (!portfolio) throw new NotFoundException('Nie znaleziono portfela inwestycyjnego.');
       return portfolio;
@@ -47,7 +47,7 @@ export class InvestmentAccountsService {
 
   renamePortfolio(userId: string, portfolioId: string, name: string) {
     return this.safely(() => this.prisma.portfolio.update({
-      where: { id: portfolioId, userId }, data: { name }, select: portfolioSelect,
+      where: { id: portfolioId, userId, mode: 'MANUAL' }, data: { name }, select: portfolioSelect,
     }));
   }
 
@@ -55,7 +55,7 @@ export class InvestmentAccountsService {
     return this.safely(async () => {
       await this.getPortfolio(userId, portfolioId);
       return this.prisma.investmentAccount.findMany({
-        where: { portfolioId, portfolio: { userId } }, select: accountSelect,
+        where: { portfolioId, portfolio: { userId, mode: 'MANUAL' } }, select: accountSelect,
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
     });
@@ -71,7 +71,7 @@ export class InvestmentAccountsService {
   getAccount(userId: string, portfolioId: string, accountId: string) {
     return this.safely(async () => {
       const account = await this.prisma.investmentAccount.findFirst({
-        where: { id: accountId, portfolioId, portfolio: { userId } }, select: accountSelect,
+        where: { id: accountId, portfolioId, portfolio: { userId, mode: 'MANUAL' } }, select: accountSelect,
       });
       if (!account) throw new NotFoundException('Nie znaleziono rachunku inwestycyjnego.');
       return account;
@@ -88,7 +88,7 @@ export class InvestmentAccountsService {
         SELECT a."id", a."archivedAt" FROM "InvestmentAccount" a
         JOIN "Portfolio" p ON p."id" = a."portfolioId"
         WHERE a."id" = ${accountId}::uuid AND a."portfolioId" = ${portfolioId}::uuid
-          AND p."userId" = ${userId}::uuid
+          AND p."userId" = ${userId}::uuid AND p.mode = 'MANUAL'
         FOR UPDATE OF a
       `;
       if (!account) throw new NotFoundException('Nie znaleziono rachunku inwestycyjnego.');

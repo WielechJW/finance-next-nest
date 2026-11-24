@@ -25,6 +25,12 @@ model User {
   financialReports FinancialReport[]
   investmentNotes InvestmentNote[]
   importBatches ImportBatch[]
+  brokerConnections BrokerConnection[]
+}
+
+enum PortfolioMode {
+  MANUAL
+  PAPER
 }
 
 model Portfolio {
@@ -34,6 +40,7 @@ model Portfolio {
   name      String              @db.VarChar(100)
   accounts  InvestmentAccount[]
   valuations PortfolioValuationSnapshot[]
+  mode PortfolioMode @default(MANUAL)
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
 
@@ -51,6 +58,7 @@ model InvestmentAccount {
   events      InvestmentEvent[]
   importBatches ImportBatch[]
   strategies Strategy[]
+  brokerConnection BrokerConnection?
 
   // Ownership is derived through Portfolio.userId, without a second userId.
   @@index([portfolioId])
@@ -121,6 +129,7 @@ model Instrument {
   importRows ImportRow[]
   strategies Strategy[]
   signals Signal[]
+  paperOrders Order[]
   providerMappings InstrumentProviderMapping[]
   trades           Trade[]
   openingLots      OpeningLot[]
@@ -410,6 +419,7 @@ model InvestmentEvent {
   corporateAction CorporateAction? @relation(fields: [corporateActionId], references: [id], onDelete: Restrict)
   cashEntries      CashEntry[]
   securityEntries  SecurityEntry[]
+  paperFill Fill?
 
   // Migrated ordering must be reviewed before posting or replaying legacy events.
   // Source and actor identifiers are snapshots; posting checks account ownership.
@@ -789,4 +799,114 @@ model BacktestRun {
 
   @@index([versionId, createdAt])
   @@index([baselineId])
+}
+
+enum BrokerMode {
+  LOCAL_PAPER
+}
+
+enum PaperSide {
+  BUY
+  SELL
+}
+
+enum PaperOrderType {
+  MARKET
+  LIMIT
+}
+
+enum PaperOrderState {
+  INTENT
+  SENT
+  ACCEPTED
+  PARTIALLY_FILLED
+  FILLED
+  REJECTED
+  CANCELLED
+  UNKNOWN
+}
+
+enum PaperEventKind {
+  SENT
+  ACCEPTED
+  FILL
+  REJECTED
+  CANCELLED
+}
+
+model BrokerConnection {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @db.Uuid
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId   String            @unique @db.Uuid
+  account     InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  mode        BrokerMode        @default(LOCAL_PAPER)
+  idempotencyKey String          @db.Uuid
+  payloadHash String             @db.Char(64)
+  name        String            @db.VarChar(100)
+  openingOn   DateTime          @db.Date
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
+  orders      Order[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+}
+
+model Order {
+  id          String           @id @default(uuid()) @db.Uuid
+  connectionId String         @db.Uuid
+  connection  BrokerConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  instrumentId String          @db.Uuid
+  instrument  Instrument      @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  clientOrderId String         @default(uuid()) @db.Uuid
+  idempotencyKey String        @db.VarChar(128)
+  payloadHash String           @db.Char(64)
+  side        PaperSide
+  type        PaperOrderType
+  state       PaperOrderState  @default(INTENT)
+  quantity    Decimal          @db.Decimal(28, 10)
+  filledQuantity Decimal       @default(0) @db.Decimal(28, 10)
+  limitPrice  Decimal?         @db.Decimal(28, 10)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  events      OrderEvent[]
+  fills       Fill[]
+
+  @@unique([id, connectionId])
+  @@unique([connectionId, clientOrderId])
+  @@unique([connectionId, idempotencyKey])
+  @@index([connectionId, createdAt])
+  @@index([instrumentId])
+}
+
+model OrderEvent {
+  id              String        @id @default(uuid()) @db.Uuid
+  orderId         String        @db.Uuid
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  externalEventId String        @db.VarChar(128)
+  kind            PaperEventKind
+  happenedAt      DateTime      @db.Timestamptz(3)
+  payloadHash     String        @db.Char(64)
+  recordedAt      DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@unique([orderId, externalEventId])
+  @@index([orderId, happenedAt])
+}
+
+model Fill {
+  id            String          @id @default(uuid()) @db.Uuid
+  orderId       String          @db.Uuid
+  connectionId  String          @db.Uuid
+  order         Order           @relation(fields: [orderId, connectionId], references: [id, connectionId], onDelete: Cascade)
+  executionId   String          @db.VarChar(128)
+  executedAt    DateTime        @db.Timestamptz(3)
+  daySequence   Int
+  quantity      Decimal         @db.Decimal(28, 10)
+  price         Decimal         @db.Decimal(28, 10)
+  fee           Decimal         @db.Decimal(28, 8)
+  ledgerEventId String          @unique @db.Uuid
+  ledgerEvent   InvestmentEvent @relation(fields: [ledgerEventId], references: [id], onDelete: Cascade)
+  payloadHash   String          @db.Char(64)
+
+  @@unique([connectionId, executionId])
+  @@index([orderId, connectionId, executedAt])
 }
