@@ -113,7 +113,7 @@ export class NotificationsService {
     });
     if (!connection?.dailySummaryEnabled) return;
     const portfolios = await this.prisma.portfolio.findMany({
-      where: { userId },
+      where: { userId, mode: 'MANUAL' },
       orderBy: { id: 'asc' },
       select: { id: true, name: true },
     });

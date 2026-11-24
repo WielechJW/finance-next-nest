@@ -26,7 +26,7 @@ export class MarketSchedulerService {
     }
     const to = targetSession('XWAR');
     if (to) await this.jobs.ensure(`fx_${to}`, 'fx', { from: previousDay(to, 7), to }, 1);
-    const accounts = await this.prisma.investmentAccount.findMany({ include: { events: { where: { activeSlot: 1 }, include: { cashEntries: true, securityEntries: true, split: true } } } });
+    const accounts = await this.prisma.investmentAccount.findMany({ where: { portfolio: { mode: 'MANUAL' } }, include: { events: { where: { activeSlot: 1 }, include: { cashEntries: true, securityEntries: true, split: true } } } });
     const held = new Set<string>();
     const invalidPortfolios = new Set<string>();
     for (const account of accounts) {
@@ -71,7 +71,7 @@ export class MarketSchedulerService {
           { ...payload, from: days ? previousDay(target, Math.max(days, 90)) : actionsFrom }, 20);
       }
     }
-    const portfolios = await this.prisma.portfolio.findMany({ select: { id: true, userId: true, accounts: { select: { events: { where: { activeSlot: 1 }, select: { id: true, revision: true }, orderBy: { id: 'asc' } } } } } });
+    const portfolios = await this.prisma.portfolio.findMany({ where: { mode: 'MANUAL' }, select: { id: true, userId: true, accounts: { select: { events: { where: { activeSlot: 1 }, select: { id: true, revision: true }, orderBy: { id: 'asc' } } } } } });
     const prices = await this.prisma.priceBar.findMany({ where: { currentSlot: 1 }, select: { id: true }, orderBy: { id: 'asc' } });
     const fx = await this.prisma.fxRate.findMany({ where: { currentSlot: 1 }, select: { id: true }, orderBy: { id: 'asc' } });
     const splits = await this.prisma.corporateAction.findMany({ where: { kind: 'SPLIT', currentSlot: 1 }, select: { id: true }, orderBy: { id: 'asc' } });

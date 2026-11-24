@@ -31,3 +31,17 @@ kluczy u brokera.
 
 Testy na rachunku zewnętrznym wymagają jawnej zgody właściciela środowiska.
 Tryb lokalny ma osobny stan i służy do odbioru przepływu wewnątrz aplikacji.
+
+## Lokalny rejestr zleceń
+
+Rachunek lokalny ma własny portfel i osobne salda PLN oraz USD. Intencja
+ma klucz ponowienia oraz trwały `clientOrderId`. Wysłanie, przyjęcie,
+odrzucenie, anulowanie i wykonanie przychodzą jako zdarzenia. Wykonanie
+zapisuje wpis rejestru w tej samej transakcji. Chroni je identyfikator
+wykonania w obrębie rachunku. Numer kolejności w danym dniu pochodzi
+z symulatora i pozwala odtworzyć względny czas wpisów, także gdy dotrą później.
+Pierwsze dwa numery dnia są zarezerwowane dla sald otwarcia.
+
+W trybie lokalnym obsługiwane są akcje GPW i USA, kupno, sprzedaż oraz zlecenia
+market i limit. Warunek ceny oraz dostępne saldo i ilość są sprawdzane przed
+zaksięgowaniem wykonania.
