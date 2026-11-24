@@ -47,8 +47,10 @@ export class BrowserDatabase {
   async expireSessions(account: TestAccount): Promise<void> {
     if (!this.emails.has(account.email))
       throw new Error('Konto nie należy do tego testu.');
+    // Model the database pruner. An in-flight authenticated request may touch
+    // an expired row, but it cannot restore a pruned session.
     const result = await this.pool.query(
-      "UPDATE session SET expire = NOW() - INTERVAL '1 minute' WHERE sess->>'userId' IN (SELECT id::text FROM \"User\" WHERE email = $1)",
+      "DELETE FROM session WHERE sess->>'userId' IN (SELECT id::text FROM \"User\" WHERE email = $1)",
       [account.email],
     );
     if (!result.rowCount)
