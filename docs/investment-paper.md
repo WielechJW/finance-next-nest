@@ -58,3 +58,32 @@ Raport porównuje otwarte zlecenia, wykonania, pozycje, gotówkę i gotówkę do
 po kwotach oczekujących zakupów z ustalonym limitem. Uzgodnienie odtwarza
 brakujące wykonania dokładnie raz. Gdy identyfikator nie występuje jeszcze
 po stronie symulatora albo występuje inna różnica, blokada pozostaje aktywna.
+
+## Odbiór lokalnej wersji D
+
+Otwórz **Inwestycje → Lokalny symulator zleceń** i załóż osobny rachunek z testową
+gotówką PLN i USD. Z historii strategii wybierz **Przenieś sygnał do symulatora**.
+Instrument i strona wynikają z zapisanego sygnału. Podaj ilość i ewentualny limit,
+zapisz intencję i wyślij ją do symulatora przed upływem ważności sygnału. Wprowadź
+cenę, ilość i prowizję wykonania. Panel pokaże aktualny zapis gotówki i pozycji.
+Wybierz **Uzgodnij rachunek**, aby porównać księgę z potwierdzeniami symulatora
+i zapisać wynik. Po częściowym wykonaniu można anulować resztę i ponownie uzgodnić.
+
+| Rynek | Przejście zapisywane w CI | Oczekiwany wynik |
+| --- | --- | --- |
+| GPW (XWAR) | Sygnał kupna → intencja na trzy akcje → wygaśnięcie sesji przed wysyłką → przyjęcie po ponowieniu → częściowe wykonanie i anulowanie reszty → uzgodnienie | Dwie akcje, 799,00 PLN z początkowych 1000 PLN, status anulowania z wykonaniem. |
+| USA (XNAS) | Sygnał kupna → intencja na jedną akcję → przyjęcie → pełne wykonanie → uzgodnienie | Jedna akcja, 949,50 USD z początkowych 1000 USD, status wykonania. |
+
+`npm run test:integration -- investment-paper.integration-spec.ts` w backendzie
+sprawdza także brak odpowiedzi po przyjęciu, wznowienie z nową instancją usługi,
+brak potwierdzenia przed przyjęciem, odrzucenie, limit ceny oraz równoczesne
+duplikaty. Przy braku rozstrzygającego potwierdzenia rachunek zgłasza rozbieżność
+i wstrzymuje wysyłkę. `npm run test:browser -- investment-paper.pw.ts` przechodzi
+przez oba rynki z PostgreSQL i Chromium na jawnie przygotowanych danych.
+
+Strategia pobiera zapisane rewizje dziennych kursów zamknięcia z oznaczeniem
+źródła EODHD. Wykonanie korzysta z ręcznie podanych cen, ilości i opłat, a próba
+przeglądarkowa przygotowuje syntetyczne kursy w PostgreSQL. Zakres odbioru obejmuje
+poprawność procesu lokalnego i spójność rejestru. Arkusz zleceń, kolejka
+uczestników, jakość wykonania i dostępność danych wymagają weryfikacji
+zewnętrznej w #92.

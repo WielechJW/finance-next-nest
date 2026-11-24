@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import {
   strategyApi,
@@ -224,6 +225,17 @@ export function StrategyHistory({
                         >
                           Odtwórz decyzję
                         </button>
+                        {row.signalId &&
+                          row.decision.validUntil &&
+                          new Date(row.decision.validUntil) > new Date() && (
+                            <p>
+                              <Link
+                                href={`/dashboard/investments/paper?signal=${encodeURIComponent(row.signalId)}`}
+                              >
+                                Przenieś sygnał do symulatora
+                              </Link>
+                            </p>
+                          )}
                       </td>
                     </tr>
                   ))}

@@ -20,10 +20,11 @@ import {
   paperHash,
   projectPaperOrder,
 } from './paper-domain.js';
-import type { PaperEventDto } from './paper.dto.js';
+import type { PaperEventDto, SimulatePaperEventDto } from './paper.dto.js';
 import { PaperService } from './paper.service.js';
 
-export type SubmissionFault = 'NONE' | 'BEFORE_RECEIPT' | 'AFTER_RECEIPT';
+export type SubmissionFault =
+  'NONE' | 'BEFORE_RECEIPT' | 'AFTER_RECEIPT' | 'SESSION_EXPIRED';
 const detail = {
   instrument: { select: { currency: true } },
   fills: { select: { executionId: true } },
@@ -224,18 +225,37 @@ export class PaperExecutionService {
     orderId: string,
     fault: SubmissionFault,
   ) {
-    const sentAt = new Date().toISOString();
     const claim = await this.prisma.$transaction(async (tx) => {
       const connection = await lockPaperAccount(tx, userId, connectionId);
       const order = await tx.order.findUnique({
         where: { id_connectionId: { id: orderId, connectionId } },
-        select: { id: true, state: true, clientOrderId: true },
+        select: {
+          id: true,
+          state: true,
+          clientOrderId: true,
+          signal: { select: { validUntil: true } },
+        },
       });
       if (!order)
         throw new NotFoundException('Nie znaleziono zlecenia symulowanego.');
       if (connection.reconciliationRequired || order.state === 'UNKNOWN')
         throw new ConflictException('Najpierw uzgodnij rachunek symulowany.');
-      if (order.state !== 'INTENT') return { ...order, repeat: true };
+      if (order.state !== 'INTENT')
+        return {
+          state: order.state,
+          clientOrderId: order.clientOrderId,
+          repeat: true,
+        };
+      const now = new Date();
+      if (order.signal && order.signal.validUntil <= now)
+        throw new ConflictException('Sygnał wygasł przed wysłaniem zlecenia.');
+      if (fault === 'SESSION_EXPIRED')
+        return {
+          state: order.state,
+          clientOrderId: order.clientOrderId,
+          repeat: true,
+        };
+      const sentAt = now.toISOString();
       await this.paper.recordInTransaction(tx, userId, connectionId, orderId, {
         externalEventId: `sent:${order.clientOrderId}`,
         happenedAt: sentAt,
@@ -248,7 +268,13 @@ export class PaperExecutionService {
       return { ...order, repeat: false };
     });
     if (claim.repeat)
-      return { clientOrderId: claim.clientOrderId, state: claim.state };
+      return {
+        clientOrderId: claim.clientOrderId,
+        state: claim.state,
+        ...(fault === 'SESSION_EXPIRED' && claim.state === 'INTENT'
+          ? { sessionExpired: true }
+          : {}),
+      };
 
     try {
       if (fault !== 'BEFORE_RECEIPT') {
@@ -326,6 +352,107 @@ export class PaperExecutionService {
       venueState: order.venue ? status.state : null,
       fillIds: status.fills.map((entry) => entry.fill!.executionId),
     };
+  }
+
+  simulate(
+    userId: string,
+    connectionId: string,
+    orderId: string,
+    action: SimulatePaperEventDto,
+  ) {
+    if ((action.kind === 'FILL') !== !!action.fill)
+      throw new BadRequestException('Podaj szczegóły wyłącznie dla wykonania.');
+    const externalEventId = `simulation:${action.idempotencyKey}`;
+    const fill = action.fill && {
+      quantity: paperDecimal(action.fill.quantity, 'quantity'),
+      price: paperDecimal(action.fill.price, 'unitPrice'),
+      fee: paperDecimal(action.fill.fee, 'amount8'),
+    };
+    return this.prisma.$transaction(
+      async (tx) => {
+        const connection = await lockPaperAccount(tx, userId, connectionId);
+        const order = await tx.order.findUnique({
+          where: { id_connectionId: { id: orderId, connectionId } },
+          include: detail,
+        });
+        if (!order?.venue)
+          throw new NotFoundException('Zlecenie nie dotarło do symulatora.');
+        const { venue } = order;
+        const existing = venue.events.find(
+          (event) => event.eventKey === externalEventId,
+        );
+        if (existing) {
+          const payload = readStored(existing.payload);
+          const previous = payload.fill;
+          if (
+            payload.kind !== action.kind ||
+            paperHash(fill ?? null) !==
+              paperHash(
+                previous
+                  ? {
+                      quantity: previous.quantity,
+                      price: previous.price,
+                      fee: previous.fee,
+                    }
+                  : null,
+              )
+          )
+            throw new ConflictException('Powtórzona akcja ma inną treść.');
+          return { recorded: true };
+        }
+        if (connection.reconciliationRequired)
+          throw new ConflictException('Najpierw uzgodnij rachunek symulowany.');
+        if (
+          order.state !== 'ACCEPTED' &&
+          (order.state !== 'PARTIALLY_FILLED' || action.kind === 'REJECTED')
+        )
+          throw new ConflictException(
+            'Akcja jest niedostępna w tym stanie zlecenia.',
+          );
+        const now = new Date();
+        const day = zonedClock(now, 'Europe/Warsaw').day;
+        const sequence = fill
+          ? (
+              await tx.investmentEvent.aggregate({
+                where: {
+                  accountId: connection.accountId,
+                  occurredOn: new Date(day),
+                  activeSlot: 1,
+                },
+                _max: { daySequence: true },
+              })
+            )._max.daySequence
+          : null;
+        const event: PaperEventDto = {
+          kind: action.kind,
+          happenedAt: now.toISOString(),
+          externalEventId,
+          ...(fill
+            ? {
+                fill: {
+                  ...fill,
+                  executionId: externalEventId,
+                  daySequence: Math.max(sequence ?? 0, 2) + 1,
+                },
+              }
+            : {}),
+        };
+        await saveVenueEvent(tx, venue.id, event);
+        await this.paper.recordInTransaction(
+          tx,
+          userId,
+          connectionId,
+          orderId,
+          event,
+        );
+        await tx.brokerConnection.update({
+          where: { id: connectionId },
+          data: { reconciliationRequired: true },
+        });
+        return { recorded: true };
+      },
+      { timeout: 30000 },
+    );
   }
 
   async venueEvent(

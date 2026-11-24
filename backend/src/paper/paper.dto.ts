@@ -38,6 +38,7 @@ export class PaperConnectionDto {
   cash!: PaperCashDto;
 }
 export class PaperOrderDto {
+  @IsOptional() @IsUUID() signalId?: string;
   @IsUUID() instrumentId!: string;
   @IsUUID() idempotencyKey!: string;
   @IsIn(['BUY', 'SELL']) side!: 'BUY' | 'SELL';
@@ -67,6 +68,24 @@ export class PaperEventDto {
 }
 
 export class SubmitPaperOrderDto {
-  @IsOptional() @IsIn(['NONE', 'BEFORE_RECEIPT', 'AFTER_RECEIPT']) fault?:
-    'NONE' | 'BEFORE_RECEIPT' | 'AFTER_RECEIPT';
+  @IsOptional()
+  @IsIn(['NONE', 'BEFORE_RECEIPT', 'AFTER_RECEIPT', 'SESSION_EXPIRED'])
+  fault?: 'NONE' | 'BEFORE_RECEIPT' | 'AFTER_RECEIPT' | 'SESSION_EXPIRED';
+}
+
+class SimulatedFillDto {
+  @Matches(lots) quantity!: string;
+  @Matches(lots) price!: string;
+  @Matches(amount) fee!: string;
+}
+
+export class SimulatePaperEventDto {
+  @IsUUID() idempotencyKey!: string;
+  @IsIn(['FILL', 'REJECTED', 'CANCELLED']) kind!:
+    'FILL' | 'REJECTED' | 'CANCELLED';
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SimulatedFillDto)
+  fill?: SimulatedFillDto;
 }

@@ -8,9 +8,16 @@ interface Accounts {
   newAccount(): TestAccount;
   register(): Promise<TestAccount>;
   expireSessions(account: TestAccount): Promise<void>;
-  investmentInstrument(): Promise<{ id: string; ticker: string }>;
+  investmentInstrument(
+    mic?: 'XWAR' | 'XNAS',
+  ): Promise<{ id: string; ticker: string }>;
   populateCatalog(): Promise<void>;
-  investmentQuote(instrumentId: string, close?: string): Promise<void>;
+  investmentQuote(
+    instrumentId: string,
+    close?: string,
+    on?: string,
+    fetchedAt?: Date,
+  ): Promise<void>;
 }
 
 export const test = base.extend<{ accounts: Accounts }>({
@@ -29,9 +36,10 @@ export const test = base.extend<{ accounts: Accounts }>({
           return account;
         },
         expireSessions: (account) => database.expireSessions(account),
-        investmentInstrument: () => database.investmentInstrument(),
+        investmentInstrument: (mic) => database.investmentInstrument(mic),
         populateCatalog: () => database.populateCatalog(),
-        investmentQuote: (id, close) => database.investmentQuote(id, close),
+        investmentQuote: (id, close, on, fetchedAt) =>
+          database.investmentQuote(id, close, on, fetchedAt),
       });
     } finally {
       await database.dispose();
