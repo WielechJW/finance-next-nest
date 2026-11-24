@@ -47,3 +47,12 @@ identyfikator wersji i sesji chronią przed powtórzeniem.
 Powiadomienia o sygnałach można włączyć dla wybranej strategii. Kanał Telegram
 korzysta z istniejącej kolejki i zasad ponawiania. Po utracie połączenia,
 wyłączeniu strategii lub wygaśnięciu sygnału powiadomienie zostaje anulowane.
+
+## Panel rachunku
+
+W widoku rachunku wybierz **Strategie sygnałowe**. Dodaj regułę dla wybranego
+instrumentu i zapisz parametry średnich. Harmonogram oraz powiadomienia można
+włączyć osobno w ustawieniach zapisanej strategii. Historia pokazuje także
+uruchomienia bez sygnału. **Odtwórz decyzję** przedstawia stan rachunku,
+użyte kursy i ustawienia wersji. Uruchomienie analizy zapisuje decyzję do
+historii strategii.
