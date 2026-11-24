@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import { InvestmentExports } from "./investment-exports";
 import { ImportPreview } from "./investment-import-preview";
 import { importApi, type ImportBatch } from "@/lib/investment-import-api";
@@ -15,6 +20,10 @@ const formats = {
 const sample =
   "type,occurredOn,currency,amount,ticker,mic,quantity,unitPrice,commission,externalId\r\nDEPOSIT,2025-01-08,PLN,1000,,,,,,cash-1\r\nBUY,2025-01-09,PLN,,CDR,XWAR,2,100,1.99,trade-1\r\n";
 
+const listenForHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
+
 export function InvestmentImports({
   portfolioId,
   accountId,
@@ -27,6 +36,11 @@ export function InvestmentImports({
     [portfolioId, accountId],
   );
   const { state, refresh } = useInvestmentResource(load);
+  const hydrated = useSyncExternalStore(
+    listenForHydration,
+    clientReady,
+    serverReady,
+  );
   const [batch, setBatch] = useState<ImportBatch | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -83,7 +97,7 @@ export function InvestmentImports({
           Pobierz szablon CSV
         </a>
         <form onSubmit={upload}>
-          <fieldset className={styles.fields} disabled={busy}>
+          <fieldset className={styles.fields} disabled={!hydrated || busy}>
             <label>
               Format eksportu
               <select name="format">
@@ -100,7 +114,7 @@ export function InvestmentImports({
             </label>
           </fieldset>
           <div>
-            <button type="submit" disabled={busy}>
+            <button type="submit" disabled={!hydrated || busy}>
               Sprawdź plik
             </button>
           </div>
