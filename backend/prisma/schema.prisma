@@ -847,6 +847,8 @@ model BrokerConnection {
   openingOn   DateTime          @db.Date
   createdAt   DateTime          @default(now()) @db.Timestamptz(3)
   orders      Order[]
+  reconciliationRequired Boolean @default(false)
+  reconciliations PaperReconciliation[]
 
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
@@ -870,6 +872,7 @@ model Order {
   createdAt   DateTime         @default(now()) @db.Timestamptz(3)
   events      OrderEvent[]
   fills       Fill[]
+  venue       PaperVenueOrder?
 
   @@unique([id, connectionId])
   @@unique([connectionId, clientOrderId])
@@ -909,4 +912,38 @@ model Fill {
 
   @@unique([connectionId, executionId])
   @@index([orderId, connectionId, executedAt])
+}
+
+
+model PaperVenueOrder {
+  id            String @id @default(uuid()) @db.Uuid
+  orderId       String @unique @db.Uuid
+  order         Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  clientOrderId String @unique @db.Uuid
+  acceptedAt    DateTime @db.Timestamptz(3)
+  events        PaperVenueEvent[]
+}
+
+model PaperVenueEvent {
+  id           String          @id @default(uuid()) @db.Uuid
+  venueOrderId String          @db.Uuid
+  venueOrder   PaperVenueOrder @relation(fields: [venueOrderId], references: [id], onDelete: Cascade)
+  eventKey     String          @db.VarChar(128)
+  occurredAt   DateTime        @db.Timestamptz(3)
+  payload      Json
+  payloadHash  String          @db.Char(64)
+
+  @@unique([venueOrderId, eventKey])
+  @@index([venueOrderId, occurredAt])
+}
+
+model PaperReconciliation {
+  id           String           @id @default(uuid()) @db.Uuid
+  connectionId String           @db.Uuid
+  connection   BrokerConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  matched      Boolean
+  result       Json
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+
+  @@index([connectionId, createdAt])
 }

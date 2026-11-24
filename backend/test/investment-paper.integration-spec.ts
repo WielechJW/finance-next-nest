@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { PaperExecutionService } from '../src/paper/paper-execution.service.js';
+import { PaperService } from '../src/paper/paper.service.js';
 import { investmentHttpContext } from './support/investment-http.js';
 
 const root = '/investment-paper/connections';
@@ -214,5 +216,192 @@ describe('Local paper order ledger (PostgreSQL)', () => {
       USD: '899.00',
       PLN: '1000.00',
     });
+  });
+
+  it('recovers the same clientOrderId after a restart and replays delayed venue executions', async () => {
+    const owner = await setup();
+    const outsider = await context.signIn();
+    const instrument = await stock('XWAR');
+    const orders = `${owner.path}/orders`;
+    const create = () =>
+      owner.agent
+        .post(orders)
+        .set('Origin', context.origin)
+        .send({
+          instrumentId: instrument.id,
+          side: 'BUY',
+          type: 'LIMIT',
+          limitPrice: '50',
+          quantity: '5',
+          idempotencyKey: randomUUID(),
+        })
+        .expect(201);
+    const order = await create();
+    const orderId = order.body.id as string;
+    const clientOrderId = order.body.clientOrderId as string;
+    const post = (sub: string, input: object = {}) =>
+      owner.agent
+        .post(`${owner.path}/${sub}`)
+        .set('Origin', context.origin)
+        .send(input);
+    const timedOut = await post(`orders/${orderId}/submit`, {
+      fault: 'AFTER_RECEIPT',
+    }).expect(201);
+    expect(timedOut.body).toMatchObject({
+      clientOrderId,
+      state: 'UNKNOWN',
+      foundAtVenue: null,
+    });
+    await post(`orders/${orderId}/submit`).expect(409);
+    const other = await create();
+    await post(`orders/${other.body.id}/submit`).expect(409);
+    await outsider.agent
+      .get(`${owner.path}/venue-orders/${clientOrderId}`)
+      .expect(404);
+    await owner.agent
+      .get(`${owner.path}/venue-orders/${clientOrderId}`)
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toMatchObject({
+          clientOrderId,
+          found: true,
+          venueState: 'ACCEPTED',
+        }),
+      );
+    const restarted = new PaperExecutionService(
+      context.prisma,
+      context.app.get(PaperService),
+    );
+    expect(await restarted.reconcile(owner.userId, owner.id)).toMatchObject({
+      matched: true,
+      local: {
+        available: { PLN: '750.00' },
+        openOrders: [{ clientOrderId, state: 'ACCEPTED' }],
+      },
+    });
+    const partial = {
+      externalEventId: 'venue-partial',
+      kind: 'FILL',
+      happenedAt: new Date().toISOString(),
+      fill: {
+        executionId: 'venue-execution-1',
+        daySequence: 3,
+        quantity: '2',
+        price: '49',
+        fee: '1',
+      },
+    };
+    await post(`orders/${orderId}/venue-events`, partial).expect(201);
+    await post(`orders/${orderId}/venue-events`, partial).expect(201);
+    await post(`orders/${other.body.id}/submit`).expect(409);
+    const result = await post('reconcile').expect(201);
+    expect(result.body).toMatchObject({
+      matched: true,
+      local: {
+        cash: { PLN: '901.00' },
+        available: { PLN: '751.00' },
+        securities: { [instrument.id]: '2.0000000000' },
+        fillIds: ['venue-execution-1'],
+      },
+    });
+    const cancelled = {
+      externalEventId: 'venue-cancel',
+      kind: 'CANCELLED',
+      happenedAt: new Date().toISOString(),
+    };
+    await post(`orders/${orderId}/venue-events`, cancelled).expect(201);
+    await post('reconcile')
+      .expect(201)
+      .expect(({ body }) => expect(body.local.available.PLN).toBe('901.00'));
+    expect(
+      await context.prisma.paperVenueOrder.count({
+        where: { order: { connectionId: owner.id } },
+      }),
+    ).toBe(1);
+  });
+
+  it('blocks an unknown submission without a receipt and reports a balance mismatch', async () => {
+    const owner = await setup();
+    const instrument = await stock('XNAS');
+    const create = () =>
+      owner.agent
+        .post(`${owner.path}/orders`)
+        .set('Origin', context.origin)
+        .send({
+          instrumentId: instrument.id,
+          side: 'BUY',
+          type: 'MARKET',
+          quantity: '1',
+          idempotencyKey: randomUUID(),
+        })
+        .expect(201);
+    const wrong = await create();
+    const post = (sub: string, input: object = {}) =>
+      owner.agent
+        .post(`${owner.path}/${sub}`)
+        .set('Origin', context.origin)
+        .send(input);
+    // A direct local receipt models the difference the reconciler must detect.
+    await post(`orders/${wrong.body.id}/events`, {
+      externalEventId: 'local-only',
+      kind: 'FILL',
+      happenedAt: new Date().toISOString(),
+      fill: {
+        executionId: 'local-only',
+        daySequence: 3,
+        quantity: '1',
+        price: '10',
+        fee: '0',
+      },
+    }).expect(201);
+    const mismatch = await post('reconcile').expect(201);
+    expect(mismatch.body).toMatchObject({
+      matched: false,
+      differences: {
+        cash: [{ key: 'USD', recorded: '990.00', observed: '1000.00' }],
+        positions: [{ key: instrument.id }],
+        fills: ['local-only'],
+      },
+    });
+    const held = await create();
+    await post(`orders/${held.body.id}/submit`).expect(409);
+    const clear = await setup();
+    const pending = await clear.agent
+      .post(`${clear.path}/orders`)
+      .set('Origin', context.origin)
+      .send({
+        instrumentId: instrument.id,
+        side: 'BUY',
+        type: 'MARKET',
+        quantity: '1',
+        idempotencyKey: randomUUID(),
+      })
+      .expect(201);
+    const clearPost = (sub: string, input: object = {}) =>
+      clear.agent
+        .post(`${clear.path}/${sub}`)
+        .set('Origin', context.origin)
+        .send(input);
+    await clearPost(`orders/${pending.body.id}/submit`, {
+      fault: 'BEFORE_RECEIPT',
+    })
+      .expect(201)
+      .expect(({ body }) =>
+        expect(body).toMatchObject({ state: 'UNKNOWN', foundAtVenue: false }),
+      );
+    await clearPost('reconcile')
+      .expect(201)
+      .expect(({ body }) =>
+        expect(body).toMatchObject({
+          matched: false,
+          differences: { openOrders: [pending.body.clientOrderId] },
+        }),
+      );
+    await clearPost(`orders/${pending.body.id}/submit`).expect(409);
+    expect(
+      await context.prisma.paperVenueOrder.count({
+        where: { order: { connectionId: clear.id } },
+      }),
+    ).toBe(0);
   });
 });

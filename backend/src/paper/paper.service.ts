@@ -30,6 +30,7 @@ const connectionSelect = {
   mode: true,
   openingOn: true,
   createdAt: true,
+  reconciliationRequired: true,
 } satisfies Prisma.BrokerConnectionSelect;
 const orderInclude = {
   instrument: { select: { id: true, ticker: true, mic: true, currency: true } },
@@ -263,6 +264,24 @@ export class PaperService {
       throw new BadRequestException(
         'Dane wykonania są wymagane tylko dla zdarzenia FILL.',
       );
+    return this.prisma.$transaction(
+      (tx) =>
+        this.recordInTransaction(tx, userId, connectionId, orderId, input),
+      { timeout: 30000 },
+    );
+  }
+
+  async recordInTransaction(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    connectionId: string,
+    orderId: string,
+    input: PaperEventDto,
+  ) {
+    if ((input.kind === 'FILL') !== !!input.fill)
+      throw new BadRequestException(
+        'Dane wykonania są wymagane tylko dla zdarzenia FILL.',
+      );
     const happenedAt = new Date(input.happenedAt);
     const occurredOn = zonedClock(happenedAt, 'Europe/Warsaw').day;
     if (happenedAt > new Date())
@@ -279,114 +298,104 @@ export class PaperService {
         }
       : null;
     const payloadHash = paperHash([input.kind, happenedAt.toISOString(), fill]);
-    return this.prisma.$transaction(
-      async (tx) => {
-        const locked = await lockPaperAccount(tx, userId, connectionId);
-        const order = await tx.order.findUnique({
-          where: { id_connectionId: { id: orderId, connectionId } },
-          include: orderInclude,
-        });
-        if (!order)
-          throw new NotFoundException('Nie znaleziono zlecenia symulowanego.');
-        if (occurredOn < paperDay(locked.openingOn))
-          throw new BadRequestException(
-            'Zdarzenie poprzedza otwarcie rachunku symulowanego.',
-          );
-        const receipt = order.events.find(
-          (item) => item.externalEventId === input.externalEventId,
+    const locked = await lockPaperAccount(tx, userId, connectionId);
+    const order = await tx.order.findUnique({
+      where: { id_connectionId: { id: orderId, connectionId } },
+      include: orderInclude,
+    });
+    if (!order)
+      throw new NotFoundException('Nie znaleziono zlecenia symulowanego.');
+    if (occurredOn < paperDay(locked.openingOn))
+      throw new BadRequestException(
+        'Zdarzenie poprzedza otwarcie rachunku symulowanego.',
+      );
+    const receipt = order.events.find(
+      (item) => item.externalEventId === input.externalEventId,
+    );
+    if (receipt) {
+      if (receipt.payloadHash !== payloadHash)
+        throw new ConflictException(
+          'Powtórzony identyfikator zdarzenia ma inną treść.',
         );
-        if (receipt) {
-          if (receipt.payloadHash !== payloadHash)
-            throw new ConflictException(
-              'Powtórzony identyfikator zdarzenia ma inną treść.',
-            );
-          return serialize(order);
-        }
-        assertFillTiming(order.events, input.kind, happenedAt, order.fills);
-        let filled = new D(order.filledQuantity.toFixed());
-        if (fill) {
-          const old = await tx.fill.findUnique({
-            where: {
-              connectionId_executionId: {
-                connectionId,
-                executionId: fill.executionId,
-              },
-            },
-          });
-          if (
-            old &&
-            (old.orderId !== orderId || old.payloadHash !== payloadHash)
-          )
-            throw new ConflictException(
-              'Identyfikator wykonania jest już przypisany do innych danych.',
-            );
-          if (!old) {
-            filled = filled.plus(fill.quantity);
-            if (filled.gt(order.quantity.toFixed()))
-              throw new ConflictException(
-                'Wykonania przekraczają ilość zlecenia.',
-              );
-            if (
-              order.limitPrice &&
-              (order.side === 'BUY'
-                ? new D(fill.price).gt(order.limitPrice.toFixed())
-                : new D(fill.price).lt(order.limitPrice.toFixed()))
-            )
-              throw new ConflictException(
-                'Cena wykonania przekracza warunek zlecenia.',
-              );
-            const posted = await this.posting.postInTransaction(tx, userId, {
-              type: order.side,
-              accountId: locked.accountId,
-              instrumentId: order.instrumentId,
-              quantity: fill.quantity,
-              unitPrice: fill.price,
-              commission: fill.fee,
-              occurredOn,
-              executedAt: happenedAt.toISOString(),
-              sourceTimeZone: 'UTC',
-              timePrecision: 'INSTANT',
-              daySequence: fill.daySequence,
-              source: 'BROKER',
-              sourceKey: 'paper:local',
-              externalOperationId: fill.executionId,
-              idempotencyKey: paperHash(['paper:local', fill.executionId]),
-            });
-            await tx.fill.create({
-              data: {
-                ...fill,
-                orderId,
-                connectionId,
-                executedAt: happenedAt,
-                ledgerEventId: posted.eventId,
-                payloadHash,
-              },
-            });
-          }
-        }
-        await tx.orderEvent.create({
+      return serialize(order);
+    }
+    assertFillTiming(order.events, input.kind, happenedAt, order.fills);
+    let filled = new D(order.filledQuantity.toFixed());
+    if (fill) {
+      const old = await tx.fill.findUnique({
+        where: {
+          connectionId_executionId: {
+            connectionId,
+            executionId: fill.executionId,
+          },
+        },
+      });
+      if (old && (old.orderId !== orderId || old.payloadHash !== payloadHash))
+        throw new ConflictException(
+          'Identyfikator wykonania jest już przypisany do innych danych.',
+        );
+      if (!old) {
+        filled = filled.plus(fill.quantity);
+        if (filled.gt(order.quantity.toFixed()))
+          throw new ConflictException('Wykonania przekraczają ilość zlecenia.');
+        if (
+          order.limitPrice &&
+          (order.side === 'BUY'
+            ? new D(fill.price).gt(order.limitPrice.toFixed())
+            : new D(fill.price).lt(order.limitPrice.toFixed()))
+        )
+          throw new ConflictException(
+            'Cena wykonania przekracza warunek zlecenia.',
+          );
+        const posted = await this.posting.postInTransaction(tx, userId, {
+          type: order.side,
+          accountId: locked.accountId,
+          instrumentId: order.instrumentId,
+          quantity: fill.quantity,
+          unitPrice: fill.price,
+          commission: fill.fee,
+          occurredOn,
+          executedAt: happenedAt.toISOString(),
+          sourceTimeZone: 'UTC',
+          timePrecision: 'INSTANT',
+          daySequence: fill.daySequence,
+          source: 'BROKER',
+          sourceKey: 'paper:local',
+          externalOperationId: fill.executionId,
+          idempotencyKey: paperHash(['paper:local', fill.executionId]),
+        });
+        await tx.fill.create({
           data: {
+            ...fill,
             orderId,
-            externalEventId: input.externalEventId,
-            kind: input.kind,
-            happenedAt,
+            connectionId,
+            executedAt: happenedAt,
+            ledgerEventId: posted.eventId,
             payloadHash,
           },
         });
-        const state = projectPaperOrder(
-          order.quantity.toFixed(),
-          filled.toFixed(),
-          [...order.events, { kind: input.kind, happenedAt }],
-        );
-        return serialize(
-          await tx.order.update({
-            where: { id: orderId },
-            data: { state, filledQuantity: filled.toFixed() },
-            include: orderInclude,
-          }),
-        );
+      }
+    }
+    await tx.orderEvent.create({
+      data: {
+        orderId,
+        externalEventId: input.externalEventId,
+        kind: input.kind,
+        happenedAt,
+        payloadHash,
       },
-      { timeout: 30000 },
+    });
+    const state = projectPaperOrder(
+      order.quantity.toFixed(),
+      filled.toFixed(),
+      [...order.events, { kind: input.kind, happenedAt }],
+    );
+    return serialize(
+      await tx.order.update({
+        where: { id: orderId },
+        data: { state, filledQuantity: filled.toFixed() },
+        include: orderInclude,
+      }),
     );
   }
 }
