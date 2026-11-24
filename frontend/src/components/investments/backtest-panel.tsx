@@ -53,6 +53,20 @@ function Report({ result }: { result: BacktestDetail }) {
         {phase(result.phase)} · {result.fromOn} – {result.toOn} · wersja reguły{" "}
         {result.version} · model {result.modelVersion}
       </p>
+      <p>
+        Identyfikator próby <code>{result.id}</code>
+      </p>
+      {result.verified && (
+        <p role="status">
+          Odtworzono identyczny wynik z zapisanego zestawu danych.
+        </p>
+      )}
+      {report?.coverage && (
+        <p>
+          Zestaw {report.coverage.source} · instrumenty{" "}
+          {report.coverage.instruments} · wycofane {report.coverage.delisted}
+        </p>
+      )}
       {result.error && (
         <p role="status">Próba zakończona błędem. {result.error}</p>
       )}
@@ -243,7 +257,27 @@ export function BacktestPanel({
         ) : (
           <p>Brak prób historycznych.</p>
         ))}
-      {detail && <Report result={detail} />}
+      {detail && (
+        <>
+          <Report result={detail} />
+          {detail.report && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void open(() =>
+                  backtestsApi.replay(
+                    { portfolioId, accountId, strategyId },
+                    detail.id,
+                  ),
+                )
+              }
+            >
+              Odtwórz test historyczny
+            </button>
+          )}
+        </>
+      )}
     </section>
   );
 }

@@ -50,9 +50,18 @@ function performance(value: unknown) {
 function detail(value: unknown) {
   const row = marketObject(value);
   const report = row.report === null ? null : marketObject(row.report);
+  const coverage = report?.inputCoverage
+    ? marketObject(report.inputCoverage)
+    : null;
   return {
     ...summary(value),
+    verified: row.verified === true,
     report: report && {
+      coverage: coverage && {
+        source: marketText(coverage.source),
+        instruments: marketInteger(coverage.instruments),
+        delisted: marketInteger(coverage.delisted),
+      },
       strategy: performance(report.strategy),
       benchmark: performance(report.benchmark),
       currency: marketText(report.currency),
@@ -83,6 +92,13 @@ export const backtestsApi = {
   async get(scope: Scope, id: string) {
     return detail(
       await apiRequest<unknown>(`${root(scope)}/${encodeURIComponent(id)}`),
+    );
+  },
+  async replay(scope: Scope, id: string) {
+    return detail(
+      await apiRequest<unknown>(
+        `${root(scope)}/${encodeURIComponent(id)}/replay`,
+      ),
     );
   },
 };

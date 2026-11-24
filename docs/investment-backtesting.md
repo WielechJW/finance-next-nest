@@ -68,3 +68,24 @@ ustaw `"phase": "OUT_OF_SAMPLE"`, dodaj `baselineId` wcześniejszej zakończonej
 próby tej samej strategii i wybierz okres zaczynający się po jej zakończeniu.
 Test użyje wersji parametrów z wcześniejszej próby. Nieudane obliczenia
 zostają zapisane wraz z przyczyną oraz identyfikatorem zestawu wejściowego.
+
+## Zapis wejścia i dane historyczne
+
+Nowy plik zawiera `history.source`, listę `history.universe` i listę
+`history.reports`. Przy instrumencie podaj ticker, MIC, walutę i `listedOn`.
+`delistedOn` oznacza pierwszy dzień poza uniwersum. Zostaw w pliku również
+instrumenty wycofane po początku testowanego okresu. Filtr stosuje te daty
+osobno dla każdej sesji.
+
+Raport fundamentalny ma okres, zakres, źródło, wersję, `publishedAt` oraz
+`availableAt`. Reguła otrzymuje tylko raporty opublikowane i dostępne przed
+chwilą decyzji. Z późniejszych rewizji może skorzystać dopiero po ich
+udostępnieniu. Dane w przykładowym pliku są demonstracyjne.
+
+Model `next-open-2` wymaga instrumentu w historycznym uniwersum, obserwacji
+każdej sesji, odpowiedniego rozgrzania średnich oraz danych do wyceny.
+Wartość `opening: null` oznacza jawny brak ceny otwarcia. Zapisuje się
+niezmienny zestaw danych, jego skrót SHA-256, parametry i wersję modelu.
+Przycisk **Odtwórz test historyczny** weryfikuje skrót i ponownie oblicza
+wynik z zapisanego zestawu. Zachowano odczyt i odtworzenie prób zapisanych
+przed wprowadzeniem wymogu historycznego uniwersum.

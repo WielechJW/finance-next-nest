@@ -4,6 +4,7 @@ import {
   IsArray,
   IsDefined,
   IsIn,
+  IsUrl,
   IsInt,
   IsISO8601,
   IsObject,
@@ -88,7 +89,60 @@ class CostsDto {
   @IsInt() @Min(0) @Max(10000) slippageBps!: number;
 }
 
+class UniverseMemberDto {
+  @Matches(/^[A-Z0-9][A-Z0-9.-]{0,31}$/) ticker!: string;
+  @Matches(/^[A-Z0-9]{4}$/) mic!: string;
+  @IsIn(currencies) currency!: Currency;
+  @IsCalendarDate() listedOn!: string;
+  @IsOptional() @IsCalendarDate() delistedOn?: string;
+}
+class ReportFactDto {
+  @Matches(/^[A-Z][A-Z0-9_]{0,60}$/) metric!: string;
+  @Matches(/^-?\d{1,20}(?:\.\d{1,10})?$/) amount!: string;
+  @IsString() @MaxLength(32) unit!: string;
+}
+class DatedReportDto {
+  @Matches(/^[A-Z0-9][A-Z0-9.-]{0,31}$/) ticker!: string;
+  @Matches(/^[A-Z0-9]{4}$/) mic!: string;
+  @IsString() @MaxLength(80) id!: string;
+  @IsCalendarDate() periodEnd!: string;
+  @IsISO8601({ strict: true, strictSeparator: true })
+  @Matches(instant)
+  publishedAt!: string;
+  @IsISO8601({ strict: true, strictSeparator: true })
+  @Matches(instant)
+  availableAt!: string;
+  @IsInt() @Min(1) @Max(2147483647) revision!: number;
+  @IsIn(['CONSOLIDATED', 'STANDALONE']) scope!: 'CONSOLIDATED' | 'STANDALONE';
+  @MaxLength(2048)
+  @IsUrl({ protocols: ['https'], require_protocol: true, disallow_auth: true })
+  sourceUrl!: string;
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => ReportFactDto)
+  facts!: ReportFactDto[];
+}
+class HistoryDto {
+  @IsString() @MaxLength(200) source!: string;
+  @IsArray()
+  @ArrayMaxSize(3000)
+  @ValidateNested({ each: true })
+  @Type(() => UniverseMemberDto)
+  universe!: UniverseMemberDto[];
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @ValidateNested({ each: true })
+  @Type(() => DatedReportDto)
+  reports!: DatedReportDto[];
+}
+
 export class BacktestInputDto {
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => HistoryDto)
+  history?: HistoryDto;
   @IsIn(['DEVELOPMENT', 'OUT_OF_SAMPLE']) phase!:
     'DEVELOPMENT' | 'OUT_OF_SAMPLE';
   @IsOptional() @IsUUID() baselineId?: string;

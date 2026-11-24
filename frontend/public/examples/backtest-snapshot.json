@@ -4,7 +4,10 @@
   "toOn": "2026-07-13",
   "reportingCurrency": "USD",
   "priceBasis": "RAW",
-  "startingCash": { "PLN": "0", "USD": "1000" },
+  "startingCash": {
+    "PLN": "0",
+    "USD": "1000"
+  },
   "orderQuantity": "2",
   "maxWaitSessions": 2,
   "costs": {
@@ -17,17 +20,26 @@
     {
       "sessionOn": "2026-07-09",
       "decidedAt": "2026-07-09T22:00:00Z",
-      "opening": { "price": "50", "availableQuantity": "100" }
+      "opening": {
+        "price": "50",
+        "availableQuantity": "100"
+      }
     },
     {
       "sessionOn": "2026-07-10",
       "decidedAt": "2026-07-10T22:00:00Z",
-      "opening": { "price": "130", "availableQuantity": "100" }
+      "opening": {
+        "price": "130",
+        "availableQuantity": "100"
+      }
     },
     {
       "sessionOn": "2026-07-13",
       "decidedAt": "2026-07-13T22:00:00Z",
-      "opening": { "price": "160", "availableQuantity": "100" }
+      "opening": {
+        "price": "160",
+        "availableQuantity": "100"
+      }
     }
   ],
   "bars": [
@@ -76,5 +88,24 @@
   ],
   "fxMarks": [],
   "fx": [],
-  "actions": []
+  "actions": [],
+  "history": {
+    "source": "Dane demonstracyjne do ręcznej weryfikacji",
+    "universe": [
+      {
+        "ticker": "AAPL",
+        "mic": "XNAS",
+        "currency": "USD",
+        "listedOn": "2025-01-01"
+      },
+      {
+        "ticker": "DEMOOLD",
+        "mic": "XNAS",
+        "currency": "USD",
+        "listedOn": "2025-01-01",
+        "delistedOn": "2026-07-10"
+      }
+    ],
+    "reports": []
+  }
 }
