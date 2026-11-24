@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { login, logout } from './actions.js';
 import { API_URL, FRONTEND_URL, expect, test } from './fixtures.js';
 
@@ -61,6 +62,42 @@ test('configures a private strategy, stops the schedule and replays a saved deci
     page
       .getByRole('region', { name: 'Odtworzenie decyzji' })
       .getByText('Średnie z 5 i 20 sesji · ważność 60 min'),
+  ).toBeVisible();
+  const settings = page.getByRole('form', { name: 'Parametry strategii' });
+  await settings.getByLabel('Szybka średnia (sesje)').fill('2');
+  await settings.getByLabel('Długa średnia (sesje)').fill('3');
+  await settings.getByRole('button', { name: 'Zapisz parametry' }).click();
+  await expect(page.getByText('Zapisano parametry strategii.')).toBeVisible();
+  const data = JSON.parse(
+    await readFile(
+      new URL(
+        '../../../frontend/public/examples/backtest-snapshot.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  ) as Record<string, unknown>;
+  data.reportingCurrency = 'PLN';
+  data.startingCash = { PLN: '1000', USD: '0' };
+  const backtest = page.getByRole('form', { name: 'Uruchom test historyczny' });
+  await backtest
+    .getByLabel('Dane testu JSON')
+    .setInputFiles({
+      name: 'snapshot.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(data)),
+    });
+  await backtest.getByRole('button', { name: 'Uruchom test' }).click();
+  const report = page.getByRole('table', {
+    name: 'Wyniki strategii i benchmarku',
+  });
+  await expect(
+    report.getByRole('row', { name: /Kapitał końcowy/ }),
+  ).toContainText('938 PLN');
+  await expect(
+    page.getByRole('figure', {
+      name: 'Krzywa kapitału strategii i benchmarku',
+    }),
   ).toBeVisible();
   await logout(page);
   await login(page, stranger);

@@ -1,3 +1,5 @@
+import { BacktestsController } from '../backtests/backtests.controller.js';
+import { BacktestsService } from '../backtests/backtests.service.js';
 import { Module } from '@nestjs/common';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import { MarketJobsModule } from '../jobs/jobs.module.js';
@@ -9,8 +11,13 @@ import { StrategiesService } from './strategies.service.js';
 
 @Module({
   imports: [UsersModule, InvestmentsModule, MarketJobsModule],
-  providers: [StrategiesService, StrategyRunnerService, SessionAuthGuard],
-  controllers: [StrategiesController],
+  providers: [
+    StrategiesService,
+    StrategyRunnerService,
+    BacktestsService,
+    SessionAuthGuard,
+  ],
+  controllers: [StrategiesController, BacktestsController],
   exports: [StrategiesService, StrategyRunnerService],
 })
 export class StrategiesModule {}

@@ -711,6 +711,7 @@ model StrategyVersion {
   parameters  Json
   createdAt   DateTime      @default(now()) @db.Timestamptz(3)
   runs        StrategyRun[]
+  backtests   BacktestRun[]
 
   @@unique([strategyId, number])
 }
@@ -755,4 +756,37 @@ model Signal {
   notification      Notification?
 
   @@index([instrumentId, decidedAt])
+}
+
+
+enum BacktestPhase {
+  DEVELOPMENT
+  OUT_OF_SAMPLE
+}
+
+enum BacktestStatus {
+  COMPLETE
+  FAILED
+}
+
+model BacktestRun {
+  id            String          @id @default(uuid()) @db.Uuid
+  versionId     String          @db.Uuid
+  version       StrategyVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  baselineId    String?         @db.Uuid
+  baseline      BacktestRun?    @relation("BacktestBaseline", fields: [baselineId], references: [id], onDelete: Cascade)
+  validations   BacktestRun[]   @relation("BacktestBaseline")
+  phase         BacktestPhase
+  status        BacktestStatus
+  fromOn        DateTime        @db.Date
+  toOn          DateTime        @db.Date
+  modelVersion  String          @db.VarChar(32)
+  inputHash     String          @db.Char(64)
+  input         Json
+  report        Json?
+  error         String?         @db.VarChar(500)
+  createdAt     DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@index([versionId, createdAt])
+  @@index([baselineId])
 }
