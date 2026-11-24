@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import { login } from './actions.js';
 import { API_URL, FRONTEND_URL, expect, test } from './fixtures.js';
@@ -20,7 +21,7 @@ async function openImportPage(page: Page) {
   await page.goto(
     `/dashboard/investments/${portfolioId}/accounts/${accountId}`,
   );
-  await page.getByRole('link', { name: 'Import historii CSV' }).click();
+  await page.getByRole('link', { name: 'Import i eksport CSV' }).click();
 }
 
 test('uploads a report, reopens saved validation results and leaves cash unchanged', async ({
@@ -97,6 +98,15 @@ test('confirms a batch and reopens its broker reconciliation', async ({
   await page.reload();
   await page.getByRole('button', { name: /Szablon ogólny/ }).click();
   await expect(differences.getByText('0.02', { exact: true })).toBeVisible();
+  const exportForm = page.getByRole('form', { name: 'Eksportuj CSV' });
+  await exportForm.getByLabel('Do dnia').fill('2025-01-08');
+  const download = page.waitForEvent('download');
+  await exportForm.getByRole('button', { name: 'Pobierz CSV' }).click();
+  const csv = await download;
+  expect(csv.suggestedFilename()).toBe('finance-operations-2025-01-08.csv');
+  expect(await readFile(await csv.path(), 'utf8')).toContain(
+    '"DEPOSIT","2025-01-08","PLN","100.02"',
+  );
   await page.getByRole('link', { name: 'Wróć do rachunku' }).click();
   await expect(
     page.getByText('100,02 PLN', { exact: true }).first(),

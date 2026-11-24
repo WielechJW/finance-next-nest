@@ -93,10 +93,12 @@ export async function apiRequest<T>(
 
   try {
     const headers = new Headers(init.headers);
-    headers.set(
-      "Accept",
-      responseType === "blob" ? "application/pdf" : "application/json",
-    );
+    if (!headers.has("Accept")) {
+      headers.set(
+        "Accept",
+        responseType === "blob" ? "application/pdf" : "application/json",
+      );
+    }
     if (
       init.body &&
       !(init.body instanceof FormData) &&

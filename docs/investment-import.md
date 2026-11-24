@@ -1,6 +1,6 @@
 # Import historii inwestycyjnej z CSV
 
-Na rachunku inwestycyjnym wybierz **Import historii CSV** i wskaż plik oraz
+Na rachunku inwestycyjnym wybierz **Import i eksport CSV** i wskaż plik oraz
 format. Aplikacja zapisuje partię i wynik odczytu każdego wiersza. Po sprawdzeniu
 możesz zatwierdzić wybrane operacje wraz z wartościami z dokumentu brokera. Ponowne przesłanie tego samego pliku
 w tym samym formacie i na ten sam rachunek zwraca istniejącą partię.
@@ -92,3 +92,30 @@ Partia zawiera typ formatu, autora, status, rozpoznane kodowanie, znormalizowane
 wartości i ewentualny błąd wraz z numerem wiersza. Przesłane bajty pliku są
 przetwarzane w pamięci. Widok ostatnich partii i ich wiersze są dostępne po
 zalogowaniu na konto właściciela rachunku.
+
+## Eksport i retencja
+
+Z sekcji **Eksportuj CSV** można pobrać cztery pliki przypisane do rachunku.
+
+- **Operacje do ponownego importu** zawierają bieżące wersje wpisów w wybranym
+  zakresie, w kolejności księgowania. `externalId` ma identyfikator wersji wpisu,
+  a `originalExternalId` zachowuje identyfikator źródłowy. Importuj jako szablon
+  ogólny. Do odtworzenia salda użyj całej historii lub uzupełnij stan otwarcia.
+- **Historia zmian** obejmuje także wersje zastąpione, anulowania i przyczyny
+  korekt. Pobierz ten plik do przeglądu śladu zmian.
+- **Pozycje i wycena** pokazują koszt FIFO, ilość, źródło i dzień kursu, stan
+  danych i obliczone wartości na wybrany dzień. Przy braku kalendarza dla
+  wybranego roku plik zachowuje ilości i koszt oraz oznacza brak wyceny rynkowej.
+- **Wyniki i gotówka** pokazują wartości według waluty i sumę w PLN. Puste
+  wartości w podsumowaniu oznaczają brak danych niezbędnych do pełnej wyceny.
+
+Eksport ma kodowanie UTF-8 z BOM i zachowuje dokładność dziesiętną. Każda
+komórka ma cudzysłowy CSV, a tekst przypominający formułę arkusza jest
+poprzedzony apostrofem. Znaki końca wiersza i tabulatory w treści opisowej
+są zapisywane jako sekwencje tekstowe.
+
+Oryginalne pliki importu są przetwarzane w pamięci, a pliki eksportu są
+budowane na żądanie sesji właściciela. Przechowywane są znormalizowane
+wiersze, skrót importu i wynik uzgodnienia powiązane z rachunkiem. Zachowanie
+potwierdzeń pozwala bezpiecznie ponowić żądanie. Korekta zmienia rejestr przez
+nową wersję operacji i zachowuje wcześniejszą wersję w historii zmian.

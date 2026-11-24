@@ -7,6 +7,7 @@ import { replayBalances } from '../investments/posting.js';
 import { replayFifo } from '../investments/fifo.js';
 import { eventInclude } from '../investments/events.service.js';
 import { InvestmentCalculation as D } from '../investments/precision.js';
+import { MarketDataError } from '../market-data/contracts.js';
 import { expectedSession, previousDay, zonedClock } from '../market-data/calendar.js';
 
 const dayOf = (value: Date) => value.toISOString().slice(0, 10);
@@ -16,11 +17,12 @@ const zero = () => new D(0);
 @Injectable()
 export class PortfolioValuationService {
   constructor(private readonly prisma: PrismaService) {}
-  async load(userId: string, portfolioId: string, asOf: string, benchmarkId?: string) {
+  async load(userId: string, portfolioId: string, asOf: string, benchmarkId?: string, accountId?: string) {
     return this.prisma.$transaction(async tx => {
       const portfolio = await tx.portfolio.findFirst({ where: { id: portfolioId, userId }, select: { id: true, name: true } });
       if (!portfolio) throw new NotFoundException('Nie znaleziono portfela inwestycyjnego.');
-      const accounts = await tx.investmentAccount.findMany({ where: { portfolioId }, include: { events: { where: { activeSlot: 1, occurredOn: { lte: new Date(`${asOf}T00:00:00Z`) } }, include: eventInclude, orderBy: [{ occurredOn: 'asc' }, { daySequence: 'asc' }, { id: 'asc' }] } } });
+      const accounts = await tx.investmentAccount.findMany({ where: { portfolioId, ...(accountId ? { id: accountId } : {}) }, include: { events: { where: { activeSlot: 1, occurredOn: { lte: new Date(`${asOf}T00:00:00Z`) } }, include: eventInclude, orderBy: [{ occurredOn: 'asc' }, { daySequence: 'asc' }, { id: 'asc' }] } } });
+      if (accountId && !accounts.length) throw new NotFoundException('Nie znaleziono rachunku inwestycyjnego.');
       const ids = new Set(accounts.flatMap(account => account.events.flatMap(event => [event.trade?.instrumentId, event.openingLot?.instrumentId, event.split?.instrumentId].filter((id): id is string => !!id))));
       if (benchmarkId) ids.add(benchmarkId);
       const instruments = await tx.instrument.findMany({ where: { id: { in: [...ids] } }, orderBy: { id: 'asc' } });
@@ -37,7 +39,7 @@ export class PortfolioValuationService {
       return { portfolio, accounts, instruments, prices, fx, unresolved };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
-  calculate(data: Awaited<ReturnType<PortfolioValuationService['load']>>, asOf: string, now = new Date(`${asOf}T22:59:59Z`)) {
+  calculate(data: Awaited<ReturnType<PortfolioValuationService['load']>>, asOf: string, now = new Date(`${asOf}T22:59:59Z`), options: { allowMissingCalendar?: boolean } = {}) {
     const events = data.accounts.flatMap(account => account.events.filter(event => dayOf(event.occurredOn) <= asOf));
     const fxIds = new Set<string>();
     const convert = (amount: string, currency: 'PLN' | 'USD', date = asOf): InstanceType<typeof D> | null => {
@@ -67,9 +69,13 @@ export class PortfolioValuationService {
     if (usdCash === null) complete = false; else known = known.plus(usdCash);
     const positions = [...held].map(([instrumentId, position]) => {
       const instrument = data.instruments.find(row => row.id === instrumentId)!;
-      const expected = expectedSession(instrument.mic, now);
-      const price = data.prices.find(row => row.instrumentId === instrumentId && dayOf(row.sessionOn) <= expected);
-      const status = !price ? 'missing' : dayOf(price.sessionOn) < expected ? 'stale' : 'fresh';
+      let expected: string | null = null;
+      try { expected = expectedSession(instrument.mic, now); }
+      catch (error) {
+        if (!options.allowMissingCalendar || !(error instanceof MarketDataError) || error.code !== 'configuration') throw error;
+      }
+      const price = expected ? data.prices.find(row => row.instrumentId === instrumentId && dayOf(row.sessionOn) <= expected) : undefined;
+      const status = !expected ? 'calendar_unavailable' : !price ? 'missing' : dayOf(price.sessionOn) < expected ? 'stale' : 'fresh';
       const value = price && !affected.has(instrumentId) ? position.quantity.times(price.close.toString()) : null;
       const pln = value ? convert(value.toFixed(), position.currency) : null;
       if (status !== 'fresh' || pln === null) complete = false;

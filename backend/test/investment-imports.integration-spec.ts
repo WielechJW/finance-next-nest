@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { readCsv } from '../src/imports/csv-reader.js';
 import { investmentHttpContext } from './support/investment-http.js';
 
 const file = Buffer.from(
@@ -522,6 +523,145 @@ describe('Investment CSV import batches (PostgreSQL)', () => {
         .set('Origin', context.origin)
         .send({ instrumentId: stock.id })
         .expect(409);
+    } finally {
+      await context.cleanup();
+      await context.prisma.instrument.delete({ where: { id: stock.id } });
+    }
+  });
+
+  it('exports scoped operations, corrections and valuation, then reimports the exact ledger to another account', async () => {
+    const owner = await setup();
+    const other = await setup();
+    const stock = await context.prisma.instrument.create({
+      data: { ticker: 'IMPORT83TEST', mic: 'XNAS', currency: 'USD' },
+    });
+    try {
+      const events = `${owner.path}/events`;
+      const post = (body: object) =>
+        owner.agent
+          .post(events)
+          .set('Origin', context.origin)
+          .send(body)
+          .expect(201);
+      await post({
+        type: 'DEPOSIT',
+        currency: 'USD',
+        amount: '100',
+        occurredOn: '2025-01-08',
+        timePrecision: 'DATE',
+        daySequence: 1,
+        idempotencyKey: 'export-deposit',
+      });
+      const buy = {
+        type: 'BUY',
+        instrumentId: stock.id,
+        quantity: '0.5000000000',
+        unitPrice: '10.10',
+        commission: '0.01',
+        occurredOn: '2025-01-09',
+        timePrecision: 'INSTANT',
+        daySequence: 1,
+        executedAt: '2025-01-08T18:00:00-05:00',
+        sourceTimeZone: 'America/New_York',
+        marketSessionOn: '2025-01-08',
+      };
+      const original = await post({ ...buy, idempotencyKey: 'export-buy' });
+      const correction = await owner.agent
+        .post(`${events}/${original.body.eventId}/corrections`)
+        .set('Origin', context.origin)
+        .send({
+          expectedRevision: 0,
+          reason: '=1+1',
+          idempotencyKey: 'export-correction',
+          replacement: {
+            ...buy,
+            unitPrice: '10.20',
+            idempotencyKey: 'export-correction',
+          },
+        })
+        .expect(201);
+      const url = `${owner.path}/exports`;
+      await other.agent
+        .get(url)
+        .query({ kind: 'operations', asOf: '2025-01-10' })
+        .expect(404);
+      const get = (kind: string, query: object = {}) =>
+        owner.agent
+          .get(url)
+          .query({ kind, asOf: '2025-01-10', ...query })
+          .expect(200)
+          .expect('Cache-Control', 'no-store')
+          .expect('Content-Type', /text\/csv/);
+      const audit = await get('audit');
+      expect(audit.text).toContain(`"'=1+1"`);
+      expect(audit.text).toContain(original.body.eventId);
+      expect(readCsv(Buffer.from(audit.text), ['effective']).rows).toHaveLength(
+        3,
+      );
+      const valuation = await get('positions');
+      const snapshot = readCsv(Buffer.from(valuation.text), ['quotestatus'])
+        .rows[0].values;
+      expect(snapshot && Object.fromEntries(snapshot)).toMatchObject({
+        quantity: '0.5000000000',
+        quotestatus: 'calendar_unavailable',
+        asof: '2025-01-10',
+        cost: '5.11000000',
+      });
+      const currentValuation = await get('positions', { asOf: '2026-07-10' });
+      expect(
+        readCsv(Buffer.from(currentValuation.text), [
+          'quotestatus',
+        ]).rows[0].values?.get('quotestatus'),
+      ).toBe('missing');
+      const result = await get('results');
+      const resultRows = readCsv(Buffer.from(result.text), [
+        'cash',
+        'complete',
+      ]).rows;
+      expect(resultRows[1].values?.get('cash')).toBe('94.89');
+      expect(resultRows[2].values?.get('complete')).toBe('false');
+      const range = await get('operations', { from: '2025-01-09' });
+      expect(readCsv(Buffer.from(range.text), ['type']).rows).toHaveLength(1);
+      const file = await get('operations');
+      expect(file.headers['content-disposition']).toBe(
+        'attachment; filename="finance-operations-2025-01-10.csv"',
+      );
+      const rows = readCsv(Buffer.from(file.text), ['type']).rows;
+      expect(rows).toHaveLength(2);
+      expect(rows[1].values?.get('externalid')).toBe(correction.body.eventId);
+      expect(rows[1].values?.get('executedat')).toBe(
+        '2025-01-08T18:00:00.000-05:00',
+      );
+      const target = await owner.agent
+        .post(owner.path.slice(0, owner.path.lastIndexOf('/')))
+        .send({ name: 'Odtworzony' })
+        .expect(201);
+      const imports =
+        owner.path.slice(0, owner.path.lastIndexOf('/') + 1) +
+        target.body.id +
+        '/imports';
+      const uploaded = await owner.agent
+        .post(imports)
+        .set('Origin', context.origin)
+        .field('format', 'GENERIC')
+        .attach('csv', Buffer.from(file.text), 'roundtrip.csv')
+        .expect(201);
+      expect(uploaded.body.status).toBe('PARSED');
+      const imported = await owner.agent
+        .post(`${imports}/${uploaded.body.id}/confirm`)
+        .set('Origin', context.origin)
+        .send({
+          completeHistory: true,
+          asOf: '2025-01-10',
+          cash: { PLN: '0', USD: '94.89' },
+          positions: [{ instrumentId: stock.id, quantity: '0.5' }],
+          decisions: [],
+        })
+        .expect(200);
+      expect(imported.body).toMatchObject({
+        posted: 2,
+        reconciliation: { cash: [], positions: [] },
+      });
     } finally {
       await context.cleanup();
       await context.prisma.instrument.delete({ where: { id: stock.id } });
