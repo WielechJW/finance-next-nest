@@ -369,4 +369,162 @@ describe('Investment CSV import batches (PostgreSQL)', () => {
       await context.prisma.instrument.delete({ where: { id: instrument.id } });
     }
   });
+
+  it('rolls back a failed posting, then confirms a valid batch exactly once and reports broker differences', async () => {
+    const owner = await setup();
+    const other = await setup();
+    const input = {
+      completeHistory: true,
+      asOf: '2025-01-10',
+      cash: { PLN: '179.00', USD: '0' },
+      positions: [],
+      decisions: [],
+    };
+    const upload = async (content: string) => {
+      const report = await owner.agent
+        .post(owner.imports)
+        .set('Origin', context.origin)
+        .field('format', 'GENERIC')
+        .attach(
+          'csv',
+          Buffer.from('type,occurredOn,currency,amount,externalId\n' + content),
+          'confirmation.csv',
+        )
+        .expect(201);
+      return report.body.id as string;
+    };
+    const confirm = (id: string, changes: object = {}) =>
+      owner.agent
+        .post(`${owner.imports}/${id}/confirm`)
+        .set('Origin', context.origin)
+        .send({ ...input, ...changes });
+    const bad = await upload(
+      'DEPOSIT,2025-01-08,PLN,200,cash-1\nWITHDRAWAL,2025-01-09,PLN,400,cash-2',
+    );
+    await confirm(bad).expect(409);
+    expect(
+      await context.prisma.investmentEvent.count({
+        where: { accountId: owner.accountId },
+      }),
+    ).toBe(0);
+    expect(
+      (await owner.agent.get(`${owner.imports}/${bad}`).expect(200)).body
+        .status,
+    ).toBe('PARSED');
+    const good = await upload(
+      'DEPOSIT,2025-01-08,PLN,200,cash-1\nWITHDRAWAL,2025-01-09,PLN,20,cash-2',
+    );
+    await other.agent
+      .post(`${owner.imports}/${good}/confirm`)
+      .set('Origin', context.origin)
+      .send(input)
+      .expect(404);
+    const [first, retry] = await Promise.all([
+      confirm(good).expect(200),
+      confirm(good).expect(200),
+    ]);
+    expect(retry.body).toEqual(first.body);
+    expect(first.body).toMatchObject({
+      posted: 2,
+      skipped: [],
+      reconciliation: {
+        asOf: '2025-01-10',
+        cash: [
+          {
+            currency: 'PLN',
+            expected: '179.00',
+            actual: '180.00',
+            difference: '1',
+          },
+        ],
+        positions: [],
+      },
+    });
+    await confirm(good, { cash: { PLN: '180', USD: '0' } }).expect(409);
+    const read = await owner.agent.get(`${owner.imports}/${good}`).expect(200);
+    expect(read.body).toMatchObject({
+      status: 'CONFIRMED',
+      confirmation: first.body,
+    });
+    const overlap = await upload('DEPOSIT,2025-01-08,PLN,200.00,cash-1');
+    expect((await confirm(overlap).expect(200)).body).toMatchObject({
+      posted: 0,
+      skipped: [2],
+    });
+    const mismatched = await upload('DEPOSIT,2025-01-08,PLN,201,cash-1');
+    await confirm(mismatched).expect(409);
+    expect(
+      await context.prisma.investmentEvent.count({
+        where: { accountId: owner.accountId },
+      }),
+    ).toBe(2);
+  });
+
+  it('requires an explicit state for partial history and supports a dated opening lot', async () => {
+    const owner = await setup();
+    const stock = await context.prisma.instrument.create({
+      data: { ticker: 'IMPORT82TEST', mic: 'XNAS', currency: 'USD' },
+    });
+    try {
+      const file = [
+        'type,occurredOn,currency,ticker,mic,quantity,totalCost,acquiredOn,unitPrice,externalId',
+        `OPENING_POSITION,2025-01-01,USD,${stock.ticker},XNAS,2,15,2024-04-30,,opening`,
+        `SELL,2025-01-08,USD,${stock.ticker},XNAS,1,,,10,sale`,
+      ].join('\n');
+      const saved = await owner.agent
+        .post(owner.imports)
+        .set('Origin', context.origin)
+        .field('format', 'GENERIC')
+        .attach('csv', Buffer.from(file), 'partial.csv')
+        .expect(201);
+      const id = saved.body.id as string;
+      const path = `${owner.imports}/${id}/confirm`;
+      const partial = {
+        completeHistory: false,
+        asOf: '2025-01-09',
+        cash: { PLN: '0', USD: '10' },
+        positions: [{ instrumentId: stock.id, quantity: '2' }],
+        decisions: [],
+      };
+      const confirm = (changes: object = {}) =>
+        owner.agent
+          .post(path)
+          .set('Origin', context.origin)
+          .send({ ...partial, ...changes });
+      await confirm().expect(400);
+      await confirm({ openingOn: '2025-01-01', openingEmpty: true }).expect(
+        409,
+      );
+      const result = await confirm({ openingOn: '2025-01-01' }).expect(200);
+      expect(result.body).toMatchObject({
+        posted: 2,
+        reconciliation: {
+          cash: [],
+          positions: [
+            {
+              instrumentId: stock.id,
+              expected: '2',
+              actual: '1.0000000000',
+              difference: '-1',
+            },
+          ],
+        },
+      });
+      const balances = await owner.agent
+        .get(`${owner.path}/summary`)
+        .expect(200);
+      expect(balances.body).toMatchObject({
+        cash: { USD: '10.00' },
+        positions: [{ quantity: '1.0000000000', cost: '7.50000000' }],
+      });
+      await owner.agent
+        .patch(`${owner.imports}/${id}/rows/2/instrument`)
+        .set('Origin', context.origin)
+        .send({ instrumentId: stock.id })
+        .expect(409);
+    } finally {
+      await context.cleanup();
+      await context.prisma.instrument.delete({ where: { id: stock.id } });
+    }
+  });
 });

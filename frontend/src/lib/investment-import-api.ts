@@ -29,6 +29,10 @@ function summary(value: unknown) {
 function detail(value: unknown) {
   return {
     ...summary(value),
+    confirmation:
+      marketObject(value).confirmation === null
+        ? null
+        : confirmation(marketObject(value).confirmation),
     rows: marketArray(marketObject(value).rows, (value) => {
       const row = marketObject(value);
       return {
@@ -68,6 +72,45 @@ function previewRow(value: unknown) {
     ),
   };
 }
+
+function confirmation(value: unknown) {
+  const item = marketObject(value);
+  const reconciliation = marketObject(item.reconciliation);
+  const difference = (row: Record<string, unknown>) => ({
+    expected: marketText(row.expected),
+    actual: marketText(row.actual),
+    difference: marketText(row.difference),
+  });
+  return {
+    posted: marketInteger(item.posted),
+    skipped: marketArray(item.skipped, marketInteger),
+    reconciliation: {
+      asOf: marketText(reconciliation.asOf),
+      cash: marketArray(reconciliation.cash, (row) => {
+        const entry = marketObject(row);
+        return { currency: marketText(entry.currency), ...difference(entry) };
+      }),
+      positions: marketArray(reconciliation.positions, (row) => {
+        const entry = marketObject(row);
+        return {
+          instrumentId: marketText(entry.instrumentId),
+          ...difference(entry),
+        };
+      }),
+    },
+  };
+}
+
+export type ImportConfirmation = ReturnType<typeof confirmation>;
+export type ImportConfirmationInput = {
+  completeHistory: boolean;
+  openingOn?: string;
+  openingEmpty?: boolean;
+  asOf: string;
+  cash: { PLN: string; USD: string };
+  positions: { instrumentId: string; quantity: string }[];
+  decisions: { number: number; action: "KEEP" | "SKIP" }[];
+};
 
 export type ImportPreviewRow = ReturnType<typeof previewRow>;
 
@@ -122,6 +165,23 @@ export const importApi = {
         method: "PATCH",
         body: JSON.stringify({ instrumentId }),
       },
+    );
+  },
+  async confirm(
+    portfolioId: string,
+    accountId: string,
+    id: string,
+    input: ImportConfirmationInput,
+  ) {
+    return confirmation(
+      await apiRequest<unknown>(
+        `${root(portfolioId, accountId)}/${encodeURIComponent(id)}/confirm`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+          timeoutMs: 45_000,
+        },
+      ),
     );
   },
 };

@@ -1,8 +1,8 @@
 # Import historii inwestycyjnej z CSV
 
 Na rachunku inwestycyjnym wybierz **Import historii CSV** i wskaż plik oraz
-format. Aplikacja zapisuje partię i wynik odczytu każdego wiersza. Saldo i
-historia operacji pozostają bez zmian. Ponowne przesłanie tego samego pliku
+format. Aplikacja zapisuje partię i wynik odczytu każdego wiersza. Po sprawdzeniu
+możesz zatwierdzić wybrane operacje wraz z wartościami z dokumentu brokera. Ponowne przesłanie tego samego pliku
 w tym samym formacie i na ten sam rachunek zwraca istniejącą partię.
 
 ## Szablon ogólny
@@ -62,6 +62,24 @@ Waluta wybranego instrumentu musi odpowiadać walucie wiersza.
 Podobieństwo do istniejącej operacji jest ostrzeżeniem do przeglądu. Dwie
 operacje o tej samej dacie i wartościach mogą być odrębne. Podgląd osobno
 pokazuje znane identyfikatory źródłowe i powtórzone identyfikatory w pliku.
+
+## Zatwierdzenie i uzgodnienie
+
+Wprowadź datę dokumentu brokera, salda PLN i USD oraz ilości instrumentów.
+Przy każdym podobnym wpisie zdecyduj, czy jest już w historii rachunku, czy
+stanowi odrębną operację. Ten sam identyfikator i te same dane mogą zostać
+wykryte przy ponownym wczytaniu. Zmiana danych z zachowaniem identyfikatora
+wymaga sprawdzenia pliku.
+
+Niepełna historia wymaga daty stanu początkowego oraz jawnych partii otwarcia
+z kosztem i datą nabycia lub początkowej gotówki. Możesz wskazać pusty stan w
+dniu otwarcia, jeżeli zgadza się z rachunkiem. Wiersze z pliku o tej samej dacie
+są księgowane w kolejności pliku po istniejących operacjach tego dnia.
+
+Zatwierdzenie zapisuje wszystkie wybrane operacje w jednej transakcji. Jeśli
+walidacja stwierdzi brak gotówki, pozycji lub niezgodną kolejność, zapis
+pozostaje do ponownego sprawdzenia. Po zatwierdzeniu aplikacja wyświetla raport
+różnic między stanem rachunku a dokumentem brokera z podanej daty.
 
 ## Limity i wynik odczytu
 

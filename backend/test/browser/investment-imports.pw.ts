@@ -1,12 +1,8 @@
+import type { Page } from '@playwright/test';
 import { login } from './actions.js';
 import { API_URL, FRONTEND_URL, expect, test } from './fixtures.js';
 
-test('uploads a report, reopens saved validation results and leaves cash unchanged', async ({
-  page,
-  accounts,
-}) => {
-  const instrument = await accounts.investmentInstrument();
-  await login(page, await accounts.register());
+async function openImportPage(page: Page) {
   const headers = { Origin: FRONTEND_URL };
   const portfolios = API_URL + '/investments/portfolios';
   const portfolio = await page.request.post(portfolios, {
@@ -25,6 +21,15 @@ test('uploads a report, reopens saved validation results and leaves cash unchang
     `/dashboard/investments/${portfolioId}/accounts/${accountId}`,
   );
   await page.getByRole('link', { name: 'Import historii CSV' }).click();
+}
+
+test('uploads a report, reopens saved validation results and leaves cash unchanged', async ({
+  page,
+  accounts,
+}) => {
+  const instrument = await accounts.investmentInstrument();
+  await login(page, await accounts.register());
+  await openImportPage(page);
   await page.getByLabel('Plik CSV (do 1 MB)').setInputFiles({
     name: 'historia.csv',
     mimeType: 'text/csv',
@@ -62,5 +67,38 @@ test('uploads a report, reopens saved validation results and leaves cash unchang
     page
       .getByRole('region', { name: 'Gotówka inwestycyjna' })
       .getByText('0,00 PLN', { exact: true }),
+  ).toBeVisible();
+});
+
+test('confirms a batch and reopens its broker reconciliation', async ({
+  page,
+  accounts,
+}) => {
+  await login(page, await accounts.register());
+  await openImportPage(page);
+  await page.getByLabel('Plik CSV (do 1 MB)').setInputFiles({
+    name: 'historia.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'type,occurredOn,currency,amount\nDEPOSIT,2025-01-08,PLN,100.02',
+    ),
+  });
+  await page.getByRole('button', { name: 'Sprawdź plik' }).click();
+  const form = page.getByRole('form', { name: 'Dane dokumentu brokera' });
+  await form
+    .getByRole('combobox', { name: 'Zakres historii', exact: true })
+    .selectOption('complete');
+  await form.getByLabel('Data dokumentu brokera').fill('2025-01-08');
+  await form.getByLabel('Saldo PLN w dokumencie').fill('100');
+  await form.getByLabel('Saldo USD w dokumencie').fill('0');
+  await form.getByRole('button', { name: 'Zatwierdź i zaksięguj' }).click();
+  const differences = page.getByRole('table', { name: 'Różnice uzgodnienia' });
+  await expect(differences.getByText('0.02', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: /Szablon ogólny/ }).click();
+  await expect(differences.getByText('0.02', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Wróć do rachunku' }).click();
+  await expect(
+    page.getByText('100,02 PLN', { exact: true }).first(),
   ).toBeVisible();
 });
